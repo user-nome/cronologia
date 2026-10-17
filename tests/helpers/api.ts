@@ -50,8 +50,9 @@ export interface ApiMock {
   vaultLock: Mock<() => Promise<VaultStatus>>;
   vaultDestroy: Mock<() => Promise<VaultResult>>;
   vaultTouch: Mock<() => Promise<void>>;
-  vaultOnLocked: Mock<(callback: () => void) => () => void>;
-  emitVaultLocked: () => void;
+  vaultOnLocked: Mock<(callback: (automatic: boolean) => void) => () => void>;
+  /** `automatic = true` simula o auto-lock por ociosidade; `false`, o bloqueio manual. */
+  emitVaultLocked: (automatic?: boolean) => void;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -159,7 +160,7 @@ export function createApiMock(options: ApiMockOptions = {}): ApiMock {
   // Padrão: cofre criado e aberto (as ações do modal só rodam com cofre aberto).
   const DEFAULT_VAULT: VaultStatus = { exists: true, unlocked: true, attempts: 0, lockUntil: 0 };
   let vault: VaultStatus = { ...DEFAULT_VAULT, ...(options.vault ?? {}) };
-  const vaultListeners = new Set<() => void>();
+  const vaultListeners = new Set<(automatic: boolean) => void>();
 
   const vaultStatus = vi.fn((): Promise<VaultStatus> => Promise.resolve({ ...vault }));
 
@@ -193,7 +194,7 @@ export function createApiMock(options: ApiMockOptions = {}): ApiMock {
 
   const vaultTouch = vi.fn((): Promise<void> => Promise.resolve());
 
-  const vaultOnLocked = vi.fn((callback: () => void): (() => void) => {
+  const vaultOnLocked = vi.fn((callback: (automatic: boolean) => void): (() => void) => {
     vaultListeners.add(callback);
     return () => vaultListeners.delete(callback);
   });
@@ -260,8 +261,8 @@ export function createApiMock(options: ApiMockOptions = {}): ApiMock {
     vaultDestroy,
     vaultTouch,
     vaultOnLocked,
-    emitVaultLocked: (): void => {
-      for (const listener of vaultListeners) listener();
+    emitVaultLocked: (automatic = true): void => {
+      for (const listener of vaultListeners) listener(automatic);
     },
   };
 }

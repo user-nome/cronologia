@@ -3,7 +3,8 @@ import path from 'path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { VaultContainer } from '@zero/main/vault/container';
 import { decodeContainer, encodeContainer } from '@zero/main/vault/container';
-import { VaultError, isVaultError } from '@zero/main/vault/errors';
+import { isVaultError } from '@zero/main/vault/errors';
+import type { VaultError } from '@zero/main/vault/errors';
 import {
   createVault,
   deleteSecret,

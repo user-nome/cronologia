@@ -132,7 +132,7 @@ export const ko: Messages = {
     saveError: '저장에 실패했습니다.',
     coverAlt: '표지 미리보기',
     coverHelp:
-      '작품 표지 이미지를 추가하세요(JPG, PNG, WebP…). 이미지는 로컬 라이브러리에 ' + '복사됩니다.',
+      '작품 표지 이미지를 추가하세요(JPG, PNG, WebP…). 이미지는 로컬 라이브러리에 복사됩니다.',
     chooseImage: '이미지 선택',
     removeCover: '표지 제거',
     titleLabel: '제목',

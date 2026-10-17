@@ -102,7 +102,7 @@ describe('guarda de origem dos canais de cofre', () => {
 });
 
 describe('auto-lock do cofre', () => {
-  it('derruba a sessão após a ociosidade e envia vault:locked para a janela', () => {
+  it('derruba a sessão após a ociosidade e avisa a janela que foi o auto-lock', () => {
     const win = BrowserWindow.instances[0];
     if (win === undefined) throw new Error('Janela não criada.');
     win.webContents.send.mockClear();
@@ -113,10 +113,23 @@ describe('auto-lock do cofre', () => {
       expect(vaultSession.isUnlocked()).toBe(true);
       vi.advanceTimersByTime(IDLE_LOCK_MS);
       expect(vaultSession.isUnlocked()).toBe(false);
-      expect(win.webContents.send).toHaveBeenCalledWith('vault:locked');
+      expect(win.webContents.send).toHaveBeenCalledWith('vault:locked', true);
     } finally {
       vi.useRealTimers();
       vaultSession.wipe();
     }
+  });
+
+  it('o bloqueio manual também avisa a janela, marcado como não automático', () => {
+    // O acervo é cifrado com a chave do cofre: fechar o cofre tem de ter o mesmo
+    // efeito na tela que o auto-lock. Sem o aviso, as obras ficavam descifradas
+    // na grade com o disco já sem chave (achado pelo E2E).
+    const win = BrowserWindow.instances[0];
+    if (win === undefined) throw new Error('Janela não criada.');
+    vaultSession.adopt(Buffer.alloc(32, 7));
+    win.webContents.send.mockClear();
+
+    expect(invoke('vault:lock')).toMatchObject({ unlocked: false });
+    expect(win.webContents.send).toHaveBeenCalledWith('vault:locked', false);
   });
 });

@@ -134,7 +134,7 @@ export const en: Messages = {
     saveError: 'Failed to save.',
     coverAlt: 'Cover preview',
     coverHelp:
-      'Add the work cover image (JPG, PNG, WebP…). The image is copied to the local ' + 'library.',
+      'Add the work cover image (JPG, PNG, WebP…). The image is copied to the local library.',
     chooseImage: 'Choose image',
     removeCover: 'Remove cover',
     titleLabel: 'Title',

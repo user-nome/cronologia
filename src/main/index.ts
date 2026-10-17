@@ -344,6 +344,11 @@ function registerIpc(): void {
     const status = lockVault();
     // Com o cofre fechado a sessão do Dropbox não sobrevive em memória.
     reloadDriveState();
+    // O acervo é cifrado com a chave do cofre, então fechar o cofre tem o mesmo
+    // efeito na tela que o auto-lock: a biblioteca some e a barreira volta a
+    // pedir a senha. Sem este aviso, um bloqueio pedido pelo próprio usuário
+    // deixava as obras descifradas na grade, com o disco já sem chave.
+    notifyVaultLocked(false);
     return status;
   });
 
@@ -359,11 +364,19 @@ function registerIpc(): void {
     return { ok: true, status: vaultStatus() };
   });
 
+  /**
+   * Avisa a janela que a sessão do cofre caiu. `automatic` distingue o auto-lock
+   * por ociosidade do bloqueio que o próprio usuário pediu, para a tela não
+   * anunciar "fechou sozinho" no segundo caso.
+   */
+  function notifyVaultLocked(automatic: boolean): void {
+    if (mainWindow === null || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send('vault:locked', automatic);
+  }
+
   vaultSession.onAutoLock(() => {
     reloadDriveState();
-    if (mainWindow !== null && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('vault:locked');
-    }
+    notifyVaultLocked(true);
   });
 
   // Atividade da interface alimenta a janela de ociosidade do cofre. O

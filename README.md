@@ -134,17 +134,24 @@ qualquer outro aplicativo que passe a falhar depois que `/tmp` for apagada.
 | `npm run dev`             | Sobe o app em modo desenvolvimento (hot reload), com log do Chromium no terminal |
 | `npm run dev:inspect`     | Igual ao `dev`, com o V8 inspector do processo main na porta 5858                |
 | `npm run dev:inspect-brk` | Igual ao `dev:inspect`, mas pausa na primeira linha esperando o depurador        |
-| `npm run typecheck`       | `tsc --noEmit` nos projetos node, web e testes                                   |
+| `npm run typecheck`       | `tsc --noEmit` nos projetos node, web, testes e E2E                              |
 | `npm run lint`            | ESLint rigoroso (type-aware) em todo o repositório                               |
 | `npm run lint:fix`        | ESLint com correção automática                                                   |
 | `npm run format`          | Formata tudo com Prettier                                                        |
 | `npm run format:check`    | Verifica a formatação (CI)                                                       |
 | `npm test`                | Roda a suíte Vitest (`tests/**/*.test.{ts,tsx}`)                                 |
+| `npm run test:coverage`   | A suíte com medição de cobertura (limiar de 50% por métrica)                     |
+| `npm run test:e2e`        | E2E com Playwright: app compilado e payload do `.deb` (veja `docs/e2e.md`)       |
+| `npm run test:mutation`   | Varredura de mutação de `src/` (veja `docs/mutation.md`)                         |
 | `npm run security:audit`  | Auditoria de vulnerabilidades via OSV Scanner                                    |
 | `npm run check`           | `typecheck` + `lint` + `format:check` + auditoria                                |
 | `npm run clean`           | Apaga `out/` (build anterior)                                                    |
 | `npm run build`           | Limpa + compila main/preload/renderer                                            |
 | `npm run dist`            | Build + gera o `.deb` com electron-builder                                       |
+
+O `test:e2e` e o `test:mutation` **não** entram no `check`: o primeiro abre
+janela de verdade e paga Argon2id de produção, e a segunda leva horas. Ambos
+rodam no CI (`quality.yml`), em jobs próprios.
 
 O `dev:inspect` não existe no app instalado: o fuse
 `enableNodeCliInspectArguments` está desligado, para que o usuário não abra um
@@ -182,12 +189,42 @@ O projeto roda com o máximo de rigor disponível:
   `no-unsafe-*` (assignment/argument/call/member-access/return), `no-unnecessary-condition`,
   `strict-boolean-expressions` (sem coerção implícita: `if (str)` é proibido, use
   `str === ''`), `explicit-function-return-type`, `explicit-member-accessibility`,
-  `require-await`, `switch-exhaustiveness-check`, `no-deprecated` etc.
-- `eslint-plugin-react-hooks` com `rules-of-hooks` e `exhaustive-deps` em `error`.
+  `require-await`, `switch-exhaustiveness-check`, `no-deprecated`,
+  `ban-ts-comment` + `prefer-ts-expect-error`, `consistent-type-imports`/`-exports`,
+  `only-throw-error` e a lista de armadilhas clássicas (`no-useless-return`,
+  `default-case`, `radix`, `no-path-concat`…).
+- **Fronteira de camada como regra** (`no-restricted-imports` por camada): cada
+  camada declara os aliases que pode importar, e `fs`, `electron` e
+  `child_process` são concessão nomeada — o `fs` é do processo main, o
+  `electron` só de `index.ts`/`protocols.ts`/`external.ts` (mais o preload), e o
+  `child_process` só de `vault/privilege.ts`. `CRONOLOGIA_VAR_LIB`,
+  `CRONOLOGIA_VAULT_DIR` e `ELECTRON_RENDERER_URL` só são lidos por
+  `vault/vault.ts`, `vault/privilege.ts` e `main/index.ts`.
+- **Teto de tamanho** (`max-lines`, pulando linha em branco e comentário): 520 em
+  `src/`, 750 em `tests/`, `e2e/` e `tools/`.
+- `eslint-plugin-react-hooks` com `rules-of-hooks`, `exhaustive-deps` e as regras
+  de compilador que o `recommended-latest` não traz
+  (`exhaustive-effect-dependencies`, `memo-dependencies`,
+  `memoized-effect-dependencies`, `no-deriving-state-in-effects`, `invariant`,
+  `rule-suppression`), todas em `error`.
 - `eslint-config-prettier` desliga apenas o que conflita com a formatação.
 
 **Prettier (`.prettierrc.json`)**: 100 colunas, aspas simples, ponto e vírgula, vírgula final,
 2 espaços. Rode `npm run check` antes de commitar.
+
+**Três sinais de teste, três perguntas diferentes**:
+
+| Camada              | Pergunta                                                 | Onde              |
+| ------------------- | -------------------------------------------------------- | ----------------- |
+| Unitária/integrada  | "este módulo faz o que diz?"                             | `tests/**`        |
+| Ponta a ponta (E2E) | "o app de verdade funciona depois que tudo monta?"       | `e2e/**`          |
+| Mutação             | "se esta linha fizesse outra coisa, a suíte perceberia?" | `tools/mutation/` |
+
+Cobertura de linha é o piso (50% por métrica, em `vitest.config.mts`); a
+mutação é o que diz se esse piso significa alguma coisa, e o E2E é o único lugar
+onde o bundle, o `cronologia://`, o IPC real e o Argon2id de produção aparecem
+juntos. Detalhes em [`docs/testes.md`](docs/testes.md), [`docs/e2e.md`](docs/e2e.md)
+e [`docs/mutation.md`](docs/mutation.md).
 
 ---
 
@@ -208,7 +245,10 @@ resolvers que o projeto usa (build, testes e Node puro):
 | `@zero/renderer/*` | `src/renderer/src/*`     | `electron.vite.config.mts`, `vitest.config.mts`, loader |
 
 - **Build** (`npm run dev` / `npm run build`): electron-vite (Vite) resolve os aliases.
-- **Testes** (`npm test`): vitest resolve os mesmos aliases.
+- **Testes** (`npm test`): vitest resolve os mesmos aliases. `vitest.e2e.config.mts`
+  e `vitest.mutation.config.mts` importam o mapa de `vitest.config.mts` em vez de
+  redeclará-lo, então mudar um alias continua sendo uma mudança nos três arquivos
+  da tabela.
 - Com `module: nodenext`, os candidatos de `paths` em `tsconfig.base.json` declaram a extensão
   (`.ts` / `.tsx` / `index.tsx`); `allowImportingTsExtensions: true` (que exige `noEmit`) é o
   que permite isso sem erro de import.
@@ -356,6 +396,8 @@ cronologia/
 │   ├── seguranca.md            # mapa de segurança (medida → arquivo)
 │   ├── messages.md             # i18n: bundles pt-BR/en/ko/zh-CN/ja e o que não se traduz
 │   ├── testes.md               # testes: como rodar, inventário, convenções, cobertura
+│   ├── e2e.md                  # testes ponta a ponta (app compilado + payload do .deb)
+│   ├── mutation.md             # testes de mutação: operadores, escopo e garantias
 │   ├── atribuicoes.md          # página de Atribuições (créditos em loop)
 │   ├── doacoes.md              # página de Doações (Mercado Pago)
 │   ├── api.md                  # referência da API interna
@@ -412,14 +454,24 @@ cronologia/
 │   ├── setup-env.ts          # sandbox HOME/XDG temporária por processo de teste
 │   ├── setup.ts              # jest-dom, cleanup e restauração de mocks/timers
 │   └── tsconfig.json         # typecheck dos testes
+├── e2e/                      # Playwright: app compilado e payload do .deb (não importa src/)
+│   ├── support/              # env isolado, launch (bundled e packaged), seletores, fluxos
+│   ├── bundled.e2e.test.ts   # jornada completa contra out/
+│   ├── packaged.e2e.test.ts  # fumaça contra o payload extraído do .deb
+│   └── tsconfig.json         # typecheck dos fluxos
+├── tools/
+│   └── mutation/             # motor da varredura de mutação (operadores, grafo, matriz)
 ├── .github/
-│   ├── workflows/            # CodeQL, agradecimento, publicação do .deb
+│   ├── workflows/            # CodeQL, qualidade (check/testes/E2E/mutação), publicação do .deb
 │   ├── ISSUE_TEMPLATE/       # formulários de bug e de funcionalidade
 │   ├── dependabot.yml        # deps e actions atualizadas semanalmente
 │   └── pull_request_template.md
 ├── eslint.config.mjs
 ├── .prettierrc.json
 ├── tsconfig*.json
+├── vitest.config.mts         # suíte unitária (npm test)
+├── vitest.e2e.config.mts     # E2E (npm run test:e2e)
+├── vitest.mutation.config.mts# varredura de mutação (npm run test:mutation)
 └── electron.vite.config.mts
 ```
 
@@ -544,6 +596,8 @@ Guias e referências (tudo em pt-BR):
 | [`docs/messages.md`](docs/messages.md)                 | i18n: bundles de mensagens (pt-BR/en/ko/zh-CN/ja) e regras de tradução |
 | [`docs/api.md`](docs/api.md)                           | Referência da API interna (`window.api` + canais IPC)                  |
 | [`docs/testes.md`](docs/testes.md)                     | Testes: como rodar, inventário, convenções e cobertura                 |
+| [`docs/e2e.md`](docs/e2e.md)                           | Testes ponta a ponta: app compilado e payload do `.deb` (Playwright)   |
+| [`docs/mutation.md`](docs/mutation.md)                 | Testes de mutação: operadores, escopo, garantias e score               |
 | [`docs/openapi.yaml`](docs/openapi.yaml)               | Mesma API em OpenAPI 3.1 (abre em Swagger UI/Redoc)                    |
 | [`CHANGELOG.md`](CHANGELOG.md)                         | Histórico de mudanças por versão                                       |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md)                   | Como contribuir (ambiente, scripts, convenções)                        |

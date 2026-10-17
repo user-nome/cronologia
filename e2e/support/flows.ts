@@ -1,5 +1,5 @@
 import { expect } from 'vitest';
-import type { Page } from 'playwright-core';
+import type { Locator, Page } from 'playwright-core';
 import { LANGUAGE_LABELS, messages } from '@zero/messages';
 import {
   button,
@@ -63,9 +63,7 @@ async function fillWorkForm(page: Page, work: { title: string; synopsis: string 
   await page
     .getByPlaceholder(pt.workModal.synopsisPlaceholder, { exact: true })
     .fill(work.synopsis);
-  await page
-    .getByPlaceholder(pt.workModal.markerPlaceholder, { exact: true })
-    .fill(WORK.marker);
+  await page.getByPlaceholder(pt.workModal.markerPlaceholder, { exact: true }).fill(WORK.marker);
 }
 
 export async function createVault(page: Page): Promise<void> {
@@ -191,10 +189,7 @@ export async function visitAttributions(page: Page): Promise<void> {
   await waitForHeading(page, pt.attributions.title);
   // A tela tem duas cópias da rolagem (a original e a do laço): o texto do
   // subtítulo é o mesmo nas duas, e a visível vem primeiro.
-  await page
-    .getByText(pt.attributions.creditsSubtitle, { exact: true })
-    .first()
-    .waitFor();
+  await page.getByText(pt.attributions.creditsSubtitle, { exact: true }).first().waitFor();
   await closeButton(page, pt.common.close).click();
   await waitForText(page, WORK.editedTitle);
 }
@@ -212,21 +207,35 @@ export async function visitDonate(page: Page): Promise<void> {
  * que é onde o ajuste é salvo; o header e os cards acompanham porque a UI lê do
  * mesmo contexto de mensagens.
  */
+/**
+ * Troca de idioma e volta.
+ *
+ * O botão de salvar acompanha o idioma **já salvo**, e não o escolhido no
+ * `Select`: o modal lê os textos do contexto, que só muda depois que o main
+ * devolve as configurações normalizadas. Por isso o primeiro salvamento é pelo
+ * rótulo em português e o segundo, com a tela já em inglês, pelo rótulo em
+ * inglês.
+ */
 export async function switchLanguage(page: Page): Promise<void> {
   await openSettings(page);
   await page.getByRole('button', { name: LANGUAGE_LABELS['pt-BR'], exact: true }).click();
   await page.getByRole('option', { name: LANGUAGE_LABELS.en, exact: true }).click();
-  await clickButton(page, en.common.save);
+  await clickButton(page, pt.common.save);
   await waitForText(page, en.app.newWork);
 
   await page.getByRole('button', { name: LANGUAGE_LABELS.en, exact: true }).click();
   await page.getByRole('option', { name: LANGUAGE_LABELS['pt-BR'], exact: true }).click();
-  await clickButton(page, pt.common.save);
+  await clickButton(page, en.common.save);
   await waitForText(page, pt.app.newWork);
   await closeSettings(page);
 }
 
-/** Ação destrutiva sem a palavra exata: o botão de confirmar não habilita. */
+/**
+ * Ação destrutiva sem a palavra exata: o botão de confirmar não habilita.
+ *
+ * A comparação da palavra ignora caixa (`typed.toUpperCase() === word.toUpperCase()`),
+ * então a palavra errada aqui é outra, e não a mesma em minúsculas.
+ */
 export async function resetLibraryRequiresExactWord(page: Page): Promise<void> {
   await openSettings(page);
   await page.getByTitle(pt.danger.resetTitle, { exact: true }).click();
@@ -234,26 +243,46 @@ export async function resetLibraryRequiresExactWord(page: Page): Promise<void> {
   const confirm = button(page, pt.danger.confirmAction);
   expect(await confirm.isDisabled()).toBe(true);
 
-  await confirmInput.fill('apagar');
+  await confirmInput.fill(pt.danger.destroyWord);
   expect(await confirm.isDisabled()).toBe(true);
-  await clickButton(page, pt.common.cancel);
+  // "Cancelar" também é o atalho de cancelar obra no cartão, então o clique sai
+  // do painel de confirmação: o pai do aviso é o campo que tem os dois botões.
+  const panel = page.getByText(pt.danger.resetConfirm, { exact: true }).locator('..');
+  await panel.getByRole('button', { name: pt.common.cancel, exact: true }).click();
   await waitForText(page, pt.danger.resetAction);
   await closeSettings(page);
+}
+
+/**
+ * O modal de tela cheia do cofre, localizado pelo título.
+ *
+ * O botão "Desbloquear" também existe no modal de configurações (que fica por
+ * baixo, aberto), então as ações da barreira saem daqui para não ambiguar. A
+ * subida é pelo DOM: `h2` → cabeçalho do modal → modal.
+ */
+function vaultBarrier(page: Page): Locator {
+  return page
+    .getByRole('heading', { name: pt.vault.unlockTitle, exact: true })
+    .locator('xpath=../..');
 }
 
 export async function lockAndUnlockVault(page: Page): Promise<void> {
   await openSettings(page);
   await clickButton(page, pt.vault.closeVault);
   await waitForHeading(page, pt.vault.unlockTitle);
+  const barreira = vaultBarrier(page);
 
-  await fillLabel(page, pt.vault.passwordLabel, VAULT.wrong);
-  await clickButton(page, pt.vault.unlockAction);
+  await barreira.getByLabel(pt.vault.passwordLabel, { exact: true }).fill(VAULT.wrong);
+  await barreira.getByRole('button', { name: pt.vault.unlockAction, exact: true }).click();
   await waitForText(page, pt.vault.errors.vaultWrongPassword);
 
-  await fillLabel(page, pt.vault.passwordLabel, VAULT.master);
-  await clickButton(page, pt.vault.unlockAction);
-  // O badge de cofre aberto fica no modal de configurações, que continua aberto.
-  await waitForText(page, pt.vault.badge.open);
+  await barreira.getByLabel(pt.vault.passwordLabel, { exact: true }).fill(VAULT.master);
+  await barreira.getByRole('button', { name: pt.vault.unlockAction, exact: true }).click();
+  // A barreira some quando a chave volta: o modal de configurações, que ficou
+  // aberto por baixo, é o que aparece no topo de novo.
+  await page
+    .getByRole('heading', { name: pt.vault.unlockTitle, exact: true })
+    .waitFor({ state: 'detached' });
   await closeSettings(page);
   // O acervo voltou: o roundtrip da biblioteca cifrada passou pelo disco.
   await waitForText(page, WORK.editedTitle);

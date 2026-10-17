@@ -47,8 +47,9 @@ const api: ElectronApi = {
     destroy: (): Promise<VaultResult> => ipcRenderer.invoke('vault:destroy'),
     /** Registra atividade do usuário para a janela de ociosidade do cofre. */
     touch: () => ipcRenderer.invoke('vault:touch'),
-    onLocked: (cb: () => void) => {
-      const listener = (): void => cb();
+    onLocked: (cb: (automatic: boolean) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, automatic: boolean): void =>
+        cb(automatic);
       ipcRenderer.on('vault:locked', listener);
       return () => ipcRenderer.removeListener('vault:locked', listener);
     },

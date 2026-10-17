@@ -4,6 +4,86 @@ Todos os lançamentos seguem [versionamento semântico](https://semver.org/lang/
 (`MAJOR.MINOR.PATCH`) e o formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 em português do Brasil.
 
+## [Não lançado]
+
+### Cobertura de teste
+
+- **testes ponta a ponta** (`e2e/`, `npm run test:e2e`): Playwright
+  (`playwright-core`, sem download de browser) sobe o app **de verdade** em dois
+  alvos, o bundle compilado (`out/`) pelo `_electron.launch` e o payload do
+  `.deb` extraído com `dpkg-deb -x` + CDP. A jornada compilada cobre a criação
+  do cofre (recusando confirmação e senha previsível), o cadastro de obra com
+  tipo/status/categoria/marcação, o acompanhamento de progresso e status pelo
+  cartão, busca e edição, exclusão em duas etapas, os chips de filtro, as telas
+  de Atribuições e Doações, a troca de idioma e volta, a recusa da ação
+  destrutiva sem a palavra exata, o fechar/reabrir do cofre, o apagar da
+  biblioteca e o destruir do cofre. O alvo empacotado é fumaça: abrir, criar
+  cofre, cadastrar obra, mexer no progresso. Cada app sobe com `HOME`,
+  `XDG_*`, `CRONOLOGIA_VAR_LIB` e `CRONOLOGIA_VAULT_DIR` próprios em diretório
+  temporário, e o pacote é derrubado pelo **grupo** de processos (Chromium tem
+  zygote, GPU e crashpad) antes do `rmSync`. Guia em `docs/e2e.md`.
+- **testes de mutação** (`tools/mutation/`, `npm run test:mutation`): motor
+  próprio sobre a AST do Babel (doze operadores, splicing de texto, sem
+  reprintar o arquivo). O plano cruza AST, cobertura da linha de base e um grafo
+  de módulos que segue o nome importado **através** dos barrels, e seleciona por
+  linha com uma matriz de teste → linha em cache; são **2.045 mutantes em 44
+  arquivos** de `src/`. O runner exige baseline verde antes de medir qualquer
+  veredito, usa um doppelgänger barato do Argon2id (PBKDF2 com os parâmetros do
+  próprio pedido) para caber em horas em vez de dias, e desliga o
+  `fsModuleCache` do Vitest, que revalidava o texto do mutante anterior e fazia
+  a varredura medir o mutante errado. `tests/tools/mutation-runner.test.ts`
+  trava splicing, cache, nomes de nó da AST e ausência de órfão em escopo.
+  Guia em `docs/mutation.md`.
+- `quality.yml` novo: **Verificar qualidade**, **Testes e cobertura** e **Testes
+  E2E** em push na `main` e pull request, mais **Testes de mutação** por
+  disparo manual (leva horas; `min_score` e `mutation_file` são inputs). O
+  `publish.yml` continua com o `check` + `test` próprios, porque precisa ser
+  autossuficiente para tag `v*` e Release criada na UI.
+- lint completo: a matriz de camadas do `AGENTS.md` virou regra
+  (`no-restricted-imports` por camada, com `fs`/`electron`/`child_process` como
+  concessão nomeada), `max-lines` com o teto do projeto (520 em `src/`, 750 em
+  `tests/`, `e2e/` e `tools/`), guarda de ambiente para `CRONOLOGIA_VAR_LIB`,
+  `CRONOLOGIA_VAULT_DIR` e `ELECTRON_RENDERER_URL`, as regras mais duras do
+  React Hooks, `only-throw-error`, `ban-ts-comment`/`prefer-ts-expect-error`,
+  `consistent-type-imports`/`-exports` e a lista de armadilhas clássicas. As
+  nove violações que apareceram foram corrigidas no código, não desligando
+  regra. `npm run typecheck` agora inclui `e2e/tsconfig.json`.
+- `dist`/`dist:dir` ganharam `--publish never`: sem isso o electron-builder
+  detecta o CI, tenta publicar sozinho ("Implicit publishing") e morre sem
+  token. O job de E2E depende disso para gerar o pacote.
+
+### Corrigido
+
+- **a gravação atrasada do cartão atropelava o "Salvar" do modal.** O cartão
+  agenda a gravação com 450 ms de atraso e o modal grava na hora; sem serializar
+  as duas pela mesma obra, a gravação atrasada saía depois e trazia o rascunho
+  antigo de volta, na tela e no disco. Quem edita o título e clica em Salvar
+  perdia a edição meio segundo depois. Agora as escritas passam por uma fila
+  por id (`write` em `src/renderer/src/App.tsx`), e cada gravação descarta o
+  agendamento pendente daquela obra. Regressão em
+  `tests/renderer/src/App.test.tsx`.
+- **o bloqueio manual do cofre não derrubava a barreira.** `vault:locked` só era
+  emitido pelo auto-lock, então um "Fechar cofre" pedido pelo usuário zerava a
+  chave em memória e em disco mas deixava as obras descifradas na grade. O evento
+  passou a sair também de `vault:lock`, com um booleano que distingue as duas
+  causas, para o aviso de "o cofre fechou sozinho por inatividade" continuar
+  verdadeiro só no auto-lock. Regressão em `tests/main/index-vault.test.ts` e
+  `tests/renderer/src/App.test.tsx`. Ambos os bugs foram encontrados pela
+  jornada E2E, não por leitura.
+
+### Comportamento interno
+
+- `window.api.vault.onLocked` passou a entregar um `automatic: boolean` ao
+  ouvinte (assinatura de `src/types/api.ts`, do preload e do mock de teste).
+- `src/renderer/src/components/SettingsModal.tsx`: o estado do cofre lido em
+  `ensureVault` deixou de se chamar `status`, que sombreava o estado do Drive.
+- `tests/preload/index.test.ts` passou a conferir a lista **completa** de canais
+  de cada grupo. Quatro deles (`library:reset`, `drive:purge`, `vault:destroy`,
+  `vault:touch`) não eram conferidos por ninguém, e a primeira varredura de
+  mutação apontou: trocar o nome do canal por `''` não quebrava nada, porque o
+  mock de `ipcRenderer.invoke` devolve o que quiser. Um canal digitado errado só
+  falharia em runtime, no clique do usuário.
+
 ## [1.9.2]
 
 ### Features

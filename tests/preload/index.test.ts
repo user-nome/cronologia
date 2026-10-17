@@ -30,9 +30,11 @@ describe('preload (contextBridge)', () => {
     await api.library.get();
     await api.library.save(work);
     await api.library.remove('id-1');
+    await api.library.reset();
     expect(ipcRenderer.invoke).toHaveBeenNthCalledWith(1, 'library:get');
     expect(ipcRenderer.invoke).toHaveBeenNthCalledWith(2, 'library:save', work);
     expect(ipcRenderer.invoke).toHaveBeenNthCalledWith(3, 'library:delete', 'id-1');
+    expect(ipcRenderer.invoke).toHaveBeenNthCalledWith(4, 'library:reset');
   });
 
   it('encaminha capa e configurações', async () => {
@@ -59,6 +61,7 @@ describe('preload (contextBridge)', () => {
     await api.drive.restore('senha-de-teste');
     await api.drive.backupInfo();
     await api.drive.disconnect();
+    await api.drive.purge();
     expect(ipcRenderer.invoke.mock.calls.map((call) => call[0])).toEqual([
       'drive:status',
       'drive:providers',
@@ -67,6 +70,7 @@ describe('preload (contextBridge)', () => {
       'drive:restore',
       'drive:backup-info',
       'drive:disconnect',
+      'drive:purge',
     ]);
   });
 
@@ -100,26 +104,35 @@ describe('preload (contextBridge)', () => {
     await api.vault.create('senha-mestra-123');
     await api.vault.unlock('senha-mestra-123');
     await api.vault.lock();
+    await api.vault.destroy();
+    await api.vault.touch();
     expect(ipcRenderer.invoke.mock.calls.map((call) => call[0])).toEqual([
       'vault:status',
       'vault:create',
       'vault:unlock',
       'vault:lock',
+      'vault:destroy',
+      'vault:touch',
     ]);
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('vault:create', 'senha-mestra-123');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('vault:unlock', 'senha-mestra-123');
   });
 
-  it('assina e cancela o aviso de auto-lock do cofre', () => {
+  it('repassa ao ouvinte se o bloqueio foi automático ou pedido', () => {
+    // O booleano é o que separa "o cofre fechou sozinho" de "eu apertei o
+    // botão": a tela não pode anunciar o primeiro quando foi o segundo. Ler o
+    // argumento errado aqui devolveria `undefined` para um `if (automatic)`.
     const api = exposedApi();
-    const received: string[] = [];
-    const unsubscribe = api.vault.onLocked(() => received.push('locked'));
+    const received: boolean[] = [];
+    const unsubscribe = api.vault.onLocked((automatic) => received.push(automatic));
 
     const subscription = ipcRenderer.on.mock.calls.at(-1);
     expect(subscription?.[0]).toBe('vault:locked');
     const listener = subscription?.[1];
-    listener?.({}, undefined);
-    expect(received).toEqual(['locked']);
+
+    listener?.({}, true);
+    listener?.({}, false);
+    expect(received).toEqual([true, false]);
 
     unsubscribe();
     expect(ipcRenderer.removeListener).toHaveBeenCalledWith('vault:locked', listener);

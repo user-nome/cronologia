@@ -256,6 +256,58 @@ describe('App: ações nas obras', () => {
       expect.objectContaining({ id: 'w-feliz', status: 'lendo' }),
     );
   });
+
+  it('o Salvar do modal não é atropelado pela gravação agendada do cartão', async () => {
+    // Regressão do E2E: o cartão agenda a gravação com 450 ms de atraso e o
+    // modal grava na hora. Sem serializar as duas pela mesma obra, a gravação
+    // atrasada do cartão saía depois do "Salvar" e trazia o rascunho antigo de
+    // volta para a tela (e para o disco): o título editado sumia.
+    const user = userEvent.setup();
+    const { mock } = setup();
+    await screen.findByText(/4 obra\(s\)/);
+
+    // Agendamento pendente do cartão, com o rascunho antigo em mãos.
+    await user.click(within(cardOf('Solo Leveling')).getByTitle('Aumentar 1'));
+    // O modal salva antes do debounce do cartão.
+    await user.click(screen.getByText('Solo Leveling'));
+    await user.clear(screen.getByPlaceholderText('Ex.: Solo Leveling'));
+    await user.type(screen.getByPlaceholderText('Ex.: Solo Leveling'), 'Solo Leveling revisado');
+    await user.click(screen.getByRole('button', { name: /Salvar/ }));
+
+    // Passa a janela do debounce: o agendamento antigo não pode ressurgir.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    expect(screen.getByText('Solo Leveling revisado')).toBeInTheDocument();
+    expect(screen.queryByText('Solo Leveling')).not.toBeInTheDocument();
+    // A última gravação é a do modal: o rascunho antigo do cartão não pode ser
+    // a última escrita, era exatamente isso que trazia o título de volta.
+    expect(mock.librarySave).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 'w-lendo', title: 'Solo Leveling revisado' }),
+    );
+  });
+
+  it('a exclusão do modal não é ressuscitada pela gravação agendada do cartão', async () => {
+    const user = userEvent.setup();
+    const { mock } = setup();
+    await screen.findByText(/4 obra\(s\)/);
+
+    await user.click(within(cardOf('Berserk')).getByTitle('Aumentar 1'));
+    await user.click(screen.getByText('Berserk'));
+    await user.click(screen.getByRole('button', { name: /Excluir/ }));
+    await user.click(screen.getByRole('button', { name: /Confirmar exclusão/ }));
+
+    await waitFor(() => expect(mock.libraryRemove).toHaveBeenCalledWith('w-plano'));
+    // Passa a janela do debounce: se a gravação antiga do cartão saísse depois,
+    // a obra apagada voltaria para a grade (e para o disco).
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    expect(screen.queryByText('Berserk')).not.toBeInTheDocument();
+    // A remoção é a última escrita da obra: nada gravou o rascunho velho depois.
+    const ordem = mock.libraryRemove.mock.invocationCallOrder.at(-1) ?? 0;
+    for (const call of mock.librarySave.mock.invocationCallOrder) {
+      expect(call).toBeLessThan(ordem);
+    }
+  });
 });
 
 describe('App: modais', () => {
@@ -423,12 +475,32 @@ describe('App: portão do cofre', () => {
     render(<App />);
 
     expect(await screen.findByText('Solo Leveling')).toBeInTheDocument();
-    mock.emitVaultLocked();
+    mock.emitVaultLocked(true);
     mock.vaultStatus.mockReturnValue(
       Promise.resolve({ exists: true, unlocked: false, attempts: 0, lockUntil: 0 }),
     );
 
     expect(await screen.findByText('Desbloquear o cofre')).toBeInTheDocument();
     expect(screen.queryByText('Solo Leveling')).not.toBeInTheDocument();
+    expect(screen.getByText('O cofre fechou sozinho por inatividade.')).toBeInTheDocument();
+  });
+
+  it('o bloqueio manual também some com o acervo, sem o aviso de ociosidade', async () => {
+    // O acervo é cifrado com a chave do cofre: fechar o cofre tem de ter o mesmo
+    // efeito na tela que o auto-lock. E o aviso de "fechou sozinho" seria mentira
+    // aqui, porque foi o usuário quem mandou fechar (achado pelo E2E).
+    const mock = createApiMock({ works: WORKS });
+    installApiMock(mock);
+    render(<App />);
+
+    expect(await screen.findByText('Solo Leveling')).toBeInTheDocument();
+    mock.emitVaultLocked(false);
+    mock.vaultStatus.mockReturnValue(
+      Promise.resolve({ exists: true, unlocked: false, attempts: 0, lockUntil: 0 }),
+    );
+
+    expect(await screen.findByText('Desbloquear o cofre')).toBeInTheDocument();
+    expect(screen.queryByText('Solo Leveling')).not.toBeInTheDocument();
+    expect(screen.queryByText('O cofre fechou sozinho por inatividade.')).not.toBeInTheDocument();
   });
 });

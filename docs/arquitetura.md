@@ -72,6 +72,12 @@ arquivos, que precisam mudar juntos:
 | `vitest.config.mts`        | Suíte (mapeia `electron` para o mock)           |
 | `src/node.loader.ts`       | `node --import ./src/node.loader.ts arquivo.ts` |
 
+`vitest.e2e.config.mts` e `vitest.mutation.config.mts` **não** redeclaram o
+mapa: as duas importam `aliases` de `vitest.config.mts`, então mudar um alias
+continua sendo uma mudança em três arquivos. A config de mutação só acrescenta o
+`hash-wasm` do doppelgänger (`tools/mutation/hash-wasm-stub.ts`), e a de E2E
+remova o alias do `electron` porque o app é o Electron de verdade.
+
 ## Fluxo de IPC
 
 1. A tela chama `window.api.<grupo>.<método>()` (fachada tipada em

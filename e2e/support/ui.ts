@@ -42,7 +42,10 @@ export async function waitForText(
 }
 
 export async function waitForToast(page: Page, message: string): Promise<void> {
-  await page.getByText(message, { exact: true }).first().waitFor({ state: 'visible', timeout: TOAST_TIMEOUT_MS });
+  await page
+    .getByText(message, { exact: true })
+    .first()
+    .waitFor({ state: 'visible', timeout: TOAST_TIMEOUT_MS });
 }
 
 /**

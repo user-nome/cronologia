@@ -191,6 +191,31 @@ Localmente, o equivalente ao gate é:
 npm ci && npm run check && npm test
 ```
 
+## O `quality.yml` (gate do dia a dia)
+
+O `publish.yml` só dispara na `main` quando há versão nova (e nos gatilhos de
+reserva), então o push comum e o pull request têm gate próprio em
+`.github/workflows/quality.yml`:
+
+| Job                   | Quando                     | O que roda                                                                   |
+| --------------------- | -------------------------- | ---------------------------------------------------------------------------- |
+| `Verificar qualidade` | push na `main`, PR         | `npm run check` (typecheck inclui `e2e/`, lint, formato, OSV)                |
+| `Testes e cobertura`  | push na `main`, PR         | `npm run test:coverage` + resumo na página da execução                       |
+| `Testes E2E`          | push na `main`, PR         | `npm run dist:dir` → `xvfb-run npm run test:e2e` → instalação real do `.deb` |
+| `Testes de mutação`   | **só `workflow_dispatch`** | `npm run test:mutation` (pisos `min_score`/`mutation_file` são inputs)       |
+
+O job de mutação não entra em PR nem em push de propósito: a varredura leva
+horas e o número que ela mede só muda quando alguém escreve teste novo. Aparece
+como _Skipped_ na aba de checks, e não é status check obrigatório. Piso
+configurável por disparo manual.
+
+A sobreposição entre `quality.yml` e o job `qualidade` do `publish.yml` é
+intencional: o `publish.yml` precisa ser autossuficiente para a tag `v*` e para
+Release criada na UI, que o `quality.yml` não vê.
+
+Detalhe dos fluxos E2E e da varredura: [`e2e.md`](e2e.md) e
+[`mutation.md`](mutation.md).
+
 ## Fluxo do `publish.yml`
 
 ```mermaid
@@ -215,4 +240,6 @@ binário: o `fetch-release.mjs` dela lê `releases/latest` no build.
 
 - [`distribuicao-apt.md`](distribuicao-apt.md) (Release + repo APT + landing)
 - [`testes.md`](testes.md) (o que o gate de testes cobre)
+- [`e2e.md`](e2e.md) (o job de E2E, app compilado e payload do `.deb`)
+- [`mutation.md`](mutation.md) (o job de mutação, por disparo manual)
 - [`SECURITY.md`](../SECURITY.md) (fuses, CSP e permissões da sessão)

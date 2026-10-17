@@ -1,0 +1,299 @@
+name: Qualidade
+
+# Gate de qualidade do dia a dia. O `publish.yml` continua sendo o gate da
+# release (é ele que compara a versão e publica o `.deb`), e ele carrega o seu
+# próprio `npm run check` + `npm test` porque precisa ser autossuficiente para
+# os gatilhos de reserva (tag `v*`, Release criada na UI). A sobreposição com o
+# `qualidade` deste arquivo é de propósito: este aqui cobre pull request e
+# push, que o `publish.yml` não vê.
+#
+# Gatilhos:
+# - push na `main`: a série de commits é conferida enquanto ela cresce;
+# - pull_request: é a verificação que precisa estar verde para o merge;
+# - workflow_dispatch: para rodar na mão quando um passo local ficou duvidoso.
+#
+# A porta de cobertura mora em `vitest.config.mts` (`thresholds`), não aqui: o
+# número é o mesmo para quem roda localmente e para o CI, e `npm run
+# test:coverage` sozinho já reprova abaixo da meta.
+#
+# "Testes E2E" sobe o app compilado e o payload do `.deb` de verdade
+# (`docs/e2e.md`): compila com `dist:dir`, roda sob `xvfb` e instala o pacote
+# para conferir que ele resolve as dependências. É o único job que junta bundle,
+# IPC real e React montado.
+#
+# "Testes de mutação" roda em outro ritmo, porque a varredura completa leva
+# horas e o número que ela mede só muda quando alguém escreve teste novo: ela
+# dispara uma vez por mês no agendamento e no disparo manual, e **não** em pull
+# request nem em push. Reprova abaixo do piso (ajustável pelo disparo manual),
+# então a queda real aparece como build vermelho sem virar trava de branch.
+#
+# `ubuntu-latest` em todos os jobs, como no `publish.yml`: a escolha de imagem é
+# do repositório e vale igual para o `.deb` que o usuário instala e para os
+# testes que o verificam.
+#
+# Actions fixadas por SHA completo (com a tag na comentário) para não depender
+# de segurança da tag movível; o Dependabot (`github-actions`) atualiza os pins.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      min_score:
+        description: 'Piso de reprovação do score de mutação (%). Padrão: 55'
+        required: false
+        default: '55'
+        type: string
+      mutation_file:
+        description: 'Medir só estes arquivos de src/ (separados por vírgula)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# Push seguido de outro push na mesma branch: cancela a corrida velha, que já
+# não interessa. Pull request nunca é cancelado, para o status não ficar
+# indefinido enquanto o autor corrige.
+concurrency:
+  group: qualidade-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+jobs:
+  qualidade:
+    name: Verificar qualidade
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: OSV Scanner (binário fora do git; versão fixada)
+        run: |
+          set -euo pipefail
+          # bin/osv-scanner é gitignored: a pasta não existe no checkout do CI
+          # e o curl falharia com exit 23 (não consegue criar o arquivo).
+          mkdir -p bin
+          curl -fsSL -o bin/osv-scanner \
+            https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64
+          chmod +x bin/osv-scanner
+          bin/osv-scanner --version
+
+      # O typecheck inclui `e2e/tsconfig.json`: os fluxos E2E são TypeScript
+      # tipado contra o mesmo `tsconfig.base.json` do resto do repo.
+      - name: Typecheck + lint + formato + auditoria OSV
+        run: npm run check
+
+  cobertura:
+    name: Testes e cobertura
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # `json-summary` entra como reporter extra (o `text` e o `html` já são o
+      # padrão do `vitest.config.mts`): é dele que sai a tabela do resumo da
+      # execução, com o mesmo número que o gate de 50% aplicou.
+      - name: Testes com cobertura
+        run: npm run test:coverage -- --coverage.reporter=json-summary
+
+      - name: Resumo da cobertura na página da execução
+        if: always()
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("node:fs");
+            const file = "coverage/coverage-summary.json";
+            if (!fs.existsSync(file)) process.exit(0);
+            const s = JSON.parse(fs.readFileSync(file, "utf8"));
+            const meta = s.total;
+            const cell = (m) => meta[m].pct.toFixed(2) + "%";
+            const rows = [
+              "## Cobertura",
+              "",
+              "| Linhas | Ramos | Funções | Comandos |",
+              "| --- | --- | --- | --- |",
+              "| " + cell("lines") + " | " + cell("branches") + " | " + cell("functions")
+                + " | " + cell("statements") + " |",
+              "",
+              "Meta: 50% nos quatro (definida em `vitest.config.mts`).",
+            ];
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, rows.join("\n") + "\n");
+          '
+
+      - name: Relatório HTML da cobertura
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cobertura-relatorio
+          path: coverage/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  e2e:
+    name: Testes E2E
+    # Sobe o app de verdade, então não cabe no "Verificar qualidade" (estático)
+    # nem no "Testes e cobertura" (jsdom): é o único job que junta bundle
+    # compilado, `cronologia://`, IPC real, Argon2id real e React montado. Roda
+    # em push e pull request porque é o que pega a quebra de integração.
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # O Electron abre uma janela: precisa de display (Xvfb) e das bibliotecas
+      # gráficas. `libgtk-3-0t64` e `libatspi2.0-0t64` respondem pelos nomes
+      # antigos por `Provides`, que é o que o `.deb` declara.
+      - name: Dependências de janela
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb libnss3 libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 \
+            libdrm2 libgbm1 libasound2t64 libxcomposite1 libxdamage1 \
+            libxfixes3 libxrandr2 libxkbcommon0 libgtk-3-0t64 libxss1 \
+            libxtst6 libatspi2.0-0t64 libuuid1 xdg-utils fakeroot
+
+      # Um build serve aos dois alvos: `out/` para o compilado e `release/`
+      # (`.deb` e árvore descompactada) para o empacotado. O `--publish never`
+      # já vem no script `dist:dir` do package.json: sem ele o electron-builder
+      # detecta o CI, tentaria publicar sozinho ("Implicit publishing") e
+      # morreria sem GH_TOKEN.
+      - name: Compila o app e o pacote
+        run: npm run dist:dir
+
+      - name: E2E do app compilado e do payload do .deb
+        run: xvfb-run -a npm run test:e2e
+
+      # O E2E roda sobre o payload extraído do `.deb`: o perfil AppArmor do
+      # pacote nega a porta TCP do CDP (ver `docs/e2e.md`). Aqui o pacote é
+      # instalado de verdade, para conferir que resolve as dependências e deixa
+      # o binário e o `cronologia-setup` no lugar.
+      - name: Instalação real do .deb
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y ./release/cronologia_*_amd64.deb
+          test -x /opt/Cronologia/cronologia
+          test -x /opt/Cronologia/resources/cronologia-setup
+
+  mutacao:
+    name: Testes de mutação
+    # A varredura completa leva horas, e o que ela mede muda devagar: só quando
+    # alguém escreve teste novo. Então ela **não** roda em pull request e nem em
+    # push: roda uma vez por mês no agendamento e no disparo manual, que é a
+    # válvula de escape quando se quer remediar um arquivo específico sem
+    # esperar o mês.
+    #
+    # Este `if` é do job, e não do `on:` do workflow, porque "Verificar
+    # qualidade" e "Testes e cobertura" continuam no ritmo normal de push e PR.
+    # Job pulado aparece como *Skipped* na aba de checks, o que é o esperado
+    # aqui: não é status check obrigatório.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # Grupo próprio, e não o do workflow: lá, todo push cancela a execução
+    # anterior, o que mataria uma varredura de horas no meio sem que ninguém
+    # tenha tocado em nada.
+    concurrency:
+      group: mutacao-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'push' }}
+    # O runner aborta cada mutante sozinho (240 s por padrão, `--timeout`).
+    # O teto abaixo é só para o job não ficar pendurado se algo travar fora do
+    # plano, e fica abaixo do limite de 6 h do runner hospedado, com folga para
+    # não morrer exatamente na borda.
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Varredura de mutação
+        env:
+          # Piso provisório de 55%: a varredura completa de `src/` ainda não foi
+          # medida (ver `docs/mutation.md` § "No CI"), então o primeiro disparo
+          # manual mede o número real e o piso deve ser ajustado para ficar bem
+          # abaixo dele. A folga é de propósito: o score depende da máquina,
+          # porque mutante que estoura os 240 s vira `timeout` e sai do
+          # denominador, e o runner do CI tem menos núcleo que a máquina onde a
+          # varredura foi escrita.
+          MIN_SCORE: ${{ inputs.min_score || '55' }}
+          MUTATION_FILE: ${{ inputs.mutation_file }}
+        run: |
+          set -euo pipefail
+          args=(--min-score "$MIN_SCORE")
+          if [ -n "${MUTATION_FILE:-}" ]; then
+            # O `--file` se repete: um passo por arquivo, senão o runner
+            # interpretaria a lista inteira como um caminho só.
+            IFS=',' read -ra arquivos <<< "$MUTATION_FILE"
+            for arquivo in "${arquivos[@]}"; do
+              # O input vem de digitação: tira o espaço em volta de cada item,
+              # senão ` src/main/a.ts` vira um caminho que não existe.
+              limpo="${arquivo#"${arquivo%%[![:space:]]*}"}"
+              limpo="${limpo%"${limpo##*[![:space:]]}"}"
+              [ -n "$limpo" ] && args+=(--file "$limpo")
+            done
+          fi
+          npm run test:mutation -- "${args[@]}"
+
+      - name: Números da varredura na página da execução
+        if: always()
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("node:fs");
+            const file = "mutation/results.json";
+            if (!fs.existsSync(file)) process.exit(0);
+            const results = JSON.parse(fs.readFileSync(file, "utf8")).results ?? [];
+            const count = (status) => results.filter((r) => r.status === status).length;
+            // `timeout` e `compileError` ficam fora do denominador, que é como
+            // o runner calcula o score (ver `mutationScore` em
+            // `tools/mutation/run.ts`).
+            const scored = count("killed") + count("survived");
+            const score = scored === 0 ? 0 : (count("killed") / scored) * 100;
+            const rows = [
+              "## Mutação",
+              "",
+              "Score: **" + score.toFixed(1) + "%**",
+              "",
+              "| Mortos | Sobreviventes | Timeout | Erro de compilação |",
+              "| --- | --- | --- | --- |",
+              "| " + count("killed") + " | " + count("survived") + " | " + count("timeout")
+                + " | " + count("compileError") + " |",
+              "",
+              "A lista completa dos sobreviventes está no artefato `mutacao-relatorio`.",
+            ];
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, rows.join("\n") + "\n");
+          '
+
+      - name: Relatório da varredura
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutacao-relatorio
+          path: mutation/report.md
+          retention-days: 30
+          if-no-files-found: ignore

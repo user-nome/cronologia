@@ -115,7 +115,7 @@ export const zhCN: Messages = {
 
   restore: {
     title: '备份密码',
-    banner: '请输入**备份时**在Dropbox中使用的加密密码。' + '解密下载的文件必须提供该密码。',
+    banner: '请输入**备份时**在Dropbox中使用的加密密码。解密下载的文件必须提供该密码。',
     passphraseLabel: '加密密码',
     passphrasePlaceholder: '备份时使用的密码',
     action: '恢复',

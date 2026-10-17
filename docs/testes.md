@@ -1,11 +1,21 @@
 # Testes
 
+Três camadas, com três SIGNais diferentes. Esta doc é da primeira:
+
+| Camada              | Onde              | O que responde                                      | Guia                         |
+| ------------------- | ----------------- | --------------------------------------------------- | ---------------------------- |
+| Unitária/integrada  | `tests/**`        | "este módulo faz o que diz?"                        | este arquivo                 |
+| Ponta a ponta (E2E) | `e2e/**`          | "o app de verdade funciona depois que tudo monta?"  | [`e2e.md`](e2e.md)           |
+| Mutação             | `tools/mutation/` | "se esta linha fizesse outra coisa, a suíte veria?" | [`mutation.md`](mutation.md) |
+
+## A suíte unitária
+
 Suíte em Vitest com ambiente `jsdom` único (`vitest.config.mts`): o renderer e
 também o processo main rodam em `jsdom`, com o `electron` trocado pelo stub de
-`tests/mocks/electron.ts`. São **37 arquivos** e **428 testes**; a duração
-gira em torno de 2 minutos porque os testes de backup cifram de verdade com
-scrypt `N=2^17` (~128 MiB por derivação), enquanto o Argon2id do cofre roda
-com o KDF barato dos testes (16 MiB).
+`tests/mocks/electron.ts`. São **38 arquivos** e **463 testes**; a duração gira
+em torno de 2 minutos porque os testes de backup cifram de verdade com scrypt
+`N=2^17` (~128 MiB por derivação), enquanto o Argon2id do cofre roda com o KDF
+barato dos testes (16 MiB).
 
 ## Como rodar
 
@@ -17,6 +27,10 @@ npm run test:coverage  # cobertura em coverage/ (limiar de 50%)
 
 O `npm run check` **não** roda os testes: ele cobre typecheck, lint, formato e
 auditoria OSV. Rode os dois antes de concluir qualquer mudança.
+
+Os E2E e a varredura de mutação **também** não entram no `npm run check`: os
+primeiros abrem janelas e pagam Argon2id de produção, e a segunda leva horas.
+São sob demanda (ver os guias linkados no topo).
 
 ## Arquivos
 
@@ -69,16 +83,20 @@ auditoria OSV. Rode os dois antes de concluir qualquer mudança.
 
 ### Apoios
 
-| Arquivo                     | Papel                                                                                          |
-| --------------------------- | ---------------------------------------------------------------------------------------------- |
-| `tests/mocks/electron.ts`   | Stub do `electron` aplicado por alias no `vitest.config.mts` (janela, ipcMain, app, shell)     |
-| `tests/setup-env.ts`        | Sandbox `HOME`/`XDG_*` temporária por processo (antes de qualquer import)                      |
-| `tests/setup.ts`            | `jest-dom`, `cleanup`, `restoreAllMocks`, `unstubAllGlobals` e `useRealTimers` após cada teste |
-| `tests/helpers/sandbox.ts`  | `resetSandbox()`/`sandboxPath()`: limpa os diretórios XDG e a árvore do cofre do processo      |
-| `tests/helpers/api.ts`      | `createApiMock()`: fachada `ElectronApi` tipada para os testes de renderer                     |
-| `tests/helpers/drive.ts`    | Rede simulada (servidor local) e sessão do Drive pronta para os testes de backup               |
-| `tests/helpers/vault.ts`    | `openTestVault()`: cofre de teste recriado e aberto (KDF barato)                               |
-| `tests/helpers/fixtures.ts` | Fábricas de `Work`/`AppSettings` com defaults válidos                                          |
+| Arquivo                               | Papel                                                                                                               |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `tests/mocks/electron.ts`             | Stub do `electron` aplicado por alias no `vitest.config.mts` (janela, ipcMain, app, shell)                          |
+| `tests/setup-env.ts`                  | Sandbox `HOME`/`XDG_*` temporária por processo (antes de qualquer import)                                           |
+| `tests/setup.ts`                      | `jest-dom`, `cleanup`, `restoreAllMocks`, `unstubAllGlobals` e `useRealTimers` após cada teste                      |
+| `tests/helpers/sandbox.ts`            | `resetSandbox()`/`sandboxPath()`: limpa os diretórios XDG e a árvore do cofre do processo                           |
+| `tests/helpers/api.ts`                | `createApiMock()`: fachada `ElectronApi` tipada para os testes de renderer                                          |
+| `tests/helpers/drive.ts`              | Rede simulada (servidor local) e sessão do Drive pronta para os testes de backup                                    |
+| `tests/helpers/vault.ts`              | `openTestVault()`: cofre de teste recriado e aberto (KDF barato)                                                    |
+| `tests/tools/mutation-runner.test.ts` | Trava as garantias do motor de mutação: splicing, `fsModuleCache`, nomes de nó da AST e ausência de órfão em escopo |
+
+Roda em ambiente `node` (`// @vitest-environment node`), e é o motivo do guarda
+de DOM em `tests/setup.ts`: `setupFiles` roda para ele também.
+| `tests/helpers/fixtures.ts` | Fábricas de `Work`/`AppSettings` com defaults válidos |
 
 ## Convenções
 
@@ -108,24 +126,35 @@ auditoria OSV. Rode os dois antes de concluir qualquer mudança.
   `tests/mocks/electron.ts`. No renderer, use `createApiMock()` para a
   fachada.
 - **Imports dos testes**: relativos com extensão (`.ts`/`.tsx`) para os
-  helpers locais e alias `@zero/*` para o código sob teste.
+  helpers locais e alias `@zero/*` para o código sob teste. O `max-lines` é
+  750 linhas em `tests/`, `e2e/` e `tools/` (tabela de caso e runner não
+  melhoram por estarem quebrados em 500); em `src/` o teto do AGENTS.md vale
+  (520).
+- **Nada de `throw` de literal na suíte**: o ESLint libera `only-throw-error`
+  com `allowThrowingUnknown` nos testes, porque boa parte das defesas do main só
+  existe porque o valor lançado **não** é um `Error`, e o jeito honesto de dizer
+  "isto é desconhecido em tempo de compilação" é o tipo `unknown`. `any` e
+  literal continuam barrados.
 
 ## Cobertura
 
 `vitest.config.mts` mede `src/**/*.{ts,tsx}` com o provedor v8 (relatórios em
 texto e HTML em `coverage/`) e exige **50%** de linhas, instruções, funções e
-ramos. Estado atual na 1.9.1 (428 testes em 37 arquivos):
+ramos. Estado atual na 1.9.2 (463 testes em 38 arquivos):
 
 | Métrica    | Global | `src/main/vault/*` |
 | ---------- | ------ | ------------------ |
-| Statements | 86,8%  | 93,2%              |
-| Branches   | 80,9%  | 85,1%              |
-| Functions  | 82,8%  | 100%               |
-| Lines      | 88,9%  | 98,4%              |
+| Statements | 86,9%  | 93,2%              |
+| Branches   | 81,0%  | 85,1%              |
+| Functions  | 83,0%  | 100%               |
+| Lines      | 89,0%  | 98,4%              |
 
-Os módulos de destruição ficaram altos: `shred.ts` 97,7% de linhas,
-`store-crypto.ts` 100%, `library.ts` 96,5%, `cleanup.ts` 89,4%. O limiar do
-projeto é 50% nas quatro métricas.
+Os módulos de destruição ficaram altos: `store-crypto.ts` e os containers em
+100% de linhas, `shred.ts` acima de 95%, `library.ts` acima de 95%. O limiar do
+projeto é 50% nas quatro métricas. O `src/renderer/src/main.tsx` aparece com 0%
+porque é o entry que monta o React em `#root`: a suíte renderiza `<App/>`
+diretamente, então ele fica de fora do denominador (ver `scope.ts` da
+[mutação](mutation.md), que tem o mesmo motivo).
 
 Rodar cobertura: `npm run test:coverage`. Um `npm run test -- coverage` **não**
 funciona: sem os dois hífens, o Vitest lê `coverage` como filtro de nome de
@@ -203,6 +232,8 @@ Isso é verificável, e o procedimento está em [`cofre.md`](cofre.md) §
 
 ## Ver também
 
+- [`e2e.md`](e2e.md) (app compilado e payload do `.deb`, com Playwright)
+- [`mutation.md`](mutation.md) (o outro sinal: a suíte percebe a mudança?)
 - [`arquitetura.md`](arquitetura.md) (camadas e aliases)
 - [`api.md`](api.md) (contrato testado da fachada)
 - [`cofre.md`](cofre.md) (KDF barato e `CRONOLOGIA_VAULT_DIR` nos testes)

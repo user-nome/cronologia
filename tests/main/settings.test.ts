@@ -3,7 +3,8 @@ import path from 'path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { loadSettings, saveSettings } from '@zero/main/settings';
 import { createVault, destroyVault, lockVault } from '@zero/main/vault';
-import { VaultError, isVaultError } from '@zero/main/vault/errors';
+import { isVaultError } from '@zero/main/vault/errors';
+import type { VaultError } from '@zero/main/vault/errors';
 import { resetSandbox, sandboxPath } from '../helpers/sandbox.ts';
 import { FAST_KDF, PASSWORD } from '../helpers/vault.ts';
 

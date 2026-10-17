@@ -22,6 +22,12 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
 - `src/preload/`: única ponte da UI; monta e expõe `window.api` tipado.
 - `src/renderer/`: React; não acessa disco, rede nem Node direto.
 - `src/types/`: contratos compartilhados (`@zero/types`, barrel).
+- `e2e/`: testes ponta a ponta com Playwright; **não** importam `src/`, sobem o
+  app compilado (`out/`) ou o payload do `.deb`. Config em
+  `vitest.e2e.config.mts`, fluxos em `e2e/support/`, guia em `docs/e2e.md`.
+- `tools/mutation/`: motor da varredura de mutação (runner, operadores,
+  grafo de módulos, matriz de linhas). Config em `vitest.mutation.config.mts`,
+  guia em `docs/mutation.md`.
 
 ## Arquitetura
 
@@ -58,10 +64,20 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
 - Imports dentro de `src/` só pelos aliases ESM `@zero/*` (nenhum caminho
   relativo entre pastas). O mapa é declarado em `tsconfig.base.json` e
   espelhado em `electron.vite.config.mts`, `vitest.config.mts` e
-  `src/node.loader.ts`; mudar um alias vale nos quatro. `paths` usam extensão
-  explícita (`.ts`/`.tsx`/`index.tsx`) porque o projeto roda com
-  `module: nodenext`.
-- Arquivos no teto de ~500 linhas; passou disso, extraia módulos.
+  `src/node.loader.ts`; mudar um alias vale nos quatro. As configs de E2E e de
+  mutação **importam** o mapa de `vitest.config.mts`, não o redeclaram.
+  `paths` usam extensão explícita (`.ts`/`.tsx`/`index.tsx`) porque o projeto
+  roda com `module: nodenext`.
+- Arquivos no teto de ~500 linhas; passou disso, extraia módulos. O ESLint
+  mede isso (`max-lines`: 520 em `src/`, 750 em `tests/`, `e2e/` e `tools/`).
+- **Fronteira de camada é regra, não sugestão.** O `eslint.config.mjs` tem a
+  matriz do AGENTS.md como `no-restricted-imports`: cada camada declara os
+  aliases que pode importar, e `fs`/`electron`/`child_process` são concessão
+  nomeada (o `fs` é do `src/main/**`; `electron` só de `index.ts`,
+  `protocols.ts` e `external.ts`; `child_process` só de
+  `vault/privilege.ts`). `CRONOLOGIA_VAR_LIB`, `CRONOLOGIA_VAULT_DIR` e
+  `ELECTRON_RENDERER_URL` só são lidos por `vault/vault.ts`,
+  `vault/privilege.ts` e `main/index.ts`.
 - Type safety: `strict`, `noUncheckedIndexedAccess`,
   `exactOptionalPropertyTypes`, `noImplicitReturns` e
   `verbatimModuleSyntax` (import de tipo sempre `import type`). Sem `any`,
@@ -84,6 +100,16 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
   antes de concluir qualquer mudança.
 - `npm test` (ou `test:coverage`): Vitest em `tests/**`; cobertura mínima de
   50% por métrica. Comportamento novo vem com teste.
+- `npm run test:e2e` / `test:e2e:bundled` / `test:e2e:packaged`: Playwright
+  sobre o app compilado (`out/`) e o payload do `.deb`. Exige `npm run build` e
+  `npm run dist:dir` antes. Entra no typecheck (`e2e/tsconfig.json`) e no lint,
+  mas **não** no `npm run check` (abre janela, sobe porta de depuração e paga
+  Argon2id de produção). Guia em `docs/e2e.md`.
+- `npm run test:mutation` / `test:mutation:plan`: varredura de mutação de
+  `src/` (2.045 mutantes). Leva horas: planeje em `--file src/main/arquivo.ts`
+  para remediar um arquivo, e use `test:mutation:plan` para ver o plano sem
+  executar. Também **não** entra no `npm run check`; no CI roda no job próprio do
+  `quality.yml`, por disparo manual. Guia em `docs/mutation.md`.
 - `npm run dev` / `build` / `dist`: desenvolvimento, build, `.deb`. O `dev`
   já exporta `CRONOLOGIA_VAULT_DIR` para a pasta `.dev-vault` (cofre no sandbox,
   sem tocar em `/var/lib` nem disparar `pkexec`) e `ELECTRON_ENABLE_LOGGING=1`
@@ -115,7 +141,12 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
   adicionar.
 - Testes: `electron` é mockado em `tests/mocks/electron.ts` e `clearMocks`
   está desligado de propósito no `vitest.config.mts` (não ligar).
-- Não versionar build e binário: `out/`, `release/`, `node_modules`, `.deb`.
+- **Teste novo vem com a pergunta certa.** Cobertura pergunta "rodou?"; a
+  mutação pergunta "se fizesse outra coisa, a suíte veria?". Quando um teste novo
+  fecha um buraco de mutação, vale dizer isso no `CHANGELOG.md`.
+- Não versionar build e binário: `out/`, `release/`, `node_modules`, `.deb`,
+  e o relatório da varredura em `mutation/` (o `.gitignore` usa `/mutation/`
+  ancorado de propósito, para não pegar `tools/mutation/`).
 
 ## Segurança
 
@@ -165,6 +196,12 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
 - Nunca renomear os assets estáveis da Release (`Packages`, `Packages.gz`,
   `Release`, `Release.gpg`, `InRelease`, `public.key` e o alias
   `cronologia_amd64.deb`).
+- O `quality.yml` é o gate do dia a dia (push na `main` e pull request): jobs
+  **Verificar qualidade**, **Testes e cobertura** e **Testes E2E**. O job **Testes
+  de mutação** é só por disparo manual (`min_score` e `mutation_file`), porque a
+  varredura leva horas. O `publish.yml` continua com o `npm run check` + `npm test`
+  próprios porque precisa ser autossuficiente para tag `v*` e Release criada na
+  UI; a sobreposição é intencional.
 - Passo a passo completo: `docs/distribuicao-apt.md`; build, `.deb` e gate de
   qualidade do CI: `docs/build.md`. Regras do monorepo:
   `AGENTS.md` da raiz.
@@ -182,6 +219,8 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
   `docs/backup-providers.md` (provedores de nuvem e status do Google Drive),
   `docs/messages.md` (i18n: bundles e regras de tradução),
   `docs/testes.md` (suíte Vitest: convenções e cobertura),
+  `docs/e2e.md` (testes ponta a ponta: app compilado e payload do `.deb`),
+  `docs/mutation.md` (testes de mutação: operadores, escopo e garantias),
   `docs/atribuicoes.md` e `docs/doacoes.md` (páginas do app),
   `docs/distribuicao-apt.md` (distribuição APT), `docs/build.md` (build,
   `.deb` e gate no `publish.yml`), `docs/seguranca.md` (mapa medida →

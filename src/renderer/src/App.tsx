@@ -73,9 +73,15 @@ export default function App(): JSX.Element {
   const [vaultPrompt, setVaultPrompt] = useState<'create' | 'unlock' | null>(null);
 
   const saveTimers = useRef<Map<string, number>>(new Map());
+  /** Fila de gravação por obra: garante que a última intenção seja a última escrita. */
+  const saveQueue = useRef<Map<string, Promise<Work[]>>>(new Map());
   const toastTimer = useRef<number | undefined>(undefined);
 
   const m = messages(language);
+  // Extração de dependência dos hooks: o texto do erro de gravação é o mesmo
+  // durante toda a sessão, e o `scheduleSave` só precisa da string, não do
+  // bundle inteiro (que mudaria a cada troca de idioma).
+  const saveErrorMessage = m.app.toastSaveError;
 
   const notify = useCallback((message: string, kind: 'info' | 'error' = 'info'): void => {
     setToast({ message, kind });
@@ -134,9 +140,11 @@ export default function App(): JSX.Element {
   // O auto-lock do cofre (5 min sem uso): o acervo some da tela e o app volta
   // a pedir a senha, porque sem chave a biblioteca não pode ser exibida.
   useEffect(() => {
-    const unsubscribe = window.api.vault.onLocked(() => {
+    const unsubscribe = window.api.vault.onLocked((automatic) => {
       setWorks([]);
-      notify(m.vault.autoLocked, 'info');
+      // Só o auto-lock precisa de aviso: no bloqueio manual o usuário acabou de
+      // apertar o botão, e dizer "fechou sozinho por inatividade" seria mentira.
+      if (automatic) notify(m.vault.autoLocked, 'info');
       void window.api.vault
         .status()
         .then((status) => setVaultPrompt(status.exists ? 'unlock' : 'create'));
@@ -146,11 +154,33 @@ export default function App(): JSX.Element {
     };
   }, [notify, m]);
 
-  const persist = useCallback(async (work: Work): Promise<void> => {
-    const saved = await window.api.library.save(work);
-    setWorks(saved);
+  const write = useCallback((id: string, task: () => Promise<Work[]>): Promise<Work[]> => {
+    // Descarta o agendamento pendente da obra: um rascunho velho que ainda não
+    // saiu não pode ser gravado depois da intenção mais recente.
+    const pending = saveTimers.current.get(id);
+    if (pending !== undefined) {
+      window.clearTimeout(pending);
+      saveTimers.current.delete(id);
+    }
+    const previous = saveQueue.current.get(id) ?? Promise.resolve<Work[]>([]);
+    const next = previous.then(task);
+    saveQueue.current.set(id, next);
+    return next;
   }, []);
 
+  const persist = useCallback(
+    (work: Work): Promise<void> =>
+      write(work.id, () => window.api.library.save(work)).then(setWorks),
+    [write],
+  );
+
+  /**
+   * O cartão agenda a gravação com atraso (450 ms, para não gravar a cada clique
+   * em "Aumentar 1") e o modal grava na hora. Sem a fila por id, a gravação
+   * agendada do cartão sai **depois** do "Salvar" do modal e traz o rascunho
+   * antigo de volta, para o disco e para a tela: o usuário edita o título, clica
+   * em Salvar, e meio segundo depois o título volta ao anterior.
+   */
   const scheduleSave = useCallback(
     (work: Work): void => {
       const timers = saveTimers.current;
@@ -158,11 +188,11 @@ export default function App(): JSX.Element {
       if (existing !== undefined) window.clearTimeout(existing);
       const handle = window.setTimeout(() => {
         timers.delete(work.id);
-        void persist(work).catch(() => notify(m.app.toastSaveError, 'error'));
+        void persist(work).catch(() => notify(saveErrorMessage, 'error'));
       }, 450);
       timers.set(work.id, handle);
     },
-    [notify, persist, m],
+    [notify, persist, saveErrorMessage],
   );
 
   useEffect(() => {
@@ -199,20 +229,22 @@ export default function App(): JSX.Element {
 
   const saveEdited = useCallback(
     async (work: Work): Promise<void> => {
-      const saved = await window.api.library.save(work);
+      const saved = await write(work.id, () => window.api.library.save(work));
       setWorks(saved);
       notify(m.app.toastSaved);
     },
-    [notify, m],
+    [notify, m, write],
   );
 
   const deleteWork = useCallback(
     async (work: Work): Promise<void> => {
-      const saved = await window.api.library.remove(work.id);
+      // Mesmo caminho da gravação: uma exclusão não pode ser atropelada pela
+      // gravação agendada do cartão, que ressuscitaria a obra apagada.
+      const saved = await write(work.id, () => window.api.library.remove(work.id));
       setWorks(saved);
       notify(m.app.toastRemoved);
     },
-    [notify, m],
+    [notify, m, write],
   );
 
   const visible = useMemo(() => {

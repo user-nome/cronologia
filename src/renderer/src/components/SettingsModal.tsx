@@ -118,11 +118,11 @@ export default function SettingsModal({
    * tem modo legado: sem cofre não há backup).
    */
   const ensureVault = async (then: () => void): Promise<void> => {
-    const status = await window.api.vault.status();
-    setVault(status);
-    if (!status.exists || !status.unlocked) {
+    const vaultState = await window.api.vault.status();
+    setVault(vaultState);
+    if (!vaultState.exists || !vaultState.unlocked) {
       pendingVaultAction.current = then;
-      setVaultPrompt(status.exists ? 'unlock' : 'create');
+      setVaultPrompt(vaultState.exists ? 'unlock' : 'create');
       return;
     }
     then();

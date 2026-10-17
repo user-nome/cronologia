@@ -39,8 +39,14 @@ export interface ElectronApi {
     destroy: () => Promise<VaultResult>;
     /** Registra atividade do usuário (mantém a janela de ociosidade aberta). */
     touch: () => Promise<void>;
-    /** Avisa quando o auto-lock derruba a sessão do cofre. */
-    onLocked: (cb: () => void) => () => void;
+    /**
+     * Avisa quando a sessão do cofre cai. O booleano diz **por quê**:
+     * `true` é o auto-lock por ociosidade (o usuário não fez nada e precisa
+     * entender o que aconteceu) e `false` é o bloqueio que ele mesmo pediu.
+     * A tela usa isso para não anunciar "o cofre fechou sozinho" quando foi
+     * ele quem mandou fechar.
+     */
+    onLocked: (cb: (automatic: boolean) => void) => () => void;
   };
 }
 

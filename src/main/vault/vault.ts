@@ -127,7 +127,6 @@ function writeContainer(container: VaultContainer): void {
 function ensureVaultStructureWithSetup(): void {
   try {
     ensureVaultStructure();
-    return;
   } catch (error) {
     if (!isVaultDirUnavailable(error)) throw error;
     const setup = setupVaultDirectory();
