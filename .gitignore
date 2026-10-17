@@ -9,5 +9,10 @@ apt
 # scripts em bin/ SÃO versionados.
 bin/osv-scanner
 coverage
+# relatório da varredura de mutação, na raiz (artefatos fora do git).
+# Ancorado de propósito: sem a barra, `mutation/` casaria também com
+# `tools/mutation/`, que é código-fonte e precisa estar no git (sem ele o
+# `vitest.mutation.config.mts` não resolve o import e o `tsc` do CI quebra).
+/mutation/
 # build/ CONTÉM recursos de empacotamento versionados (icon.png, postrm).
 # Nunca ignorar: o electron-builder/fpm precisa deles no CI.

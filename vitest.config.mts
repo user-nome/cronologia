@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
 /** Espelha `paths` de tsconfig.base.json e o mapa de `node.loader.ts`. */
-const aliases = {
+export const aliases = {
   '@zero/types': resolve(import.meta.dirname, 'src/types'),
   '@zero/messages': resolve(import.meta.dirname, 'src/messages'),
   '@zero/main': resolve(import.meta.dirname, 'src/main'),
