@@ -1,0 +1,606 @@
+import fs from 'fs';
+import http from 'http';
+import os from 'os';
+import path from 'path';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import type { AppSettings, LibraryReset, Work } from '@zero/types';
+import {
+  configDir,
+  coversDir,
+  dataDir,
+  readCoverBuffer,
+  saveLibrary,
+  writeCoverFile,
+} from '@zero/main/library';
+import { setSecret, vaultSession } from '@zero/main/vault';
+import { destroyVault } from '@zero/main/vault';
+import { VAULT_SECRET } from '@zero/main/vault/secrets';
+import { EMBEDDED_APP_KEY } from '@zero/main/drive/constants';
+import { makeDraft, makeWork } from '../helpers/fixtures.ts';
+import { sandboxPath } from '../helpers/sandbox.ts';
+import { openTestVault } from '../helpers/vault.ts';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  globalShortcut,
+  ipcMain,
+  Menu,
+  nativeImage,
+  protocol,
+  session,
+  shell,
+} from '../mocks/electron.ts';
+import type { IpcHandler, WindowEventHandler } from '../mocks/electron.ts';
+
+function handler(channel: string): IpcHandler {
+  const call = ipcMain.handle.mock.calls.find((entry) => entry[0] === channel);
+  if (call === undefined) throw new Error(`Handler IPC ausente: ${channel}`);
+  return call[1];
+}
+
+const FAKE_EVENT = { senderFrame: { url: 'cronologia://app/index.html' } };
+
+function invoke(channel: string, ...args: unknown[]): unknown {
+  return handler(channel)(FAKE_EVENT, ...args);
+}
+
+function invokeAsync<T>(channel: string, ...args: unknown[]): Promise<T> {
+  return invoke(channel, ...args) as Promise<T>;
+}
+
+function appListener(event: string): WindowEventHandler {
+  const call = app.on.mock.calls.find((entry) => entry[0] === event);
+  if (call === undefined) throw new Error(`Listener de app ausente: ${event}`);
+  return call[1];
+}
+
+function windowEvent(win: BrowserWindow, event: string): WindowEventHandler {
+  const call = win.on.mock.calls.find((entry) => entry[0] === event);
+  if (call === undefined) throw new Error(`Listener de janela ausente: ${event}`);
+  return call[1];
+}
+
+function onceEvent(win: BrowserWindow, event: string): WindowEventHandler {
+  const call = win.once.mock.calls.find((entry) => entry[0] === event);
+  if (call === undefined) throw new Error(`Listener one-shot ausente: ${event}`);
+  return call[1];
+}
+
+function coverHandler(): (request: { url: string }) => Response {
+  const call = protocol.handle.mock.calls.find((entry) => entry[0] === 'cover');
+  if (call === undefined) throw new Error('Protocolo cover não registrado.');
+  return call[1];
+}
+
+const expectedChannels = [
+  'library:get',
+  'library:save',
+  'library:delete',
+  'library:reset',
+  'cover:pick',
+  'settings:get',
+  'settings:set',
+  'drive:status',
+  'drive:providers',
+  'drive:auth',
+  'drive:backup',
+  'drive:restore',
+  'drive:backup-info',
+  'drive:disconnect',
+  'drive:purge',
+  'vault:status',
+  'vault:create',
+  'vault:unlock',
+  'vault:lock',
+  'vault:destroy',
+  'vault:touch',
+];
+
+beforeAll(async () => {
+  // Instalação existente no lugar. O acervo é cifrado com a chave do cofre,
+  // então o cofre de teste precisa existir **antes** do acervo ser gravado.
+  await openTestVault();
+  saveLibrary([makeWork()]);
+  writeCoverFile('capa.png', Buffer.from('cover-image', 'utf-8'));
+  fs.mkdirSync(configDir(), { recursive: true });
+  fs.writeFileSync(path.join(configDir(), 'settings.json'), JSON.stringify({ language: 'pt-BR' }));
+
+  await import('@zero/main/index');
+  await vi.waitFor(() => expect(ipcMain.handle).toHaveBeenCalled());
+});
+
+describe('inicialização', () => {
+  it('registra os schemes cover e cronologia como privilegiados', () => {
+    expect(protocol.registerSchemesAsPrivileged).toHaveBeenCalledWith([
+      {
+        scheme: 'cover',
+        privileges: {
+          standard: true,
+          secure: true,
+          supportFetchAPI: true,
+          stream: true,
+        },
+      },
+      {
+        scheme: 'cronologia',
+        privileges: {
+          standard: true,
+          secure: true,
+          supportFetchAPI: true,
+          stream: true,
+        },
+      },
+    ]);
+  });
+
+  it('move o userData para o cache XDG', () => {
+    expect(app.setPath).toHaveBeenCalledWith(
+      'userData',
+      path.join(sandboxPath('XDG_CACHE_HOME'), 'cronologia'),
+    );
+  });
+
+  it('registra todos os canais de IPC', () => {
+    const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
+    expect(channels).toEqual(expectedChannels);
+  });
+
+  it('cria a janela com sandbox e context isolation', () => {
+    expect(BrowserWindow.instances).toHaveLength(1);
+    const win = BrowserWindow.instances[0];
+    expect(win).toBeDefined();
+    const options = win?.options as {
+      width: number;
+      minWidth: number;
+      minHeight: number;
+      title: string;
+      webPreferences: Record<string, unknown>;
+    };
+    expect(options.width).toBe(1200);
+    expect(options.minWidth).toBe(520);
+    expect(options.minHeight).toBe(360);
+    expect(options.title).toBe('Cronologia');
+    expect(options.webPreferences.contextIsolation).toBe(true);
+    expect(options.webPreferences.nodeIntegration).toBe(false);
+    expect(options.webPreferences.sandbox).toBe(true);
+    expect(options.webPreferences.webSecurity).toBe(true);
+    // Mock com isPackaged false (modo dev) mantém o DevTools ligado; no .deb
+    // empacotado isPackaged vira true e `devTools` desliga.
+    expect(options.webPreferences.devTools).toBe(true);
+    expect(String(options.webPreferences.preload)).toContain(path.join('preload', 'index'));
+    // Em produção o renderer é servido pelo scheme custom `cronologia://` (sem file://).
+    expect(win?.loadURL.mock.calls[0]?.[0]).toBe('cronologia://app/index.html');
+    // Sem dev URL, loadFile não é usado (scheme custom cobre a home).
+    expect(win?.loadFile).not.toHaveBeenCalled();
+  });
+
+  it('trava o app em uma única instância', () => {
+    expect(app.requestSingleInstanceLock).toHaveBeenCalled();
+    expect(app.quit).not.toHaveBeenCalled();
+  });
+
+  it('remove o menu da aplicação (sem File/Edit/View) e sem menu de botão direito', () => {
+    expect(Menu.setApplicationMenu).toHaveBeenCalledTimes(1);
+    expect(Menu.setApplicationMenu).toHaveBeenCalledWith(null);
+    const win = BrowserWindow.instances[0];
+    // O único listener de webContents é a guarda de navegação; nenhum
+    // handler de context-menu (menu de botão direito).
+    const events = win?.webContents.on.mock.calls.map((call) => call[0]) ?? [];
+    expect(events).not.toContain('context-menu');
+  });
+
+  it('nega permissões da sessão menos o clipboard', () => {
+    expect(session.defaultSession.setPermissionRequestHandler).toHaveBeenCalledTimes(1);
+    const policy = session.defaultSession.setPermissionRequestHandler.mock.calls[0]?.[0];
+    if (policy === undefined) throw new Error('Política de permissões ausente.');
+    const grant = vi.fn<(granted: boolean) => void>();
+    policy(null, 'geolocation', grant, null);
+    expect(grant).toHaveBeenCalledWith(false);
+    policy(null, 'media', grant, null);
+    expect(grant).toHaveBeenLastCalledWith(false);
+    policy(null, 'clipboard-sanitized-write', grant, null);
+    expect(grant).toHaveBeenLastCalledWith(true);
+    policy(null, 'clipboard-read', grant, null);
+    expect(grant).toHaveBeenLastCalledWith(true);
+  });
+
+  it('define o ícone da janela a partir do ícone do pacote', () => {
+    const win = BrowserWindow.instances[0];
+    expect(nativeImage.createFromPath).toHaveBeenCalledWith(
+      expect.stringContaining(path.join('build', 'icon.png')),
+    );
+    expect(win?.options.icon).toBeDefined();
+  });
+});
+
+describe('atalho F11 (tela cheia)', () => {
+  it('registra o F11 ao focar e libera ao desfocar/encerrar', () => {
+    const win = BrowserWindow.instances[0];
+    if (win === undefined) throw new Error('Janela não criada.');
+    globalShortcut.register.mockClear();
+    globalShortcut.unregister.mockClear();
+    globalShortcut.unregisterAll.mockClear();
+
+    appListener('browser-window-focus')();
+    expect(globalShortcut.register).toHaveBeenCalledWith('F11', expect.any(Function));
+
+    const toggle = globalShortcut.register.mock.calls.at(-1)?.[1];
+    if (toggle === undefined) throw new Error('Callback do F11 ausente.');
+
+    win.isFullScreen.mockReturnValue(false);
+    win.setFullScreen.mockClear();
+    toggle();
+    expect(win.setFullScreen).toHaveBeenCalledWith(true);
+
+    win.isFullScreen.mockReturnValue(true);
+    toggle();
+    expect(win.setFullScreen).toHaveBeenCalledWith(false);
+
+    appListener('browser-window-blur')();
+    expect(globalShortcut.unregister).toHaveBeenCalledWith('F11');
+
+    appListener('will-quit')();
+    expect(globalShortcut.unregisterAll).toHaveBeenCalled();
+  });
+});
+
+describe('diretórios do app', () => {
+  it('biblioteca, capas e settings ficam no XDG, sem arquivo de token', () => {
+    // O acervo em disco é cifrado: existe o arquivo, e o conteúdo em claro
+    // não está lá dentro.
+    expect(fs.existsSync(path.join(dataDir(), 'library.enc'))).toBe(true);
+    expect(fs.existsSync(path.join(dataDir(), 'library.json'))).toBe(false);
+    expect(fs.readFileSync(path.join(dataDir(), 'library.enc')).toString('utf-8')).not.toContain(
+      'Solo Leveling',
+    );
+    expect(fs.existsSync(path.join(coversDir(), 'capa.png.enc'))).toBe(true);
+    expect(readCoverBuffer('capa.png')?.toString('utf-8')).toBe('cover-image');
+    expect(fs.existsSync(path.join(configDir(), 'settings.json'))).toBe(true);
+    expect(fs.existsSync(path.join(configDir(), 'drive-tokens.json'))).toBe(false);
+    expect(fs.existsSync(path.join(configDir(), 'dropbox-tokens.json'))).toBe(false);
+    expect(fs.existsSync(coversDir())).toBe(true);
+  });
+});
+
+describe('handlers de biblioteca', () => {
+  it('library:get devolve a biblioteca decifrada', () => {
+    const works = invoke('library:get') as Work[];
+    expect(works).toHaveLength(1);
+    expect(works[0]?.title).toBe('Solo Leveling');
+  });
+
+  it('library:save insere e library:delete remove', () => {
+    const saved = invoke('library:save', makeDraft({ id: 'nova', title: 'Nova obra' })) as Work[];
+    expect(saved).toHaveLength(2);
+    expect(saved.some((work) => work.id === 'nova')).toBe(true);
+
+    const deleted = invoke('library:delete', 'nova') as Work[];
+    expect(deleted).toHaveLength(1);
+    expect(deleted[0]?.id).not.toBe('nova');
+  });
+
+  it('library:reset devolve a contagem real do shred, sem "apagado" em falso', () => {
+    const result = invoke('library:reset') as LibraryReset;
+
+    // 1 obra gravada = `library.enc` sobrescrito; a pasta de capas está vazia.
+    expect(result).toEqual({ ok: true, shredded: 1, failed: 0 });
+
+    // Sem acervo gravado, zerar de novo não inventa sucesso nem falha.
+    expect(invoke('library:reset')).toEqual({ ok: true, shredded: 0, failed: 0 });
+  });
+
+  it('library:reset com cofre fechado recusa com código e não inventa contagem', async () => {
+    destroyVault();
+
+    const result = invoke('library:reset') as LibraryReset;
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe('vaultLocked');
+
+    await openTestVault();
+  });
+});
+
+describe('handlers de configurações e Drive', () => {
+  it('settings:get devolve o idioma do disco (segredos vêm do cofre)', () => {
+    const settings = invoke('settings:get') as AppSettings;
+    expect(settings).toEqual({
+      driveClientId: '',
+      drivePassphrase: '',
+      language: 'pt-BR',
+    });
+  });
+
+  it('drive:status inicia desconectado sem sessão anterior', () => {
+    const status = invoke('drive:status') as { connected: boolean; accountEmail: string | null };
+    expect(status.connected).toBe(false);
+    expect(status.accountEmail).toBeNull();
+  });
+
+  it('drive:providers devolve o catálogo com o Google Drive não operante', () => {
+    const providers = invoke('drive:providers') as {
+      id: string;
+      operational: boolean;
+      storageHidden: boolean;
+      unavailableReason: string | null;
+    }[];
+    expect(providers.map((provider) => provider.id)).toEqual(['dropbox', 'google-drive']);
+    expect(providers[0]).toMatchObject({ operational: true, storageHidden: false });
+    expect(providers[1]).toMatchObject({ operational: false, storageHidden: true });
+    expect(providers[1]?.unavailableReason ?? '').toContain('exigências do Google');
+  });
+
+  it('drive:auth usa a chave das configurações e roda o OAuth do Dropbox', async () => {
+    invoke('settings:set', {
+      driveClientId: 'id-do-teste',
+      drivePassphrase: '',
+    });
+    shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
+      const redirect = new URL(url).searchParams.get('redirect_uri');
+      if (redirect !== null) {
+        const request = http.get(`${redirect}?error=access_denied`);
+        request.on('error', () => undefined);
+      }
+      return Promise.resolve();
+    });
+
+    const result = await invokeAsync<{ ok: boolean; error?: string }>('drive:auth');
+
+    expect(result).toEqual({ ok: false, error: 'access_denied' });
+    const opened = shell.openExternal.mock.calls.at(-1)?.[0] ?? '';
+    expect(opened).toContain('client_id=id-do-teste');
+    expect(opened).toMatch(/redirect_uri=http(%3A|:)(\/\/|%2F%2F)localhost(%3A|:)\d+/);
+    expect(opened).not.toContain('client_secret');
+    // O override do settings.json tem prioridade sobre a chave embutida.
+    expect(opened).not.toContain(`client_id=${EMBEDDED_APP_KEY}`);
+  });
+
+  it('drive:auth usa a chave embutida quando o settings não tem override', async () => {
+    // `settings:set` preserva a chave do cofre quando a janela manda `''`
+    // (ela não tem campo): limpar é papel de quem gravou (aqui, o teste).
+    setSecret(VAULT_SECRET.driveClientId, '');
+    invoke('settings:set', {
+      driveClientId: '',
+      drivePassphrase: '',
+    });
+    shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
+      const redirect = new URL(url).searchParams.get('redirect_uri');
+      if (redirect !== null) {
+        const request = http.get(`${redirect}?error=access_denied`);
+        request.on('error', () => undefined);
+      }
+      return Promise.resolve();
+    });
+
+    const result = await invokeAsync<{ ok: boolean; error?: string }>('drive:auth');
+
+    expect(result).toEqual({ ok: false, error: 'access_denied' });
+    expect(EMBEDDED_APP_KEY).not.toBe('');
+    const opened = shell.openExternal.mock.calls.at(-1)?.[0] ?? '';
+    expect(opened).toContain(`client_id=${EMBEDDED_APP_KEY}`);
+  });
+
+  it('drive:disconnect limpa a sessão e avisa a janela', () => {
+    const win = BrowserWindow.instances[0];
+    win?.webContents.send.mockClear();
+    const status = invoke('drive:disconnect') as { connected: boolean; lastError: string | null };
+    expect(status.connected).toBe(false);
+    expect(status.lastError).toBeNull();
+    expect(win?.webContents.send).toHaveBeenCalledWith(
+      'drive:status-changed',
+      expect.objectContaining({ connected: false }),
+    );
+    expect(fs.existsSync(path.join(configDir(), 'dropbox-tokens.json'))).toBe(false);
+  });
+
+  it('drive:backup, restore e backup-info exigem conexão', async () => {
+    expect(await invokeAsync('drive:backup')).toEqual({
+      ok: false,
+      error: 'Conecte a conta Dropbox primeiro.',
+    });
+    expect(await invokeAsync('drive:restore')).toEqual({
+      ok: false,
+      error: 'Conecte a conta Dropbox primeiro.',
+    });
+    expect(await invokeAsync('drive:backup-info')).toBeNull();
+  });
+
+  it('settings:set grava e normaliza as credenciais', () => {
+    const saved = invoke('settings:set', {
+      driveClientId: '  novo-id  ',
+      drivePassphrase: 'frase',
+      language: 'en',
+    }) as AppSettings;
+    expect(saved).toEqual({
+      driveClientId: 'novo-id',
+      drivePassphrase: 'frase',
+      language: 'en',
+    });
+    // O disco guarda só o idioma; os segredos ficam no cofre.
+    const onDisk: unknown = JSON.parse(
+      fs.readFileSync(path.join(configDir(), 'settings.json'), 'utf-8'),
+    );
+    expect(onDisk).toEqual({ language: 'en' });
+  });
+});
+
+describe('handler cover:pick', () => {
+  it('devolve null quando o diálogo é cancelado', async () => {
+    dialog.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] });
+    expect(await invokeAsync<string | null>('cover:pick')).toBeNull();
+  });
+
+  it('devolve null quando nenhum arquivo foi escolhido', async () => {
+    dialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [''] });
+    expect(await invokeAsync<string | null>('cover:pick')).toBeNull();
+  });
+
+  it('importa a imagem escolhida para a pasta de capas', async () => {
+    const source = path.join(os.tmpdir(), `cronologia-pick-${Date.now()}.png`);
+    fs.writeFileSync(source, 'imagem-escolhida', 'utf-8');
+    try {
+      dialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [source] });
+      const name = await invokeAsync<string | null>('cover:pick');
+      expect(name).toMatch(/\.png$/);
+      expect(fs.existsSync(path.join(coversDir(), `${name ?? 'x'}.enc`))).toBe(true);
+      expect(readCoverBuffer(name ?? 'x')?.toString('utf-8')).toBe('imagem-escolhida');
+    } finally {
+      fs.rmSync(source, { force: true });
+    }
+  });
+
+  it('abre o diálogo na janela de origem quando disponível', async () => {
+    const win = BrowserWindow.instances[0];
+    if (win === undefined) throw new Error('Janela não criada.');
+    BrowserWindow.fromWebContents.mockReturnValueOnce(win);
+    dialog.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] });
+    await invokeAsync<string | null>('cover:pick');
+    expect(dialog.showOpenDialog).toHaveBeenCalledWith(win, expect.anything());
+  });
+});
+
+describe('protocolo cover://', () => {
+  it('serve a imagem com mime e cache', () => {
+    writeCoverFile('existe.png', Buffer.from('conteudo-da-capa', 'utf-8'));
+    const response = coverHandler()({ url: 'cover://app/existe.png' });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('image/png');
+    expect(response.headers.get('Cache-Control')).toBe('max-age=3600');
+  });
+
+  it('devolve 404 para capa inexistente', () => {
+    const response = coverHandler()({ url: 'cover://app/fantasma.png' });
+    expect(response.status).toBe(404);
+  });
+
+  it('devolve 404 para caminho vazio', () => {
+    const response = coverHandler()({ url: 'cover://app/' });
+    expect(response.status).toBe(404);
+  });
+
+  it('devolve 500 para URL inválida', () => {
+    const response = coverHandler()({ url: ':::nao-e-url' });
+    expect(response.status).toBe(500);
+  });
+});
+
+describe('ciclo de vida da janela', () => {
+  it('mostra a janela quando pronta', () => {
+    const win = BrowserWindow.instances[0];
+    if (win === undefined) throw new Error('Janela não criada.');
+    win.show.mockClear();
+    onceEvent(win, 'ready-to-show')();
+    expect(win.show).toHaveBeenCalledTimes(1);
+  });
+
+  it('abre links externos no navegador e nega janelas novas', () => {
+    const win = BrowserWindow.instances[0];
+    if (win === undefined) throw new Error('Janela não criada.');
+    shell.openExternal.mockClear();
+    const opener = win.webContents.setWindowOpenHandler.mock.calls[0]?.[0];
+    if (opener === undefined) throw new Error('Window open handler ausente.');
+    const decision = opener({ url: 'https://exemplo.com/docs' });
+    expect(decision.action).toBe('deny');
+    expect(shell.openExternal).toHaveBeenCalledWith('https://exemplo.com/docs');
+  });
+
+  it('não abre URLs externas fora de https', () => {
+    const win = BrowserWindow.instances[0];
+    if (win === undefined) throw new Error('Janela não criada.');
+    shell.openExternal.mockClear();
+    const opener = win.webContents.setWindowOpenHandler.mock.calls[0]?.[0];
+    if (opener === undefined) throw new Error('Window open handler ausente.');
+    for (const url of ['javascript:alert(1)', 'file:///etc/passwd', 'http://exemplo.com/', '']) {
+      expect(opener({ url }).action).toBe('deny');
+    }
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  it('prende a navegação à página do app (will-navigate)', () => {
+    const win = BrowserWindow.instances[0];
+    if (win === undefined) throw new Error('Janela não criada.');
+    const call = win.webContents.on.mock.calls.find((entry) => entry[0] === 'will-navigate');
+    if (call === undefined) throw new Error('Listener will-navigate ausente.');
+    const listener = call[1];
+    const targetUrl = win.loadURL.mock.calls[0]?.[0] ?? '';
+    if (targetUrl === '') throw new Error('loadURL não chamado (modo dev?).');
+
+    const event = { preventDefault: vi.fn() };
+    listener(event, 'https://exemplo.com/fora');
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+
+    listener(event, targetUrl);
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+  });
+
+  it('foca (e restaura) a janela na segunda instância', () => {
+    const win = BrowserWindow.instances[0];
+    if (win === undefined) throw new Error('Janela não criada.');
+    win.focus.mockClear();
+    win.restore.mockClear();
+    const listener = appListener('second-instance');
+
+    listener();
+    expect(win.focus).toHaveBeenCalledTimes(1);
+    expect(win.restore).not.toHaveBeenCalled();
+
+    win.isMinimized.mockReturnValueOnce(true);
+    listener();
+    expect(win.restore).toHaveBeenCalledTimes(1);
+    expect(win.focus).toHaveBeenCalledTimes(2);
+  });
+
+  it('encerra o app quando todas as janelas fecham', () => {
+    app.quit.mockClear();
+    appListener('window-all-closed')();
+    expect(app.quit).toHaveBeenCalledTimes(1);
+  });
+
+  it('recria a janela no activate quando não há janelas', () => {
+    const before = BrowserWindow.instances.length;
+    BrowserWindow.getAllWindows.mockReturnValueOnce([]);
+    appListener('activate')();
+    expect(BrowserWindow.instances.length).toBe(before + 1);
+  });
+});
+
+describe('status do Drive para o renderer', () => {
+  it('para de enviar status depois que a janela é fechada', () => {
+    const win = BrowserWindow.instances[0];
+    if (win === undefined) throw new Error('Janela não criada.');
+    windowEvent(win, 'closed')();
+    win.webContents.send.mockClear();
+
+    invoke('drive:disconnect');
+    expect(win.webContents.send).not.toHaveBeenCalled();
+  });
+});
+
+describe('F11 depois que a janela é fechada', () => {
+  it('ignora o atalho sem janela viva', () => {
+    const win = BrowserWindow.instances[0];
+    if (win === undefined) throw new Error('Janela não criada.');
+    windowEvent(win, 'closed')();
+    win.setFullScreen.mockClear();
+
+    globalShortcut.register.mockClear();
+    appListener('browser-window-focus')();
+    const toggle = globalShortcut.register.mock.calls.at(-1)?.[1];
+    if (toggle === undefined) throw new Error('Callback do F11 ausente.');
+    toggle();
+    expect(win.setFullScreen).not.toHaveBeenCalled();
+  });
+});
+
+describe('encerramento', () => {
+  it('zera a chave do cofre no before-quit', () => {
+    vaultSession.adopt(Buffer.alloc(32, 7));
+    expect(vaultSession.isUnlocked()).toBe(true);
+
+    appListener('before-quit')();
+
+    expect(vaultSession.isUnlocked()).toBe(false);
+    expect(vaultSession.key()).toBeNull();
+  });
+});

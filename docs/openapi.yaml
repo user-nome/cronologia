@@ -1,0 +1,752 @@
+# OpenAPI 3.1 da API interna do Cronologia (ponte IPC `window.api`).
+#
+# Esta aplicação é desktop (Electron), não HTTP: cada `path` abaixo modela um
+# canal IPC (`x-ipc-channel`) como uma operação POST para que a especificação
+# possa ser lida por Swagger UI, Redoc e outras ferramentas do ecossistema.
+# Referência narrativa em `api.md`. Tipos-fonte em `src/types/`.
+#
+# Convenção de argumentos: o preload envia os argumentos de forma **posicional**
+# (`ipcRenderer.invoke(ch, a, b)`), sem objeto. Para "sem argumentos" o corpo
+# é um objeto vazio (`maxProperties: 0`); para argumento único, a string crua
+# (ver `/library/delete` e `/drive/restore`).
+openapi: 3.1.0
+info:
+  title: 'Cronologia: API interna (ponte IPC)'
+  version: 1.9.1
+  description: >
+    Ponte `window.api` (contextBridge) entre o renderer e o processo main:
+    biblioteca de obras, capas, configurações, cofre de segredos e backup no
+    Dropbox. Respostas do Drive usam o envelope `{ ok, error?, ... }` e nunca
+    lançam; mensagens de erro saem no idioma corrente (pt-BR por padrão; ver
+    `docs/api.md` e `docs/messages.md`). A versão desta especificação acompanha
+    a do app em `package.json`.
+  license:
+    name: MIT
+    url: https://opensource.org/license/mit
+servers:
+  - url: ipc://cronologia
+    description: Processo main via Electron IPC (sem rede)
+tags:
+  - name: biblioteca
+    description: >
+      Obras e capas locais. Em repouso são `library.enc` e `covers/<nome>.enc`
+      (cifrados); o nome `library.json` só existe como arquivo lógico dentro do
+      backup.
+  - name: configuracoes
+    description: >
+      Idioma em `settings.json` (modo 0600). Credenciais e senha de backup não
+      vão para o disco: ficam no cofre de segredos.
+  - name: cofre
+    description: Cofre de segredos (Argon2id + AES-256-GCM) e a sessão de chave
+  - name: drive
+    description: Sessão Dropbox, backup criptografado e restauração
+paths:
+  /library/get:
+    post:
+      tags: [biblioteca]
+      summary: Listar obras
+      description: >
+        Devolve todas as obras salvas; lista vazia se não há obras. Exige cofre
+        aberto (sem chave o acervo é ilegível e o main lança `vaultLocked`).
+      x-ipc-channel: library:get
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              maxProperties: 0
+      responses:
+        '200':
+          description: Lista de obras
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Work'
+  /library/save:
+    post:
+      tags: [biblioteca]
+      summary: Criar ou atualizar obra
+      description: >
+        `createdAt`/`updatedAt` ausentes são gerados pelo main (o `createdAt`
+        recebido é preservado); `progress` é arredondado e fixado em `>= 0`
+        (`NaN` vira 0). `id` vazio ou ausente faz o main gerar um UUID.
+      x-ipc-channel: library:save
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkDraft'
+      responses:
+        '200':
+          description: Lista completa atualizada
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Work'
+  /library/delete:
+    post:
+      tags: [biblioteca]
+      summary: Remover obra
+      description: >
+        Argumento posicional único: o `id` da obra. Remove a obra e apaga a
+        capa órfã, se houver. Id fora de `^[A-Za-z0-9_-]{1,64}$` é recusado com
+        `libraryErrors.invalidId`.
+      x-ipc-channel: library:delete
+      x-ipc-args: [id]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              pattern: '^[A-Za-z0-9_-]{1,64}$'
+              description: Identificador da obra
+      responses:
+        '200':
+          description: Lista restante
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Work'
+  /library/reset:
+    post:
+      tags: [biblioteca]
+      summary: Zerar a biblioteca (destrutivo)
+      description: >
+        Apaga todo o acervo sobrescrevendo os arquivos (shred) e recria a pasta
+        de capas. Exige cofre aberto. **A contagem é real**: `ok: false` sem
+        `code` significa falha parcial e a interface mostra quantos arquivos
+        sobraram no disco. Com `code`, é a recusa do cofre, que não chegou a
+        tocar no acervo. O backup na nuvem não é alterado.
+      x-ipc-channel: library:reset
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              maxProperties: 0
+      responses:
+        '200':
+          description: Contagem do que foi sobrescrito e do que falhou
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryReset'
+  /cover/pick:
+    post:
+      tags: [biblioteca]
+      summary: Escolher capa no disco
+      description: >
+        Diálogo nativo (JPG/PNG/WebP/GIF/AVIF/BMP); copia para `covers/` e
+        devolve o nome do arquivo, ou null se cancelado. Em produção é servida
+        como `cover://app/<arquivo>` (ver `docs/api.md`, §7).
+      x-ipc-channel: cover:pick
+      responses:
+        '200':
+          description: Nome do arquivo da capa ou null
+          content:
+            application/json:
+              schema:
+                type: [string, 'null']
+  /settings/get:
+    post:
+      tags: [configuracoes]
+      summary: Ler configurações
+      description: >
+        Idioma vem do disco; `driveClientId` e `drivePassphrase` vêm do cofre
+        e saem como `''` quando ele está fechado (nunca um segredo em claro).
+        Campos ausentes ou inválidos no disco caem para `''`.
+      x-ipc-channel: settings:get
+      responses:
+        '200':
+          description: Configurações atuais
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppSettings'
+  /settings/set:
+    post:
+      tags: [configuracoes]
+      summary: Salvar configurações
+      description: >
+        Grava `language` em `settings.json` (0600) e os segredos no cofre.
+        Normaliza **apenas** `driveClientId` (`trim`); a senha de backup é
+        gravada como digitada. Lança com o cofre fechado, antes de tocar no
+        disco. Um `driveClientId` vazio não apaga o valor já gravado.
+      x-ipc-channel: settings:set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppSettings'
+      responses:
+        '200':
+          description: Valor salvo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppSettings'
+  /vault/status:
+    post:
+      tags: [cofre]
+      summary: Estado do cofre
+      description: Relógio do auto-lock e tentativas de desbloqueio, sem exigir cofre aberto.
+      x-ipc-channel: vault:status
+      responses:
+        '200':
+          description: Estado do cofre
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultStatus'
+  /vault/create:
+    post:
+      tags: [cofre]
+      summary: Criar o cofre (destrutivo se já existir)
+      description: >
+        Argumento posicional único: a senha. Deriva a chave com Argon2id e
+        nasce **desbloqueado**. Falha com `vaultExists` se o `vault.zkv` já
+        estiver lá (com rechecagem depois do reparo da pasta) e com
+        `vaultWeakPassword` antes de qualquer derivação. Pode abrir a caixa do
+        sistema (`vaultDirUnavailable` / `vaultAuthCancelled`) se a pasta do
+        cofre precisar de reparo via PolicyKit.
+      x-ipc-channel: vault:create
+      x-ipc-args: [password]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              description: Senha mestra do cofre
+      responses:
+        '200':
+          description: Resultado com o novo estado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultResult'
+  /vault/unlock:
+    post:
+      tags: [cofre]
+      summary: Desbloquear o cofre
+      description: >
+        Argumento posicional único: a senha. Recusa **antes** do Argon2id se
+        houver trava por tentativas (`vaultLockedOut`, com `retryInMs`), e
+        depois por `vaultWrongPassword`, `vaultTampered` ou `vaultMissing`.
+      x-ipc-channel: vault:unlock
+      x-ipc-args: [password]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              description: Senha mestra do cofre
+      responses:
+        '200':
+          description: Resultado com o estado resultante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultResult'
+  /vault/lock:
+    post:
+      tags: [cofre]
+      summary: Fechar o cofre
+      description: Zera a chave da sessão (incluindo a do Dropbox, relida em seguida). O acervo e os segredos permanecem cifrados em disco.
+      x-ipc-channel: vault:lock
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              maxProperties: 0
+      responses:
+        '200':
+          description: Estado fechado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultStatus'
+  /vault/touch:
+    post:
+      tags: [cofre]
+      summary: Registrar atividade (renova a janela de ociosidade)
+      description: Chamado pelo renderer em `pointerdown`/`keydown`/`wheel`; o throttle de 30 s fica no main. Não afeta o auto-lock disparado internamente.
+      x-ipc-channel: vault:touch
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              maxProperties: 0
+      responses:
+        '200':
+          description: Sem conteúdo
+  /vault/destroy:
+    post:
+      tags: [cofre]
+      summary: Destruir o cofre (destrutivo)
+      description: >
+        Apaga a chave da sessão e sobrescreve `vault.zkv` (mais o `.tmp`
+        órfão). Sem a chave, todo `.enc` do acervo já é irrecuperável
+        (Cryptographic Erase), mas as capas são sobrescritas mesmo assim para
+        não deixar resíduo ilegível. O backup na nuvem **não** é tocado aqui:
+        é `/drive/purge`, operação separada e explícita. Depois da destruição,
+        `vaultDestroyed` barra qualquer gravação até um `vault:create` novo.
+      x-ipc-channel: vault:destroy
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              maxProperties: 0
+      responses:
+        '200':
+          description: Resultado com o estado pós-destruição
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultResult'
+  /vault/locked:
+    post:
+      tags: [cofre]
+      summary: Evento de auto-lock (assinatura)
+      description: >
+        Não é `invoke`, e sim evento push: `vault.onLocked(cb)` assina
+        `vault:locked` e devolve a função de cancelamento. Emitido quando a
+        janela de ociosidade de 5 min expira, com a chave da sessão já zerada.
+      x-ipc-event: vault:locked
+      responses:
+        '200':
+          description: Sem conteúdo
+  /drive/status:
+    post:
+      tags: [drive]
+      summary: Estado da sessão Dropbox
+      description: Montado a partir dos tokens em memória (segredo `dropbox.tokens` do cofre; cofre fechado = desconectado).
+      x-ipc-channel: drive:status
+      responses:
+        '200':
+          description: Estado atual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriveStatus'
+  /drive/providers:
+    post:
+      tags: [drive]
+      summary: Catálogo de provedores de backup
+      description: >
+        Lista os provedores catalogados (`BackupProviderInfo`): Dropbox
+        operante e Google Drive não operante, com o motivo e o destino do
+        backup (pasta oculta `appDataFolder` no Google). Textos no idioma
+        corrente (`AppSettings.language`).
+      x-ipc-channel: drive:providers
+      responses:
+        '200':
+          description: Catálogo em ordem de exibição
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BackupProviderInfo'
+  /drive/auth:
+    post:
+      tags: [drive]
+      summary: Conectar conta Dropbox (OAuth PKCE)
+      description: >
+        Abre o navegador (loopback fixo localhost:17431, sem app secret), troca
+        o código por tokens (`token_access_type=offline`) e persiste no cofre
+        (`dropbox.tokens`; exige cofre aberto). Se a porta fixa estiver
+        ocupada, o app sorteia uma porta livre e o Dropbox recusa o
+        `redirect_uri` com `tokenFailed`.
+      x-ipc-channel: drive:auth
+      responses:
+        '200':
+          description: Resultado da autorização
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthOutcome'
+  /drive/backup:
+    post:
+      tags: [drive]
+      summary: Fazer backup agora
+      description: >
+        Pré-condições, nesta ordem: nenhuma sincronização em andamento, conta
+        conectada, cofre aberto, senha de criptografia definida e acervo não
+        vazio (por ausência do arquivo local, não por lista vazia). Envia o
+        acervo como `library.json` + capas + manifesto, sempre cifrados
+        (AES-256-GCM, scrypt) e com nomes remotos opacos, à pasta do app no
+        Dropbox, e apaga os órfãos remotos.
+      x-ipc-channel: drive:backup
+      responses:
+        '200':
+          description: Resultado com resumo do envio
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Outcome'
+                  - type: object
+                    properties:
+                      summary:
+                        $ref: '#/components/schemas/BackupSummary'
+  /drive/restore:
+    post:
+      tags: [drive]
+      summary: Restaurar backup
+      description: >
+        Argumento posicional único: a senha de criptografia do backup. Baixa,
+        decifra e substitui o acervo local (inclui capas). Senha errada conta
+        para a trava exponencial (2 tentativas livres, depois 10 s → 30 s →
+        1 min → 5 min → 15 min) e só para `PassphraseError`.
+      x-ipc-channel: drive:restore
+      x-ipc-args: [passphrase]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              description: Senha de criptografia usada no backup
+      responses:
+        '200':
+          description: Resultado com nº de obras restauradas
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Outcome'
+                  - type: object
+                    properties:
+                      works:
+                        type: integer
+                        minimum: 0
+  /drive/backup-info:
+    post:
+      tags: [drive]
+      summary: Metadados do backup remoto
+      description: Null se desconectado, sem backup ou ilegível.
+      x-ipc-channel: drive:backup-info
+      responses:
+        '200':
+          description: Resumo remoto ou null
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/BackupSummary'
+                  - type: 'null'
+  /drive/disconnect:
+    post:
+      tags: [drive]
+      summary: Desconectar conta
+      description: Apaga o segredo `dropbox.tokens` do cofre. O backup na nuvem permanece. Com sessão viva e cofre fechado, é recusada com `vaultLocked`.
+      x-ipc-channel: drive:disconnect
+      responses:
+        '200':
+          description: Estado desconectado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriveStatus'
+  /drive/purge:
+    post:
+      tags: [drive]
+      summary: Apagar o backup na nuvem (destrutivo)
+      description: >
+        Apaga os arquivos cifrados do backup na conta conectada e a sessão
+        local. A falha parcial é **contada** (`deleted` e `failed`), nunca
+        escondida: a sessão só é zerada quando `failed === 0`.
+      x-ipc-channel: drive:purge
+      responses:
+        '200':
+          description: Contagem do que foi apagado e do que ficou
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurgeResult'
+  /drive/status-changed:
+    post:
+      tags: [drive]
+      summary: Evento de mudança de estado (assinatura)
+      description: >
+        Não é `invoke`, e sim evento push: `drive.onStatus(cb)` assina
+        `drive:status-changed` e devolve a função de cancelamento. Emitido a
+        cada transição (conectar, sincronizar, erro, desconectar).
+      x-ipc-event: drive:status-changed
+      responses:
+        '200':
+          description: Novo estado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriveStatus'
+components:
+  schemas:
+    WorkType:
+      type: string
+      enum: [webtoon, manhwa, manhua, manga, livro, outro]
+    WorkStatus:
+      type: string
+      enum: [planejado, lendo, pausado, concluido, cancelado]
+    Work:
+      type: object
+      required: [id, title, synopsis, type, status, progress, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        synopsis:
+          type: string
+        type:
+          $ref: '#/components/schemas/WorkType'
+        status:
+          $ref: '#/components/schemas/WorkStatus'
+        progress:
+          type: number
+          minimum: 0
+          description: Progresso de leitura **em capítulos**, sem limite superior
+        marker:
+          type: string
+          description: Indicação livre, ex. "Cap. 45"
+        coverFile:
+          type: string
+          description: Arquivo em `covers/`, cifrado em disco (`.enc`) e servido via `cover://app/<arquivo>`
+        category:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    WorkDraft:
+      description: >
+        Obra para `library:save`. `createdAt`/`updatedAt` são opcionais (o main
+        os preenche quando ausentes, preservando o `createdAt` recebido);
+        `id` também é opcional, porque `''` ou ausente faz o main gerar um UUID.
+      type: object
+      required: [title, synopsis, type, status, progress]
+      properties:
+        id:
+          type: string
+          description: Ausente ou vazio = o main gera um UUID
+        title:
+          type: string
+        synopsis:
+          type: string
+        type:
+          $ref: '#/components/schemas/WorkType'
+        status:
+          $ref: '#/components/schemas/WorkStatus'
+        progress:
+          type: number
+          minimum: 0
+        marker:
+          type: string
+        coverFile:
+          type: string
+        category:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    LibraryReset:
+      description: >
+        Contagem real do shred. `ok: false` **sem** `code` = falha parcial
+        (sobrou resíduo no disco); com `code` = o cofre recusou e nada foi
+        tocado.
+      type: object
+      required: [ok, shredded, failed]
+      properties:
+        ok:
+          type: boolean
+        shredded:
+          type: integer
+          minimum: 0
+          description: Arquivos sobrescritos e apagados
+        failed:
+          type: integer
+          minimum: 0
+          description: Arquivos que não puderam ser sobrescritos/apagados
+        code:
+          $ref: '#/components/schemas/VaultErrorCode'
+    PurgeResult:
+      description: >
+        Apagamento na nuvem. `ok: false` com `deleted > 0` é **falha parcial**:
+        parte foi apagada, parte ficou, e a contagem é mostrada na interface.
+      type: object
+      required: [ok, deleted, failed]
+      properties:
+        ok:
+          type: boolean
+        deleted:
+          type: integer
+          minimum: 0
+        failed:
+          type: integer
+          minimum: 0
+        error:
+          type: string
+          description: Motivo no idioma corrente (presente quando ok=false)
+    AppSettings:
+      type: object
+      required: [driveClientId, drivePassphrase, language]
+      properties:
+        driveClientId:
+          type: string
+          description: App key alternativa do Dropbox ('' usa a embutida; sem campo na UI, lido do cofre)
+        drivePassphrase:
+          type: string
+          description: Senha de criptografia do backup (obrigatória para enviar; guardada no cofre)
+        language:
+          type: string
+          enum: [pt-BR, en, ko, zh-CN, ja]
+          description: Idioma da interface e das mensagens (padrão pt-BR)
+    VaultErrorCode:
+      type: string
+      enum:
+        - vaultExists
+        - vaultMissing
+        - vaultLocked
+        - vaultLockedOut
+        - vaultWrongPassword
+        - vaultTampered
+        - libraryTampered
+        - vaultDestroyed
+        - vaultWeakPassword
+        - vaultDirUnavailable
+        - vaultAuthCancelled
+      description: Código da recusa; a mensagem é localizada no bundle corrente
+    VaultStatus:
+      type: object
+      required: [exists, unlocked, attempts, lockUntil]
+      properties:
+        exists:
+          type: boolean
+          description: O `vault.zkv` existe (ainda que ilegível ou adulterado)
+        unlocked:
+          type: boolean
+          description: Há chave na sessão
+        attempts:
+          type: integer
+          minimum: 0
+          description: Tentativas de desbloqueio erradas consecutivas (0 = nenhuma)
+        lockUntil:
+          type: integer
+          minimum: 0
+          description: Epoch em ms até quando o desbloqueio está suspenso (0 = sem trava)
+    VaultResult:
+      description: Resposta dos canais de cofre; nunca lança, o erro vem por código.
+      oneOf:
+        - type: object
+          required: [ok, status]
+          properties:
+            ok:
+              type: 'const'
+              value: true
+            status:
+              $ref: '#/components/schemas/VaultStatus'
+        - type: object
+          required: [ok, code, retryInMs]
+          properties:
+            ok:
+              type: 'const'
+              value: false
+            code:
+              $ref: '#/components/schemas/VaultErrorCode'
+            retryInMs:
+              type: integer
+              minimum: 0
+              description: Espera antes de nova tentativa (0 = sem trava)
+    DriveStatus:
+      type: object
+      required: [connected, syncing, lastSync, lastError, accountEmail]
+      properties:
+        connected:
+          type: boolean
+        syncing:
+          type: boolean
+        lastSync:
+          type: [string, 'null']
+          format: date-time
+        lastError:
+          type: [string, 'null']
+        accountEmail:
+          type: [string, 'null']
+    BackupSummary:
+      type: object
+      required: [id, name, modifiedTime, size, works]
+      properties:
+        id:
+          type: string
+          description: Id remoto do manifesto do backup ('novo' no primeiro backup)
+        name:
+          type: string
+        modifiedTime:
+          type: string
+          format: date-time
+        size:
+          type: integer
+          minimum: 0
+        works:
+          type: [integer, 'null']
+          minimum: 0
+    BackupProviderInfo:
+      type: object
+      required: [id, label, operational, unavailableReason, storageTarget, storageHidden]
+      properties:
+        id:
+          type: string
+          enum: [dropbox, google-drive]
+        label:
+          type: string
+          description: Nome exibido na interface
+        operational:
+          type: boolean
+          description: true quando já é possível conectar e fazer backup
+        unavailableReason:
+          type: [string, 'null']
+          description: Motivo da indisponibilidade (null quando operante)
+        storageTarget:
+          type: string
+          description: Destino do backup na conta, em texto pronto para exibição
+        storageHidden:
+          type: boolean
+          description: true quando o destino é oculto na interface do serviço
+    Outcome:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        error:
+          type: string
+          description: Mensagem no idioma corrente, pt-BR por padrão (presente quando ok=false)
+    AuthOutcome:
+      allOf:
+        - $ref: '#/components/schemas/Outcome'
+        - type: object
+          properties: {}

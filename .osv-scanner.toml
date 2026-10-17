@@ -1,0 +1,9 @@
+# Ignições de vulnerabilidades sem fix upstream, cada uma com justificativa e
+# data de revisão (`ignoreUntil`): passou da data, volta a falhar o `security:audit`
+# e força uma nova checagem.
+# Histórico: GHSA-ch52-4w7c-c8xp (http-cache-semantics) foi resolvido em
+# 2026-10-04 pela atualização da cadeia de build e removido da lista.
+# Histórico: GHSA-hp3w-g68c-fv3c (sprintf-js, via @electron/get ->
+# global-agent -> roarr) saiu da árvore em 2026-10-06 com os `overrides`
+# de @electron/get@5 e @electron/asar@4 no package.json e também foi
+# removido.
