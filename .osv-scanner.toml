@@ -1,9 +1,72 @@
-# Ignições de vulnerabilidades sem fix upstream, cada uma com justificativa e
-# data de revisão (`ignoreUntil`): passou da data, volta a falhar o `security:audit`
-# e força uma nova checagem.
-# Histórico: GHSA-ch52-4w7c-c8xp (http-cache-semantics) foi resolvido em
-# 2026-10-04 pela atualização da cadeia de build e removido da lista.
-# Histórico: GHSA-hp3w-g68c-fv3c (sprintf-js, via @electron/get ->
-# global-agent -> roarr) saiu da árvore em 2026-10-06 com os `overrides`
-# de @electron/get@5 e @electron/asar@4 no package.json e também foi
-# removido.
+# Configuração do osv-scanner (`npm run security:audit`).
+# Roda sobre o package-lock.json com o filtro de alarmes falsos.
+#
+# Mecanismo: `[[IgnoredVulns]]` com `id` + `ignoreUntil` (YYYY-MM-DD) mantém um
+# alerta suprimido só até a data; depois disso ele volta e precisa ser
+# resolvido de verdade. `reason` documenta por que vale manter suprimido.
+#
+# Histórico: nenhum ignore ativo neste repositório.
+#
+# Exemplo (adicionar só quando houver alerta real):
+#
+# [[IgnoredVulns]]
+# id = "GHSA-xxxx-xxxx-xxxx"
+# ignoreUntil = "2026-12-31"
+# reason = "só em dependência de build; não entra no .deb"
+#
+# `[[PackageOverrides]]` é o outro meio, e é o que cabe em licença: ele declara
+# a licença de um pacote específico sem calar a varredura de vulnerabilidade
+# dele. Os dois usos ativos estão no fim do arquivo, cada um com `reason` e
+# `effectiveUntil`.
+#
+# ----- o que mora no comando e não aqui -----
+#
+# Este arquivo só aceita `IgnoredVulns` e `PackageOverrides`: o resto da
+# política de auditoria são bandeiras do comando, em `package.json`
+# (`scripts.security:audit`). Para não ficar política espalhada em dois lugares,
+# aqui fica o registro do que cada bandeira faz:
+#
+# - `--all-vulns`: mostra também a vulnerabilidade que o scanner julga sem
+#   importance ou não chamada. Sem ela, o resultado é o subconjunto que o
+#   scanner considera relevante, e o relatório cala o resto sem avisar.
+# - `--experimental-flag-deprecated-packages`: pacote em versão abandonada é
+#   dívida que ninguém vai corrigir, então entra na fila.
+# - `--licenses=…`: allowlist de licença. Copilaget livre (GPL, AGPL, SSPL,
+#   BUSL) e pacote sem licença declarada ficam de fora e reprovam o `check`,
+#   que é o ponto: o `.deb` é distribuído e há `THIRD-PARTY-NOTICES.txt` para
+#   manter honesto.
+#
+# Sobre a allowlist, duas entradas não são óbvias e precisam de motivo:
+#
+# - `MPL-2.0` (lightningcss) e `CC-BY-4.0` (caniuse-lite): os dois chegam por
+#   `devDependencies` (Vite/Tailwind) e **não** entram no `.deb`, que embarca
+#   só `out/**`, `build/icon.png`, `THIRD-PARTY-NOTICES.txt` e `package.json`
+#   (ver `files` no `package.json`). São copyleft de arquivo, então só
+#   obrigariam quem distribuísse o arquivo. Se algum dia entrarem em
+#   `dependencies`, tire daqui e resolva a obrigação.
+# - `WTFPL` (truncate-utf8-bytes) e `BlueOak-1.0.0` (cadeia de ferramentas do
+#   npm): permissivas, e colocá-las aqui evita alarme falso em toda atualização
+#   de dependência transitiva.
+#
+# Licença nova que aparecer reprova o `check`: isso é proposital. É pedido de
+# revisão, não defeito; a resposta é acrescentar aqui depois de ler a licença.
+
+# ----- overrides ativos -----
+#
+# caniuse-lite 1.0.30001816 (via browserslist, que vem do @babel/core do
+# electron-vite): o scanner resolve a licença pela API do deps.dev, e o
+# deps.dev ainda não tem registro dessa versão, então a licença voltava
+# UNKNOWN e reprovava o `check` num pacote cuja licença não mudou em nada. O
+# campo `license` do tarball e do registro, e o arquivo LICENSE dentro do
+# pacote, são idênticos aos da 1.0.30001815 (que o deps.dev já responde):
+# `CC-BY-4.0`. Declarar a licença aqui é mais honesto do que prender a
+# dependência numa versão antiga por causa de uma lacuna de dado: o override
+# só vale para esta versão, expira, e a varredura de vulnerabilidade continua
+# valendo. Quando o deps.dev publicar o registro, o override pode sair.
+[[PackageOverrides]]
+name = "caniuse-lite"
+ecosystem = "npm"
+version = "1.0.30001816"
+license.override = ["CC-BY-4.0"]
+effectiveUntil = 2026-12-31
+reason = "deps.dev ainda não tem esta versão; licença conferida no tarball e no registro: CC-BY-4.0, igual à da 1.0.30001815"
