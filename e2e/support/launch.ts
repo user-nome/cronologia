@@ -35,7 +35,38 @@ export interface LaunchedApp {
   readonly page: Page;
   /** Resolve arquivos dentro do HOME temporário desta instância. */
   tempPath(name: string): string;
+  /**
+   * PID do processo principal, capturado no lançamento.
+   *
+   * É um número e não uma função de propósito: `app.process()` do Playwright
+   * lança quando o aplicativo já foi derrubado, ou seja, exatamente na
+   * situação que o teste de encerramento precisa observar. `undefined` só
+   * acontece se o processo já tiver morrido no lançamento, e aí `isRunning()`
+   * já responde `false`.
+   */
+  readonly pid: number | undefined;
+  /** `true` enquanto o processo principal continuar vivo. */
+  isRunning(): boolean;
   close(): Promise<void>;
+}
+
+/**
+ * O processo ainda existe?
+ *
+ * Usa `kill(pid, 0)`, que envia o sinal 0 (nenhum): o kernel valida e não
+ * entrega nada, então o `ESRCH` é a resposta "não existe mais". É uma pergunta
+ * ao kernel, sem passar pelo Playwright, então continua valendo depois de o app
+ * ter encerrado.
+ */
+function isAlive(pid: number | undefined): boolean {
+  if (pid === undefined) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    // EPERM é "existe, mas é de outro dono": para este fim, o processo vive.
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
 }
 
 export async function launchBundled(): Promise<LaunchedApp> {
@@ -48,9 +79,12 @@ export async function launchBundled(): Promise<LaunchedApp> {
     });
     const page = await app.firstWindow();
     await page.waitForLoadState('domcontentloaded');
+    const pid = app.process().pid;
     return {
       page,
       tempPath: (name: string): string => path.join(temp.root, name),
+      pid,
+      isRunning: () => isAlive(pid),
       close: async (): Promise<void> => {
         await app.close();
         removeTempEnv(temp);
@@ -98,6 +132,8 @@ export async function launchPackaged(binary: string): Promise<LaunchedApp> {
     return {
       page,
       tempPath: (name: string): string => path.join(temp.root, name),
+      pid: child.pid ?? 0,
+      isRunning: () => isAlive(child.pid ?? 0),
       close: async (): Promise<void> => {
         await browser.close();
         await stopChild(child);

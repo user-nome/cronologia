@@ -61,6 +61,19 @@ prova que o artefato instalado abre e executa os caminhos essenciais.
 `test:e2e` exige que os dois alvos existam: gere-os com `npm run dist:dir`. A
 suíte não marca um alvo ausente como skip silencioso.
 
+### `quit.e2e.test.ts`: fechar a janela encerra o app
+
+Fora da jornada, com uma instância própria. Fecha a janela pelo próprio "X" e
+confere que o **PID do processo principal sai**, com `kill(pid, 0)`.
+
+Existe porque é a única garantia do app que nenhuma asserção de tela pega:
+uma bandeja, um `on('close')` com `preventDefault()` ou um registro de sessão
+defiantem o app a continuar rodando com a janela fechada, e o sintoma (memória,
+CPU e rede consumidos sem ninguém pedir) só aparece no `ps` e no painel do
+desktop. Precisa de instância própria porque fechar a janela destrói o app, e a
+jornada precisa dele vivo até o fim. Os mecanismos que produziriam esse
+comportamento estão trancaados em `tests/main/index-ciclo-de-vida.test.ts`.
+
 ### Por que o `.deb` não sobe pelo Playwright
 
 O pacote liga o fusível `enableNodeCliInspectArguments: false` (`package.json`,

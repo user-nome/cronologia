@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { PIN_LENGTH, isMasterPasswordFormat, isPinFormat, strengthFor } from '@zero/shared';
-import { RECOVERY_MIN_WORDS, countWords } from '@zero/shared';
+import { MS_PER_SECOND, RECOVERY_MIN_WORDS, countWords } from '@zero/shared';
 import { useMessages } from '@zero/renderer/i18n';
 import StrengthMeter from '@zero/renderer/components/StrengthMeter';
 import { VaultActions, VaultShell, VaultSubmit } from '@zero/renderer/components/VaultShell';
@@ -65,7 +65,7 @@ export function VaultUnlockSteps({
     if (!locked) return;
     const timer = window.setInterval(() => {
       setRemaining((value) => Math.max(0, value - 1));
-    }, 1000);
+    }, MS_PER_SECOND);
     return () => window.clearInterval(timer);
   }, [locked]);
 
@@ -81,7 +81,7 @@ export function VaultUnlockSteps({
         // sem perceber, e a trava que vem logo abaixo já avisa da espera.
         setCredential('');
         setError(m.vault.errors[result.code]);
-        if (result.retryInMs > 0) setRemaining(Math.ceil(result.retryInMs / 1000));
+        if (result.retryInMs > 0) setRemaining(Math.ceil(result.retryInMs / MS_PER_SECOND));
         return;
       }
       setCredential('');
@@ -115,7 +115,7 @@ export function VaultUnlockSteps({
       const result = await window.api.vault.resetPin({ phrase: credential, newPin });
       if (!result.ok) {
         setError(m.vault.errors[result.code]);
-        if (result.retryInMs > 0) setRemaining(Math.ceil(result.retryInMs / 1000));
+        if (result.retryInMs > 0) setRemaining(Math.ceil(result.retryInMs / MS_PER_SECOND));
         return;
       }
       setCredential('');

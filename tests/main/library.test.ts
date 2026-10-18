@@ -24,6 +24,7 @@ import {
 } from '@zero/main/library';
 import { resetLibrary, writeCoverFile } from '@zero/main/library';
 import { isVaultError } from '@zero/main/vault/errors';
+import { writeStoreFile } from '@zero/main/store-crypto';
 import { lockVault, unlockVault } from '@zero/main/vault';
 import { makeDraft, makeWork } from '../helpers/fixtures.ts';
 import { resetSandbox, sandboxPath } from '../helpers/sandbox.ts';
@@ -42,6 +43,17 @@ function libraryFile(): string {
 
 function coverOnDisk(name: string): string {
   return path.join(coversDir(), `${name}.enc`);
+}
+
+/**
+ * Escreve um texto qualquer no acervo, já cifrado pelo caminho real do app.
+ *
+ * É o que permite testar o que sai do `JSON.parse` sem forjar o container: o
+ * AES-256-GCM autentica, então o `loadLibrary` enxerga exatamente o texto que
+ * foi gravado.
+ */
+function gravarPlaintext(texto: string): void {
+  writeStoreFile(libraryFile(), 'library', Buffer.from(texto, 'utf-8'));
 }
 
 /**
@@ -118,10 +130,25 @@ describe('biblioteca', () => {
     expect(() => loadLibrary()).toThrow();
   });
 
-  it('loadLibrary devolve lista vazia quando o conteúdo não é uma lista', () => {
+  it('loadLibrary devolve lista vazia quando o acervo está vazio', () => {
     saveLibrary([]);
-    // JSON válido e decifrável, mas não uma lista: aqui a lista vazia é o certo.
     expect(loadLibrary()).toEqual([]);
+  });
+
+  it('acervo decifrado que não é lista de obras falha fechado, nunca vira []', () => {
+    // O AES-256-GCM já autenticou o bloco, então conteúdo errado aqui é o app
+    // tendo gravado lixo. Devolver `[]` faria o **próximo** `saveLibrary`
+    // sobrescrever o acervo inteiro em silêncio: perder tudo é pior do que a
+    // tela dizer que o acervo está danificado.
+    for (const lixo of ['{"obra": 1}', '"texto"', '42', '[{"id": 1}]']) {
+      gravarPlaintext(lixo);
+      expect(() => loadLibrary()).toThrow(/libraryTampered/);
+    }
+  });
+
+  it('acervo decifrado que não é JSON falha fechado com libraryTampered', () => {
+    gravarPlaintext('{ não é json');
+    expect(() => loadLibrary()).toThrow(/libraryTampered/);
   });
 
   it('saveLibrary e loadLibrary fazem round-trip', () => {

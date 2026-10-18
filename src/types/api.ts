@@ -1,8 +1,11 @@
 import type {
+  AuthorizeResult,
   BackupProviderId,
   BackupProviderInfo,
+  BackupResult,
   BackupSummary,
   DriveStatus,
+  RestoreResult,
 } from '@zero/types/drive';
 import type { AppSettings } from '@zero/types/settings';
 import type {
@@ -42,10 +45,10 @@ export interface ElectronApi {
      * é visível na hora: o estado do Drive na tela inteira muda de provedor.
      * O erro vem de quem está no cofre; ver `switchProvider` em `drive/state.ts`.
      */
-    setProvider: (id: BackupProviderId) => Promise<{ ok: boolean; error?: string }>;
-    auth: () => Promise<{ ok: boolean; error?: string }>;
-    backup: () => Promise<{ ok: boolean; error?: string; summary?: BackupSummary }>;
-    restore: (passphrase: string) => Promise<{ ok: boolean; error?: string; works?: number }>;
+    setProvider: (id: BackupProviderId) => Promise<AuthorizeResult>;
+    auth: () => Promise<AuthorizeResult>;
+    backup: () => Promise<BackupResult>;
+    restore: (passphrase: string) => Promise<RestoreResult>;
     backupInfo: () => Promise<BackupSummary | null>;
     disconnect: () => Promise<DriveStatus>;
     /** Apaga os blobs do usuário na nuvem (destrutivo, irreversível). */

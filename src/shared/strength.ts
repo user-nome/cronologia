@@ -68,6 +68,21 @@ const MIN_BLOCK_LENGTH = 8;
 
 const LEVELS: readonly StrengthLevel[] = ['veryWeak', 'weak', 'fair', 'strong', 'veryStrong'];
 
+/**
+ * Fator de conversão de `score` (0..4) na largura da barra do medidor.
+ *
+ * A barra tem um segmento aceso mesmo no `score` 0 (a régua vazia ainda mostra
+ * que existe), então a largura é `score + 1` segmentos sobre o total. Derivar de
+ * `LEVELS.length` é o que impede a barra de ficar com 6 ou 4 segmentos se um dia
+ * alguém acrescentar um nível: o número sai do lugar único.
+ */
+export const LEVELS_PER_METER = LEVELS.length;
+
+/** Largura em `%` do trecho aceso da barra para um `score` de 0 a 4. */
+export function meterWidthPercent(score: number): number {
+  return ((score + 1) * 100) / LEVELS_PER_METER;
+}
+
 /** Palavras comuns (pt + en) que derrubam a nota de frases e senhas. */
 const COMMON_WORDS = new Set([
   'a',

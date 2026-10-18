@@ -1,3 +1,4 @@
+import type { AuthorizeResult, TokenGrant } from '@zero/types';
 import type { Tokens } from '@zero/main/drive/state';
 import { providerLabel } from '@zero/main/drive/constants';
 import { currentMessages } from '@zero/main/i18n';
@@ -30,12 +31,7 @@ import { vaultUnlocked } from '@zero/main/vault/secrets';
  */
 
 /** Converte a resposta da nuvem na forma que o app guarda. */
-function toTokens(raw: {
-  accessToken: string;
-  refreshToken?: string | undefined;
-  expiresIn: number;
-  grantedScopes?: string | undefined;
-}): Tokens {
+function toTokens(raw: TokenGrant): Tokens {
   return {
     accessToken: raw.accessToken,
     refreshToken: raw.refreshToken,
@@ -55,7 +51,7 @@ function toTokens(raw: {
  * cofre, então uma conexão só em memória voltaria como "desconectada" na próxima
  * abertura, que é pior do que não conectar).
  */
-export async function googleAuthorize(): Promise<{ ok: boolean; error?: string }> {
+export async function googleAuthorize(): Promise<AuthorizeResult> {
   const clientId = googleClientId();
   if (clientId === '') {
     const error = currentMessages().providers.googleNoCredentials;

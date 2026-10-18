@@ -4,7 +4,9 @@ import type { DriveStatus, Language, Work, WorkStatus } from '@zero/types';
 import { messages } from '@zero/messages';
 import {
   FILTER_OPTIONS,
+  PROGRESS_SAVE_DEBOUNCE_MS,
   STATUS_COLORS,
+  TOAST_TIMEOUT_MS,
   clampProgress,
   type StatusFilter,
 } from '@zero/renderer/constants';
@@ -86,7 +88,7 @@ export default function App(): JSX.Element {
   const notify = useCallback((message: string, kind: 'info' | 'error' = 'info'): void => {
     setToast({ message, kind });
     window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(null), 3500);
+    toastTimer.current = window.setTimeout(() => setToast(null), TOAST_TIMEOUT_MS);
   }, []);
 
   const reload = useCallback(async (): Promise<void> => {
@@ -175,11 +177,11 @@ export default function App(): JSX.Element {
   );
 
   /**
-   * O cartão agenda a gravação com atraso (450 ms, para não gravar a cada clique
-   * em "Aumentar 1") e o modal grava na hora. Sem a fila por id, a gravação
-   * agendada do cartão sai **depois** do "Salvar" do modal e traz o rascunho
-   * antigo de volta, para o disco e para a tela: o usuário edita o título, clica
-   * em Salvar, e meio segundo depois o título volta ao anterior.
+   * O cartão agenda a gravação com atraso (`PROGRESS_SAVE_DEBOUNCE_MS`, para não
+   * gravar a cada clique em "Aumentar 1") e o modal grava na hora. Sem a fila por
+   * id, a gravação agendada do cartão sai **depois** do "Salvar" do modal e traz
+   * o rascunho antigo de volta, para o disco e para a tela: o usuário edita o
+   * título, clica em Salvar, e meio segundo depois o título volta ao anterior.
    */
   const scheduleSave = useCallback(
     (work: Work): void => {
@@ -189,7 +191,7 @@ export default function App(): JSX.Element {
       const handle = window.setTimeout(() => {
         timers.delete(work.id);
         void persist(work).catch(() => notify(saveErrorMessage, 'error'));
-      }, 450);
+      }, PROGRESS_SAVE_DEBOUNCE_MS);
       timers.set(work.id, handle);
     },
     [notify, persist, saveErrorMessage],

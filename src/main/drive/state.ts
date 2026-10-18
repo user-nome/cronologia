@@ -1,4 +1,5 @@
-import type { AppSettings, BackupProviderId, DriveStatus } from '@zero/types';
+import type { AppSettings, AuthorizeResult, BackupProviderId, DriveStatus } from '@zero/types';
+import { isRecord } from '@zero/shared';
 import { isVaultError } from '@zero/main/vault/errors';
 import { providerLabel } from '@zero/main/drive/constants';
 import { dropboxAppKey } from '@zero/main/drive/providers/dropbox/credentials';
@@ -64,9 +65,11 @@ export const state: DriveState = {
 let statusListener: ((status: DriveStatus) => void) | null = null;
 
 function isTokens(value: unknown): value is Tokens {
-  if (typeof value !== 'object' || value === null) return false;
-  const record = value as Partial<Tokens>;
-  return typeof record.accessToken === 'string' && typeof record.scopeVersion === 'number';
+  // Só o mínimo é conferido: `accessToken` é o que toda chamada autenticada usa,
+  // e `scopeVersion` é o que diz se a sessão foi gravada por uma versão de
+  // escopo que ainda vale. O resto da forma é do app, não da nuvem.
+  if (!isRecord(value)) return false;
+  return typeof value.accessToken === 'string' && typeof value.scopeVersion === 'number';
 }
 
 /**
@@ -108,7 +111,7 @@ export function persistState(): void {
  * para um destino que não existe deixaria o app sem backup sem o usuário ter
  * pedido isso.
  */
-export function switchProvider(id: BackupProviderId): { ok: boolean; error?: string } {
+export function switchProvider(id: BackupProviderId): AuthorizeResult {
   if (id === state.provider) return { ok: true };
   let salvo: AppSettings;
   try {

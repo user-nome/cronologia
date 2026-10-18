@@ -1,3 +1,4 @@
+import type { AccountEmailResponse } from '@zero/types';
 import type { OAuthFlow } from '@zero/main/drive/oauth-flow';
 import { providerLabel } from '@zero/main/drive/constants';
 import {
@@ -27,7 +28,7 @@ import { currentMessages } from '@zero/main/i18n';
  */
 
 /** Valida a resposta de `users/get_current_account` (só o e-mail interessa). */
-function isAccountEmail(data: unknown): data is { email: string } {
+function isAccountEmail(data: unknown): data is AccountEmailResponse {
   if (typeof data !== 'object' || data === null || !('email' in data)) return false;
   return typeof data.email === 'string';
 }

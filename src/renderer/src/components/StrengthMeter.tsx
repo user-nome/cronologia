@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import { useMessages } from '@zero/renderer/i18n';
 import type { StrengthResult } from '@zero/shared';
+import { meterWidthPercent } from '@zero/shared';
 
 interface StrengthMeterProps {
   result: StrengthResult;
@@ -9,7 +10,7 @@ interface StrengthMeterProps {
 }
 
 /**
- * Medidor de força da credencial: barra de 4 segmentos, rótulo do nível e o que
+ * Medidor de força da credencial: barra de 5 segmentos, rótulo do nível e o que
  * derrubou a nota.
  *
  * A régua vem de `@zero/shared` e é a mesma que o main usa para recusar: os dois
@@ -31,7 +32,7 @@ export default function StrengthMeter({ result, hint }: StrengthMeterProps): JSX
       <span className="vault-strength-track">
         <span
           className={`vault-strength-bar ${result.level}`}
-          style={{ width: `${(result.score + 1) * 20}%` }}
+          style={{ width: `${meterWidthPercent(result.score)}%` }}
         />
       </span>
       <span className="help">{m.strength.levels[result.level]}</span>

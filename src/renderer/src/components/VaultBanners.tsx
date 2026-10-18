@@ -1,5 +1,5 @@
 import type { JSX, KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { formatCountdown } from '@zero/shared';
+import { MS_PER_SECOND, formatCountdown } from '@zero/shared';
 import { useMessages } from '@zero/renderer/i18n';
 
 /**
@@ -42,7 +42,8 @@ export function LockBanner({ remainingSeconds }: LockBannerProps): JSX.Element |
   if (remainingSeconds <= 0) return null;
   return (
     <div className="banner warning">
-      <i className="fa-solid fa-clock" /> {m.auth.lockout(formatCountdown(remainingSeconds * 1000))}
+      <i className="fa-solid fa-clock" />{' '}
+      {m.auth.lockout(formatCountdown(remainingSeconds * MS_PER_SECOND))}
     </div>
   );
 }

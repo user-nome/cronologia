@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { MASTER_PASSWORD_LENGTH, PIN_LENGTH, RECOVERY_MIN_WORDS, strengthFor } from '@zero/shared';
+import {
+  LEVELS_PER_METER,
+  MASTER_PASSWORD_LENGTH,
+  PIN_LENGTH,
+  RECOVERY_MIN_WORDS,
+  meterWidthPercent,
+  strengthFor,
+} from '@zero/shared';
 import type { StrengthKind, StrengthResult } from '@zero/shared';
 
 /**
@@ -237,5 +244,37 @@ describe('shared/strength: o medidor e o cofre concordam', () => {
     expect(SENHA_BOA.length).toBe(MASTER_PASSWORD_LENGTH);
     expect(PIN_BOM.length).toBe(PIN_LENGTH);
     expect(gradeOf('phrase', FRASE_BOA).blocked).toBe(false);
+  });
+});
+
+/**
+ * A barra do medidor é desenhada no renderer a partir de `score`, e o número de
+ * segmentos vem de `LEVELS_PER_METER` para não sair do lugar único. O teste
+ * amarra as duas coisas: se um nível for acrescentado na régua, a barra tem de
+ * acompanhar sem ninguém editar o CSS.
+ */
+describe('shared/strength: largura da barra', () => {
+  it('a barra tem um segmento aceso mesmo no score 0', () => {
+    expect(meterWidthPercent(0)).toBe(20);
+  });
+
+  it('cada nível aceso soma um segmento sobre o total', () => {
+    expect(meterWidthPercent(1)).toBe(40);
+    expect(meterWidthPercent(2)).toBe(60);
+    expect(meterWidthPercent(3)).toBe(80);
+    expect(meterWidthPercent(4)).toBe(100);
+  });
+
+  it('o total de segmentos vem da régua, não de um literal na tela', () => {
+    expect(LEVELS_PER_METER).toBe(5);
+    // A barra nunca fica com 6 ou 4 segmentos: o denominador é derivado.
+    expect(meterWidthPercent(LEVELS_PER_METER - 1)).toBe(100);
+  });
+
+  it('a nota mais alta que a régua produz para PIN não acende a barra toda', () => {
+    // O PIN nunca passa de "razoável" de propósito (8 dígitos não têm entropia
+    // de senha); se um dia `score` vier 4, é bug da régua, não da barra.
+    const maximo = Math.max(...[0, 1, 2, 3, 4].map((d) => gradeOf('pin', String(d)).score));
+    expect(maximo).toBeLessThanOrEqual(2);
   });
 });

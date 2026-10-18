@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { DONATION_LABEL, DONATION_URL } from '@zero/renderer/donations';
+import { COPY_FEEDBACK_MS } from '@zero/renderer/constants';
 import { useMessages } from '@zero/renderer/i18n';
 
 interface DonateModalProps {
@@ -33,7 +34,7 @@ export default function DonateModal({ onClose }: DonateModalProps): JSX.Element 
       .writeText(DONATION_URL)
       .then(() => {
         setCopied(true);
-        window.setTimeout(() => setCopied(false), 2500);
+        window.setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
       })
       .catch(() => undefined);
   };

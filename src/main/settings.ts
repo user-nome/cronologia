@@ -3,6 +3,7 @@ import path from 'path';
 import { writeJsonAtomic } from '@zero/main/jsonfile';
 import { configDir } from '@zero/main/paths';
 import type { AppSettings, BackupProviderId, Language } from '@zero/types';
+import { field, isRecord } from '@zero/shared';
 import { VAULT_SECRET, vaultUnlocked } from '@zero/main/vault/secrets';
 import { getSecret, setSecret } from '@zero/main/vault/vault';
 
@@ -39,9 +40,15 @@ function settingsPath(): string {
   return path.join(configDir(), 'settings.json');
 }
 
-/** Lê o idioma; qualquer valor fora do catálogo cai no padrão. */
-function languageField(record: object): Language {
-  const value: unknown = Reflect.get(record, 'language');
+/**
+ * Lê o idioma; qualquer valor fora do catálogo cai no padrão.
+ *
+ * O parâmetro é `Record<string, unknown>` (e não `object`) porque é o que o
+ * `field` de `@zero/shared` aceita: `Reflect.get` sobre `object` devolve `any`,
+ * e um `any` solto aqui seria a única coisa no `settings.json` sem tipo.
+ */
+function languageField(record: Record<string, unknown>): Language {
+  const value = field(record, 'language');
   return value === 'pt-BR' ||
     value === 'en' ||
     value === 'ko' ||
@@ -57,8 +64,8 @@ interface OnDisk {
   backupProvider: BackupProviderId;
 }
 
-function onDiskField(record: object): OnDisk {
-  const provider: unknown = Reflect.get(record, 'backupProvider');
+function onDiskField(record: Record<string, unknown>): OnDisk {
+  const provider = field(record, 'backupProvider');
   return {
     language: languageField(record),
     backupProvider: isProviderId(provider) ? provider : DEFAULTS.backupProvider,
@@ -72,7 +79,7 @@ function readOnDisk(): OnDisk {
       return { language: DEFAULTS.language, backupProvider: DEFAULTS.backupProvider };
     }
     const parsed: unknown = JSON.parse(fs.readFileSync(file, 'utf-8'));
-    if (typeof parsed !== 'object' || parsed === null) {
+    if (!isRecord(parsed)) {
       return { language: DEFAULTS.language, backupProvider: DEFAULTS.backupProvider };
     }
     return onDiskField(parsed);

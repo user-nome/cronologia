@@ -96,6 +96,35 @@ export const CATEGORIES: string[] = [
 
 export type StatusFilter = 'todos' | WorkStatus;
 
+/**
+ * Passo dos botões de progresso do modal de obra e do cartão.
+ *
+ * É o passo dos dois botões `+10`/`−10`, e o texto deles (`decreaseStep`/
+ * `increaseStep` em `m.workModal`) é derivado deste número. Um só lugar: mudar
+ * aqui muda os dois botões, o rótulo acessível e o `aria` junto.
+ */
+export const PROGRESS_STEP = 10;
+
+/**
+ * Prazo do `toast` da barra, em ms.
+ *
+ * Tempo de ler uma confirmação curta antes de ela sair sozinha. Maior que isso
+ * atrapalha (cobre a tela), menor e a pessoa perde a mensagem.
+ */
+export const TOAST_TIMEOUT_MS = 3_500;
+
+/** Duração do "copiado" no modal de doações (confirmar o que foi copiado). */
+export const COPY_FEEDBACK_MS = 2_500;
+
+/**
+ * Atraso da gravação agendada pelo cartão, em ms.
+ *
+ * Existe para o "+1" não gravar a cada clique: um atraso curto é invisível e
+ * some sozinho quando a pessoa para de clicar. Não dá para alongar muito sem
+ * que o "Salvar" do modal seja seguido por uma gravação antiga.
+ */
+export const PROGRESS_SAVE_DEBOUNCE_MS = 450;
+
 /** Valores dos chips de filtro da barra superior (rótulos em `m.app.filters`). */
 export const FILTER_OPTIONS: readonly StatusFilter[] = [
   'todos',

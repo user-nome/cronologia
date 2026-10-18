@@ -1,5 +1,13 @@
 import fs from 'fs';
-import type { BackupSummary, DriveStatus, Work } from '@zero/types';
+import type {
+  BackupResult,
+  BackupSummary,
+  DriveStatus,
+  RemoteFile,
+  ResolvedLocalNames,
+  RestoreResult,
+  Work,
+} from '@zero/types';
 import {
   MANIFEST_FILE,
   PassphraseError,
@@ -14,7 +22,6 @@ import {
   remoteName,
 } from '@zero/main/drive/crypto';
 import { currentProvider } from '@zero/main/drive/provider';
-import type { RemoteFile } from '@zero/main/drive/provider';
 import {
   registerRestoreFailure,
   resetRestoreLock,
@@ -38,6 +45,7 @@ import {
 } from '@zero/main/library';
 import { currentMessages } from '@zero/main/i18n';
 import { loadSettings } from '@zero/main/settings';
+import { isWorkArray } from '@zero/shared';
 import { vaultUnlocked } from '@zero/main/vault/secrets';
 
 /** Resultado de `purgeRemote`: contagem real, nunca um "apagado" em falso. */
@@ -49,32 +57,6 @@ export interface PurgeSummary {
 }
 
 /** Valida a forma mínima de uma obra vinda do backup. */
-function isWorkRecord(value: unknown): value is Work {
-  if (typeof value !== 'object' || value === null) return false;
-  if (!(
-    'id' in value &&
-    'title' in value &&
-    'synopsis' in value &&
-    'type' in value &&
-    'status' in value &&
-    'progress' in value
-  )) {
-    return false;
-  }
-  return (
-    typeof value.id === 'string' &&
-    typeof value.title === 'string' &&
-    typeof value.synopsis === 'string' &&
-    typeof value.type === 'string' &&
-    typeof value.status === 'string' &&
-    typeof value.progress === 'number'
-  );
-}
-
-/** Valida que o backup decifrado é uma lista de obras. */
-function isWorkArray(value: unknown): value is Work[] {
-  return Array.isArray(value) && value.every(isWorkRecord);
-}
 
 /**
  * Resolve cada arquivo remoto para seu nome local.
@@ -86,7 +68,7 @@ function isWorkArray(value: unknown): value is Work[] {
 async function resolveLocalNames(
   remote: RemoteFile[],
   passphrase: string,
-): Promise<{ localOf: Map<string, string>; manifestId: string | null }> {
+): Promise<ResolvedLocalNames> {
   const provider = currentProvider();
   const manifestRemote = remoteName(MANIFEST_FILE, manifestKeyFor(passphrase));
   const localOf = new Map<string, string>();
@@ -132,11 +114,7 @@ async function previousNameSalt(
   }
 }
 
-export async function backupNow(): Promise<{
-  ok: boolean;
-  error?: string;
-  summary?: BackupSummary;
-}> {
+export async function backupNow(): Promise<BackupResult> {
   if (state.syncing) return { ok: false, error: currentMessages().driveErrors.syncInProgress };
   const provider = currentProvider();
   if (state.tokens === null) {
@@ -215,11 +193,7 @@ export async function backupNow(): Promise<{
   }
 }
 
-export async function restoreNow(passphrase: string): Promise<{
-  ok: boolean;
-  error?: string;
-  works?: number;
-}> {
+export async function restoreNow(passphrase: string): Promise<RestoreResult> {
   // Trava exponencial: falhas seguidas de senha errada atrasam a próxima
   // tentativa (ver `restore-lock.ts`); checa antes de qualquer chamada de rede.
   const lockedFor = restoreLockRemainingSec();

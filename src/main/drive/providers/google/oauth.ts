@@ -1,3 +1,4 @@
+import type { AccountEmailResponse } from '@zero/types';
 import type { OAuthFlow } from '@zero/main/drive/oauth-flow';
 import {
   GOOGLE_AUTH_ENDPOINT,
@@ -11,7 +12,7 @@ import { parseJson } from '@zero/main/drive/json';
 import { currentMessages } from '@zero/main/i18n';
 
 /** Valida a resposta do `userinfo` (só o e-mail interessa). */
-function isUserInfo(data: unknown): data is { email: string } {
+function isUserInfo(data: unknown): data is AccountEmailResponse {
   if (typeof data !== 'object' || data === null || !('email' in data)) return false;
   return typeof data.email === 'string';
 }

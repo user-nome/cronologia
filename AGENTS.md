@@ -172,8 +172,12 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
   upstream só com justificativa e `ignoreUntil` em `.osv-scanner.toml`.
 - Nada de token OAuth no repositório: tokens Dropbox/Google saem do dispositivo
   do usuário (OAuth PKCE). As App keys OAuth são identificadores públicos,
-  injetados no build por `.env` local ou secrets do CI; os secrets do CI
-  (`GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`) vivem só no GitHub.
+  injetados no build por `.env` local ou por **Secrets and variables → Actions**
+  no CI (`DROPBOX_APP_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: o
+  `publish.yml` lê `secrets.*` e `vars.*` com o mesmo nome, e o `publish.yml`
+  confere que a chave entrou no `.deb` antes de anexá-lo). Os secrets do CI
+  (`GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`) vivem só no GitHub. Tabela do que é
+  obrigatório e em que aba cadastrar em `docs/build.md`.
 - Renderer com CSP (schemes `cover:` e `cronologia:`) e preload sandboxed (por
   isso ele é CommonJS); não enfraquecer `contextIsolation` nem inserir HTML
   dinâmico. Na produção a SPA é servida por `cronologia://` via

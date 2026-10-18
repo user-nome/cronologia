@@ -21,15 +21,15 @@ não fala com a rede. Tudo que importa acontece no processo main, e o preload é
 
 ## Camadas
 
-| Pasta           | Papel                                                               | Arquivo principal                |
-| --------------- | ------------------------------------------------------------------- | -------------------------------- |
-| `src/main/`     | Janela, IPC, protocolos, persistência e backup em nuvem             | `index.ts`, `protocols.ts`       |
-| `src/preload/`  | Fachada `window.api` registrada no `contextBridge` (build CJS)      | `index.ts` (entrypoint)          |
-| `src/renderer/` | Interface React: grade, modais, configurações e contexto de idioma  | `App.tsx`                        |
-| `src/types/`    | Contratos compartilhados (`Work`, `AppSettings`, `ElectronApi`)     | `index.ts` (barrel)              |
-| `src/messages/` | Textos em pt-BR (canônico), en, ko, zh-CN e ja                      | `pt-BR.ts`, `index.ts`           |
-| `src/shared/`   | Regras puras que renderer e main precisam concordar (credenenciais) | `policy.ts`, `strength.ts`       |
-| `tests/`        | Suíte Vitest (ambiente jsdom, `electron` mockado)                   | `tests/main/`, `tests/renderer/` |
+| Pasta           | Papel                                                                                      | Arquivo principal                                |
+| --------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| `src/main/`     | Janela, IPC, protocolos, persistência e backup em nuvem                                    | `index.ts`, `protocols.ts`                       |
+| `src/preload/`  | Fachada `window.api` registrada no `contextBridge` (build CJS)                             | `index.ts` (entrypoint)                          |
+| `src/renderer/` | Interface React: grade, modais, configurações e contexto de idioma                         | `App.tsx`                                        |
+| `src/types/`    | Contratos compartilhados (`Work`, `AppSettings`, `ElectronApi`)                            | `index.ts` (barrel)                              |
+| `src/messages/` | Textos em pt-BR (canônico), en, ko, zh-CN e ja                                             | `pt-BR.ts`, `index.ts`                           |
+| `src/shared/`   | Regras puras que renderer e main precisam concordar (credenciais e guarda de dado externo) | `policy.ts`, `strength.ts`, `json.ts`, `work.ts` |
+| `tests/`        | Suíte Vitest (ambiente jsdom, `electron` mockado)                                          | `tests/main/`, `tests/renderer/`                 |
 
 Regras de organização: arquivo `index.ts` só reexporta (exceto os dois
 entrypoints que o Electron exige) e arquivo no teto de ~500 linhas é quebrado.
@@ -136,8 +136,22 @@ deixar um processo sem interface; só a falha na janela encerra o processo,
 com `dialog.showErrorBox`.
 
 Encerramento: `window-all-closed` sai (fora de macOS), `before-quit` zera a
-chave do cofre na sessão (`vaultSession.dispose()`) e `will-quit`
-desregistra os atalhos globais.
+chave do cofre na sessão (`vaultSession.dispose()`), `will-quit`
+desregistra os atalhos globais e o `closed` da janela também os desregistra
+(fechar uma janela focada não emite `blur`).
+
+**Fechar a janela encerra o app, e não há bandeja.** É uma decisão de produto,
+não um detalhe esquecido: um app de leitura que continua rodando com a janela
+fechada gasta memória, CPU e (com o backup ligado) rede sem ninguém ter pedido,
+e a pessoa não tem como notar isso a não ser olhando o `ps` ou o painel do
+desktop. Os quatro mecanismos que produziriam esse comportamento estão
+**ausentes por construção** e cada um tem guarda própria em
+`tests/main/index-ciclo-de-vida.test.ts`: não existe `Tray`, não existe
+`on('close')` com `preventDefault()` (o "X" fecha mesmo), não existe
+`setLoginItemSettings` e não existe `powerSaveBlocker`. O efeito é verificado
+no E2E (`e2e/quit.e2e.test.ts`: fecha a janela e confere que o processo
+principal sai). O mesmo desenho vem do app Guardinha, que é a referência.
+
 O cofre não tem etapa de boot: ele só é tocado quando um fluxo precisa de
 segredo, e aí a UI abre a criação/desbloqueio (sem cofre aberto o app roda
 sem segredo nenhum; ver [`cofre.md`](cofre.md)). A pasta em

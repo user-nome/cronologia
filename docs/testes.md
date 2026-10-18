@@ -64,7 +64,9 @@ São sob demanda (ver os guias linkados no topo).
 | `tests/main/vault-unlock.test.ts`          | Cadeia de desbloqueio: reembrulho de custo antigo, embrulho com tamanho errado, KDF que lança por dentro e separação de salt entre coframes                 |
 | `tests/main/vault.test.ts`                 | Ciclo de vida: criar (3 credenciais), abrir por PIN/mestra, frase de recuperação, trocar credencial, segredos, adulteração, pasta sem permissão, destruição |
 | `tests/shared/policy.test.ts`              | Formato aceito de cada credencial, normalização da frase (espaço sim, caixa não) e contagem regressiva                                                      |
-| `tests/shared/strength.test.ts`            | Régua de força: o que recusa (`blocked`), a nota, o motivo, e o acordo entre a tela e o main                                                                |
+| `tests/shared/strength.test.ts`            | Régua de força: o que recusa (`blocked`), a nota, o motivo, o acordo entre a tela e o main e a largura da barra                                             |
+| `tests/shared/json.test.ts`                | Guarda de dado externo: o que `isRecord` aceita, o que `field` devolve para valor falsy e o que sobe pela cadeia de protótipos                              |
+| `tests/shared/work.test.ts`                | Validador de obra: campo obrigatório faltando, campo no tipo errado, obra sem os opcionais do backup antigo e lista com um elemento ruim                    |
 | `tests/main/vault-secrets.test.ts`         | Cofre é a única fonte: sem/aberto/fechado/adulterado (falha fechada), JSON de forma errada e sessão ligada à chave em memória                               |
 | `tests/main/vault-privilege.test.ts`       | `setupVaultDirectory`: override bloqueia pkexec; exit 0/126/127/throw → ok/cancelled/failed; `isVaultDirUnavailable` e `createVault` sem pkexec no sandbox  |
 | `tests/main/drive-auth.test.ts`            | Estado do Dropbox, tokens no cofre, escopo divergente e refresh                                                                                             |

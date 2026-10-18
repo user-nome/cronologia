@@ -35,13 +35,16 @@ Se fornecido, o valor também é embutido no bundle main. Um segredo de cliente
 incluído em um aplicativo desktop distribuído **não é confidencial** e não deve
 ser tratado como barreira de segurança; a proteção do fluxo é PKCE.
 
-No GitHub Actions, configure o secret `GOOGLE_CLIENT_ID` para incluir a
-integração nas Releases; `GOOGLE_CLIENT_SECRET` é opcional. O workflow de
-publicação injeta os valores no build, nunca no código-fonte. Sem o ID, o
-Dropbox continua operante e o Google Drive aparece no catálogo como
-indisponível. O consentimento, os escopos e o estado de publicação do app OAuth
-também precisam estar configurados no Google Cloud Console conforme as regras
-vigentes do Google.
+No GitHub Actions, configure `GOOGLE_CLIENT_ID` em **Settings → Secrets and
+variables → Actions** (aba **Variables** é o lugar certo, porque o valor é um
+identificador público de cliente Desktop; a aba **Secrets** também é lida) para
+incluir a integração nas Releases; `GOOGLE_CLIENT_SECRET` é opcional. O
+workflow de publicação injeta os valores no build, nunca no código-fonte, e
+falha com mensagem explícita se `GOOGLE_CLIENT_ID` estiver ausente (ver
+`docs/build.md`). Sem o ID, o Dropbox continua operante e o Google Drive aparece
+no catálogo como indisponível. O consentimento, os escopos e o estado de
+publicação do app OAuth também precisam estar configurados no Google Cloud
+Console conforme as regras vigentes do Google.
 
 ### Fluxos e detalhes da API
 

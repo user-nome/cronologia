@@ -62,6 +62,7 @@ import type {
   ChangePinInput,
   CreateVaultInput,
   DriveStatus,
+  IpcFrameEvent,
   LibraryReset,
   PurgeResult,
   ResetPinInput,
@@ -99,15 +100,28 @@ function preloadScript(): string {
   return found ?? path.join(dir, 'index.cjs');
 }
 
+/**
+ * Tamanho da janela, em px.
+ *
+ * O tamanho inicial acompanha uma tela de notebook (1200x800 fica bem em
+ * 1366x768 e em 1600x900). Os mínimos são pequenos o bastante para caber em
+ * meia/quarta tela, porque o tiling do Cinnamon/Muffin recusa encaixar a janela
+ * se o mínimo não couber no retângulo: metade de 1600x900 dá 800x430 e de
+ * 1366x768 dá 683x364.
+ */
+const WINDOW_SIZE = {
+  width: 1200,
+  height: 800,
+  minWidth: 520,
+  minHeight: 360,
+} as const;
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    // Mínimos pequenos o bastante para caber em meia/quarta tela (tiling do
-    // Cinnamon/Muffin recusa encaixar se o mínimo não couber no retângulo):
-    // metade de 1600x900 = 800x430; de 1366x768 = 683x364.
-    minWidth: 520,
-    minHeight: 360,
+    width: WINDOW_SIZE.width,
+    height: WINDOW_SIZE.height,
+    minWidth: WINDOW_SIZE.minWidth,
+    minHeight: WINDOW_SIZE.minHeight,
     title: 'Cronologia',
     backgroundColor: '#000000',
     icon: nativeImage.createFromPath(path.join(__dirname, '../../build/icon.png')),
@@ -142,6 +156,11 @@ function createWindow(): void {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    // O atalho global do F11 é registrado no focus e desregistrado no blur.
+    // Fechar uma janela **focada** não emite `blur`, então sem esta linha o
+    // registro sobrevive no sistema até o `will-quit`, e um `before-quit` que
+    // segure o encerramento deixaria o app capturando F11 sem janela na tela.
+    globalShortcut.unregisterAll();
   });
 }
 
@@ -180,10 +199,13 @@ function isAppFrameUrl(url: string | undefined): boolean {
 /**
  * Recusa IPC cujo emissor não é a página oficial do app (scheme `cronologia://`
  * em produção ou dev server do Vite em dev). Requer `event.senderFrame`.
+ *
+ * O evento entra como `IpcFrameEvent`: o tipo real do Electron é um superconjunto
+ * deste, então ele atravessa a função sem `as`. O que fica `unknown` é a URL, e é
+ * a decisão certa: ela só vira string depois de `isAppFrameUrl` conferir.
  */
-function assertAppFrame(event: unknown): void {
-  const sf = (event as { senderFrame?: { url?: unknown } | null } | null | undefined)?.senderFrame;
-  const url = sf?.url;
+function assertAppFrame(event: IpcFrameEvent | null | undefined): void {
+  const url = event?.senderFrame?.url;
   if (!isAppFrameUrl(typeof url === 'string' ? url : undefined)) {
     throw new Error('IPC bloqueado: frame fora da página oficial do app.');
   }

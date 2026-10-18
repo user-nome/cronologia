@@ -58,20 +58,18 @@ export function VaultShell({
   );
 }
 
+interface VaultActionsProps {
+  onClose: (() => void) | null;
+  busy: boolean;
+  children: ReactNode;
+}
+
 /**
  * Par de ações dentro do corpo do modal: cancela à esquerda, confirma à direita.
  * `onClose = null` é a barreira da tela inteira, que não tem Cancelar porque
  * não há para onde ir.
  */
-export function VaultActions({
-  onClose,
-  busy,
-  children,
-}: {
-  onClose: (() => void) | null;
-  busy: boolean;
-  children: ReactNode;
-}): JSX.Element {
+export function VaultActions({ onClose, busy, children }: VaultActionsProps): JSX.Element {
   const m = useMessages();
   return (
     <div className="modal-actions">
@@ -87,6 +85,15 @@ export function VaultActions({
   );
 }
 
+interface VaultSubmitProps {
+  busy: boolean;
+  /** Classe do ícone do Font Awesome (o botão troca por spinner quando busy). */
+  icon: string;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}
+
 /** Botão de confirmação, com o spinner enquanto o Argon2id roda. */
 export function VaultSubmit({
   busy,
@@ -94,13 +101,7 @@ export function VaultSubmit({
   label,
   onClick,
   disabled = false,
-}: {
-  busy: boolean;
-  icon: string;
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-}): JSX.Element {
+}: VaultSubmitProps): JSX.Element {
   const m = useMessages();
   return (
     <button className="btn primary" onClick={onClick} disabled={busy || disabled}>

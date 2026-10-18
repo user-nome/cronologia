@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import type { Work, WorkStatus, WorkType } from '@zero/types';
 import {
+  PROGRESS_STEP,
   STATUS_COLORS,
   STATUS_OPTIONS,
   TYPE_COLORS,
@@ -230,17 +231,17 @@ export default function WorkModal({
                 />
                 <button
                   className="btn small"
-                  title={m.workModal.decrease10}
-                  onClick={() => setProgress(draft.progress - 10)}
+                  title={m.workModal.decreaseStep(PROGRESS_STEP)}
+                  onClick={() => setProgress(draft.progress - PROGRESS_STEP)}
                 >
-                  <i className="fa-solid fa-minus" /> 10
+                  <i className="fa-solid fa-minus" /> {PROGRESS_STEP}
                 </button>
                 <button
                   className="btn small"
-                  title={m.workModal.increase10}
-                  onClick={() => setProgress(draft.progress + 10)}
+                  title={m.workModal.increaseStep(PROGRESS_STEP)}
+                  onClick={() => setProgress(draft.progress + PROGRESS_STEP)}
                 >
-                  <i className="fa-solid fa-plus" /> 10
+                  <i className="fa-solid fa-plus" /> {PROGRESS_STEP}
                 </button>
                 <span className="progress-percent">
                   {draft.status === 'concluido'

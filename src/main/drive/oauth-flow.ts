@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import http from 'http';
 import { URLSearchParams } from 'url';
-import type { BackupProviderId } from '@zero/types';
+import type { AuthorizationCode, BackupProviderId, TokenGrant, TokenResponse } from '@zero/types';
 import { providerLabel } from '@zero/main/drive/constants';
 import { parseJson } from '@zero/main/drive/json';
 import { openExternalSafe } from '@zero/main/external';
@@ -69,14 +69,7 @@ export interface AuthorizationGrant {
 }
 
 /** Resposta de token já validada, nos nomes do app (não os da nuvem). */
-export interface RawTokens {
-  accessToken: string;
-  refreshToken?: string | undefined;
-  /** Segundos de validade, contados de agora. */
-  expiresIn: number;
-  /** Escopos que a nuvem disse ter concedido, quando ela informa. */
-  grantedScopes?: string | undefined;
-}
+type RawTokens = TokenGrant;
 
 interface AuthOutcome {
   code: string | null;
@@ -125,7 +118,7 @@ async function openBrowser(
   flow: OAuthFlow,
   params: URLSearchParams,
   expectedState: string,
-): Promise<{ code: string; redirectUri: string }> {
+): Promise<AuthorizationCode> {
   let resolveOutcome: (outcome: AuthOutcome) => void = () => undefined;
   const outcomePromise = new Promise<AuthOutcome>((resolve) => {
     resolveOutcome = resolve;
@@ -220,12 +213,7 @@ export async function requestAuthorizationCode(
 }
 
 /** Valida a forma mínima da resposta de tokens antes de usar (falha fechada). */
-function isTokenResponse(data: unknown): data is {
-  access_token: string;
-  refresh_token?: string | undefined;
-  expires_in: number;
-  scope?: string | undefined;
-} {
+function isTokenResponse(data: unknown): data is TokenResponse {
   if (typeof data !== 'object' || data === null) return false;
   if (!('access_token' in data && 'expires_in' in data)) return false;
   if (typeof data.access_token !== 'string' || typeof data.expires_in !== 'number') {

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import type { Work } from '@zero/types';
+import { isWorkArray } from '@zero/shared';
 import { currentMessages } from '@zero/main/i18n';
 import { cacheDir, configDir, coversDir, dataDir, userDataDir } from '@zero/main/paths';
 import { shredDirectory, shredFile } from '@zero/main/shred';
@@ -61,13 +62,25 @@ export function libraryExists(): boolean {
   return fs.existsSync(libraryPath());
 }
 
+/**
+ * Abre o acervo decifrado.
+ *
+ * O texto já passou pelo AES-256-GCM (`readStoreFile`), então conteúdo errado
+ * aqui não é ataque: é o app tendo gravado lixo. Mesmo assim a falha é fechada
+ * (`libraryTampered`) em vez de virar `[]`, porque lista vazia é o estado que
+ * faz o **próximo** `saveLibrary` sobrescrever o acervo inteiro. Perder um acervo
+ * inteiro por um `[]` silencioso é bem pior do que a tela dizer que ele está
+ * danificado.
+ */
 function parseLibrary(raw: Buffer): Work[] {
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(raw.toString('utf-8'));
-    return Array.isArray(parsed) ? (parsed as Work[]) : [];
+    parsed = JSON.parse(raw.toString('utf-8'));
   } catch {
-    return [];
+    throw new VaultError('libraryTampered');
   }
+  if (!isWorkArray(parsed)) throw new VaultError('libraryTampered');
+  return parsed;
 }
 
 /**

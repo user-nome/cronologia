@@ -1,11 +1,23 @@
 export type { ElectronApi, LibraryReset, PurgeResult } from '@zero/types/api';
 export type {
+  AccountEmailResponse,
+  AuthorizationCode,
+  AuthorizeResult,
   BackupProviderId,
   BackupProviderInfo,
+  BackupResult,
   BackupSummary,
+  DropboxEntry,
+  DropboxErrorSummary,
+  DropboxListFolderResponse,
   DriveStatus,
   RemoteFile,
+  ResolvedLocalNames,
+  RestoreResult,
+  TokenGrant,
+  TokenResponse,
 } from '@zero/types/drive';
+export type { IpcFrameEvent, IpcSenderFrame } from '@zero/types/ipc';
 export type { AppSettings, Language } from '@zero/types/settings';
 export type {
   ChangeMasterInput,

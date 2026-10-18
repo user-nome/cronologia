@@ -313,6 +313,7 @@ flowchart TD
     subgraph SHARED["Regras compartilhadas (src/shared)"]
         S1["policy: formato de cada credencial"]
         S2["strength: régua que recusa o degenerado"]
+        S3["json/work: guarda do dado que vem de fora"]
     end
 
     subgraph MSG["Mensagens (src/messages)"]
@@ -458,7 +459,9 @@ cronologia/
 │   │   ├── policy.ts         # formato aceito de cada credencial
 │   │   ├── strength.ts       # régua de força (blocked = o que recusa)
 │   │   ├── strategy.ts       # Strategy: qual régua para cada tipo
-│   │   └── format.ts         # normalização da frase (caixa vale) e contagem da trava
+│   │   ├── format.ts         # normalização da frase (caixa vale) e contagem da trava
+│   │   ├── json.ts           # guarda de dado de fora (isRecord, field)
+│   │   └── work.ts           # validador de obra lida do disco ou da nuvem
 │   ├── preload/index.ts      # contextBridge (window.api)
 │   ├── renderer/             # React + Vite
 │   │   ├── index.html        # CSP com scheme cover:
@@ -467,7 +470,8 @@ cronologia/
 │   │   ├── index.ts          # barrel (arquivo index só como barrel)
 │   │   ├── work.ts           # Work, WorkType, WorkStatus
 │   │   ├── settings.ts       # AppSettings
-│   │   ├── drive.ts          # DriveStatus, BackupSummary
+│   │   ├── drive.ts          # DriveStatus, BackupSummary e as formas cruas da nuvem
+│   │   ├── ipc.ts            # IpcFrameEvent (o que assertAppFrame consegue ver)
 │   │   ├── vault.ts          # UnlockKind, CreateVaultInput, VaultStatus, VaultResult
 │   │   └── api.ts            # ElectronApi (contrato do preload)
 │   ├── node.loader.ts        # hooks module.registerHooks() dos aliases @zero/*
@@ -476,7 +480,7 @@ cronologia/
 │   ├── main/                 # boot, biblioteca, configurações, cofre e drive (<500 linhas cada)
 │   ├── renderer/             # App e componentes (jsdom)
 │   ├── preload/              # fachada window.api
-│   ├── shared/               # policy e strength (formato e régua das credenciais)
+│   ├── shared/               # regras puras (formato, régua, normalização, guarda de JSON)
 │   ├── helpers/              # fixtures, sandbox, vault (openTestVault), drive (FakeDropbox), kdf
 │   ├── mocks/                # mock do electron para o Vitest
 │   ├── setup-env.ts          # sandbox HOME/XDG temporária por processo de teste

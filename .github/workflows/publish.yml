@@ -158,21 +158,127 @@ jobs:
 
       - run: npm ci
 
+      # Credenciais OAuth dos clientes Desktop (Dropbox e Google Drive).
+      #
+      # `loadEnv` do electron-vite (`electron.vite.config.mts`) substitui
+      # `process.env.DROPBOX_APP_KEY`, `GOOGLE_CLIENT_ID` e
+      # `GOOGLE_CLIENT_SECRET` no bundle do processo main, então o que está aqui
+      # é o que entra no `.deb`. Os valores nunca vão para o código-fonte: nem
+      # literal no repositório, nem `.env` no runner (o `env:` do step é o
+      # equivalente do `.env` local, e o job não escreve arquivo nenhum).
+      #
+      # Secrets e variables do Actions chegam com o mesmo nome. Estas chaves
+      # identificam o aplicativo e não são segredos de servidor (clientes
+      # Desktop permitem extraí-las do binário), então **Variables** é o lugar
+      # certo; `secrets.*` continua sendo aceito para quem já configurou lá. O
+      # passo de build escolhe o que estiver preenchido.
+      - name: Juntar as credenciais OAuth (Secrets ou Variables)
+        id: oauth
+        env:
+          SEC_DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
+          SEC_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          SEC_GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          VAR_DROPBOX_APP_KEY: ${{ vars.DROPBOX_APP_KEY }}
+          VAR_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          VAR_GOOGLE_CLIENT_SECRET: ${{ vars.GOOGLE_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          # Secret tem precedência sobre Variable (mesmo valor em uso hoje, mas
+          # a ordem deixa o secret ganhar se alguém declarar os dois).
+          pick() { if [ -n "${1:-}" ]; then printf '%s' "$1"; else printf '%s' "${2:-}"; fi; }
+          {
+            echo "dropbox_app_key=$(pick "$SEC_DROPBOX_APP_KEY" "$VAR_DROPBOX_APP_KEY")"
+            echo "google_client_id=$(pick "$SEC_GOOGLE_CLIENT_ID" "$VAR_GOOGLE_CLIENT_ID")"
+            echo "google_client_secret=$(pick "$SEC_GOOGLE_CLIENT_SECRET" "$VAR_GOOGLE_CLIENT_SECRET")"
+          } >> "$GITHUB_OUTPUT"
+
+          # Falha aqui, e não no app: sem DROPBOX_APP_KEY o binário sai com o
+          # provedor desabilitado e ninguém descobre até alguém instalar e
+          # tentar conectar. A mensagem diz onde cadastrar.
+          if [ -z "$(pick "$SEC_DROPBOX_APP_KEY" "$VAR_DROPBOX_APP_KEY")" ]; then
+            echo "::error::DROPBOX_APP_KEY ausente. Cadastre em Settings → Secrets and variables → Actions (aba Secrets ou Variables, escopo Repository) no repo chronos-atalante/cronologia."
+            exit 1
+          fi
+          if [ -z "$(pick "$SEC_GOOGLE_CLIENT_ID" "$VAR_GOOGLE_CLIENT_ID")" ]; then
+            echo "::error::GOOGLE_CLIENT_ID ausente. Sem ele o Google Drive é desabilitado no .deb. Cadastre em Settings → Secrets and variables → Actions, ou remova o provider de docs/backup-providers.md se a integração for desativada."
+            exit 1
+          fi
+          # O secret do Google é opcional para o cliente Desktop (PKCE não
+          # precisa dele), então ausente não quebra: o build segue sem ele.
+          if [ -z "$(pick "$SEC_GOOGLE_CLIENT_SECRET" "$VAR_GOOGLE_CLIENT_SECRET")" ]; then
+            echo "::notice::GOOGLE_CLIENT_SECRET ausente; o Google Drive usará só o client_id (aceito para o cliente Desktop)."
+          fi
+          echo "::notice::Credenciais OAuth prontas (App key do Dropbox e client_id do Google Drive)."
+
       - name: Gerar .deb (compila e empacota; o upload é no step seguinte)
         # --publish never: sem isso, o electron-builder tenta publicar
         # sozinho por causa da tag ("Implicit publishing") e falha sem token.
         env:
-          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          DROPBOX_APP_KEY: ${{ steps.oauth.outputs.dropbox_app_key }}
+          GOOGLE_CLIENT_ID: ${{ steps.oauth.outputs.google_client_id }}
+          GOOGLE_CLIENT_SECRET: ${{ steps.oauth.outputs.google_client_secret }}
         run: |
           set -euo pipefail
-          if [ -z "$DROPBOX_APP_KEY" ]; then
-            echo "::error::Secret DROPBOX_APP_KEY ausente em Settings → Secrets → Actions (repo cronologia)."
-            exit 1
-          fi
           npm run build
           npx electron-builder --linux deb --publish never
+
+      - name: Conferir que as credenciais entraram no bundle do main
+        env:
+          DROPBOX_APP_KEY: ${{ steps.oauth.outputs.dropbox_app_key }}
+          GOOGLE_CLIENT_ID: ${{ steps.oauth.outputs.google_client_id }}
+          GOOGLE_CLIENT_SECRET: ${{ steps.oauth.outputs.google_client_secret }}
+        run: |
+          set -euo pipefail
+          # O `define` do electron-vite substitui o literal no bundle. Se o
+          # valor não estiver lá, o `.deb` sai com o provedor desabilitado e a
+          # falha só aparece na máquina de quem instalou: o teste é o `.deb`.
+          MAIN="$(ls out/main/index.js)"
+          falha=0
+          conferir() {
+            if [ -z "$2" ]; then
+              echo "::notice::$1 não configurado; nada a conferir."
+            elif grep -qF "$2" "$MAIN"; then
+              echo "::notice::$1 embutida em out/main/index.js."
+            else
+              echo "::error::$1 configurada mas não apareceu no bundle do main: o provedor sairia desabilitado. Confira o nome da variável em electron.vite.config.mts."
+              falha=1
+            fi
+          }
+          conferir DROPBOX_APP_KEY "$DROPBOX_APP_KEY"
+          conferir GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"
+          conferir GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"
+          # O mesmo arquivo tem de estar no payload do .deb: empacotar antes de
+          # compilar (ou com `afterPack` apagando) é justamente o que faria a
+          # chave sumir entre o build e o artefato.
+          # O glob pega só um arquivo (o mais recente): em `release/` pode
+          # sobrar `.deb` de uma versão anterior, e um `ls` com dois caminhos
+          # quebraria o passo inteiro.
+          DEB="$(ls -t release/cronologia_*_amd64.deb | head -n 1)"
+          PAYLOAD="$(mktemp -d)"
+          dpkg-deb -x "$DEB" "$PAYLOAD"
+          # O app vai empacotado em `app.asar`, então a conferência desce um
+          # nível: o caminho solto `out/main/index.js` não existe no `.deb`.
+          # `asar extract` (e não `extract-file`) porque este último escreve o
+          # arquivo no diretório atual, e o passo não deve depender do `cwd`.
+          ASAR="$(find "$PAYLOAD" -name 'app.asar' -print -quit)"
+          if [ -z "$ASAR" ]; then
+            echo "::error::app.asar não está no payload de $(basename "$DEB")."
+            exit 1
+          fi
+          npx asar extract "$ASAR" "$PAYLOAD/asar"
+          MAIN_DEB="$PAYLOAD/asar/out/main/index.js"
+          if [ ! -s "$MAIN_DEB" ]; then
+            echo "::error::Não consegui ler out/main/index.js de dentro do app.asar."
+            exit 1
+          fi
+          for chave in "$DROPBOX_APP_KEY" "$GOOGLE_CLIENT_ID"; do
+            [ -z "$chave" ] && continue
+            grep -qF "$chave" "$MAIN_DEB" \
+              || { echo "::error::A credencial embutida em out/ não está no payload do .deb."; falha=1; }
+          done
+          echo "::notice::Credenciais conferidas dentro do .deb ($(basename "$DEB"))."
+          rm -rf "$PAYLOAD"
+          exit "$falha"
 
       - name: Criar tag da Release (se ainda não existir)
         env:

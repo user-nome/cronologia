@@ -1,3 +1,4 @@
+import type { AuthorizeResult } from '@zero/types';
 import type { Tokens } from '@zero/main/drive/state';
 import { providerLabel } from '@zero/main/drive/constants';
 import {
@@ -30,7 +31,7 @@ export function missingScopes(granted: string | undefined): string[] {
   return flowMissingScopes(dropboxFlow, granted);
 }
 
-export async function authorize(): Promise<{ ok: boolean; error?: string }> {
+export async function authorize(): Promise<AuthorizeResult> {
   const key = appKey();
   if (key === '') {
     const error = currentMessages().driveErrors.configureAppKey;

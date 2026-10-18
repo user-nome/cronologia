@@ -6,6 +6,97 @@ em português do Brasil.
 
 ## [Não lançado]
 
+### Mudado
+
+- **Fechar a janela agora desregistra o atalho global do F11.** Ele era
+  registrado no `browser-window-focus` e desregistrado no `browser-window-blur`;
+  fechar uma janela **focada** não emite `blur`, então o registro sobrevivia no
+  sistema até o `will-quit`. Entre a janela sumir e o processo morrer (e por
+  mais tempo se algum `before-quit` segurar o encerramento), o app ficava
+  capturando F11 sem janela na tela.
+- **Tipos que estavam escritos na hora foram nomeados e movidos para
+  `src/types/`.** `assertAppFrame` usava um `as { senderFrame?: … }` inline
+  (agora `IpcFrameEvent` em `src/types/ipc.ts`), e o mesmo `{ ok: boolean;
+error?: string }` aparecia em **cinco** arquivos como retorno de
+  `authorize`/`switchProvider` (agora `AuthorizeResult`). Outros que saíram do
+  corpo da função: `TokenResponse`, `TokenGrant`, `AccountEmailResponse`,
+  `AuthorizationCode`, `BackupResult`, `RestoreResult`, `ResolvedLocalNames` e as
+  formas cruas do Dropbox (`DropboxEntry`, `DropboxListFolderResponse`,
+  `DropboxErrorSummary`). Nenhum desses existia como nome, então mudar o formato
+  do envelope exigia caçar o literal.
+- **A camada `src/shared/` ganhou a guarda de dado externo** (`json.ts` com
+  `isRecord`/`field`, `work.ts` com `isWorkRecord`/`isWorkArray`). O
+  `typeof value === 'object' && value !== null` estava copiado em quatro módulos,
+  e o par `'x' in v ? Reflect.get(v, 'x') : undefined` em três.
+- **`library.ts` não devolve mais lista vazia para acervo ilegível.** O
+  `Array.isArray(parsed) ? (parsed as Work[]) : []` era um cast que só provava que
+  o valor era array, e o `[]` faria o **próximo** `saveLibrary` sobrescrever o
+  acervo inteiro em silêncio. Agora é `libraryTampered`, como manda a regra de
+  falha fechada do acervo.
+- **Números mágicos ganharam nome.** Passo do progresso (`PROGRESS_STEP`, e os
+  textos `decrease10`/`increase10` viraram `decreaseStep(step)`/
+  `increaseStep(step)` nos cinco idiomas), prazos de UI (`TOAST_TIMEOUT_MS`,
+  `COPY_FEEDBACK_MS`, `PROGRESS_SAVE_DEBOUNCE_MS`), `MS_PER_SECOND` no lugar
+  dos `1000` soltos, parâmetros do scrypt (`SCRYPT_N` e companhia), tamanho da
+  janela (`WINDOW_SIZE`), truncamento dos corpos de erro (`ERROR_BODY_CHARS`,
+  `RAW_BODY_CHARS`) e a largura da barra do medidor, que agora sai de
+  `LEVELS_PER_METER` em vez do `* 20` escrito na tela.
+
+### Adicionado
+
+- `e2e/quit.e2e.test.ts`: fecha a janela pelo "X" e confere que o processo
+  principal sai. É a única garantia do app que nenhuma asserção de tela pega,
+  porque uma bandeja ou um `preventDefault` no `close` só se revelam no `ps` e
+  no painel do desktop. O app **já** encerrava ao fechar a janela e **não** tem
+  bandeja; o que faltava era a trava contra a regressão.
+- `tests/main/index-ciclo-de-vida.test.ts`: trava a **ausência** dos quatro
+  mecanismos que produziriam o app vivo com a janela fechada (`Tray`,
+  `preventDefault` no `close`, `setLoginItemSettings`, `powerSaveBlocker`) e do
+  `setInterval` na sessão do cofre. Verificado que os testes falham quando cada
+  mecanismo é introduzido de propósito.
+- `tests/build/apparmor-profile.test.ts`: trava as regras do perfil que já
+  quebraram em campo (socket do IBus, mídia removível) e a macro do perfil.
+- `tests/shared/json.test.ts` e `tests/shared/work.test.ts`, mais os casos do
+  acervo ilegível em `tests/main/library.test.ts`.
+
+### Corrigido
+
+- **O build instalado recusava o socket do IBus, e a frase de recuperação
+  ficava muda.** `~/.cache/ibus/dbus-<id>` não é coberto por
+  `<abstractions/ibus>` (a regra concreta está comentada lá dentro por causa do
+  LP#1856738, e só o peer abstrato `@/home/*/...` continua). Sem o socket, a
+  tecla entrava no método de entrada e não voltava como caractere. Como senha e
+  PIN são `<input type="password">` e não passam pelo IME, o defeito parecia
+  isolado num campo só: busca, sinopse e frase de recuperação (os `<textarea>`
+  e o `<input type="text">`) não recebiam nada, enquanto os campos de senha
+  digitavam normal, e `npm run dev` não reproduzia porque roda sem perfil.
+  Mesma causa e mesma correção do Guardinha (Cofre).
+- **O seletor de capa falhava com capa em pendrive.** O `cover:pick` entrega um
+  caminho qualquer para `importCover` ler, e o Mint monta pendrive e cartão em
+  `/media/$USER/<rótulo>` ou `/run/media/$USER/`, fora do `owner @{HOME}/** r`.
+  Agora há `owner /media/** r` e `owner /run/media/** r` (só leitura: o app
+  escreve o resultado em `~/.local/share/cronologia/covers/`, que já tem regra
+  própria).
+- **`publish.yml` parava de publicar quando faltava `DROPBOX_APP_KEY`, mas
+  seguia calado sem `GOOGLE_CLIENT_ID`.** A ausência virava um `.deb` com o
+  Google Drive desabilitado, e a falha só aparecia na máquina de quem instalou.
+  Os dois agora travam antes de empacotar, com `::error::` apontando o lugar
+  certo da tela.
+
+### Mudado (CI)
+
+- **As chaves OAuth do `.deb` saem de Secrets **e** Variables.** O
+  `publish.yml` lê `secrets.*` e `vars.*` com o mesmo nome
+  (`DROPBOX_APP_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`; o secret
+  vence se os dois existirem), porque chaves de cliente Desktop são
+  identificadores públicos, não segredos de servidor, e **Variables** é o lugar
+  semântico certo. Os valores continuam indo só no `env:` do passo de build, sem
+  arquivo `.env` no runner e sem literal no repositório.
+- **Novo passo "Conferir que as credenciais entraram no bundle do main"**: depois
+  de empacotar, ele abre o `.deb`, extrai o `app.asar` e confirma que a App key
+  está dentro do artefato. É o teste que pega nome de variável errado, empacotar
+  antes de compilar e `afterPack` apagando o `out/`.
+
 ## [2.0.0]
 
 ### Mudado

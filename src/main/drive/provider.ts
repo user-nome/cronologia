@@ -1,4 +1,4 @@
-import type { BackupProviderId, BackupProviderInfo } from '@zero/types';
+import type { AuthorizeResult, BackupProviderId, BackupProviderInfo } from '@zero/types';
 import type { Messages } from '@zero/messages';
 import type { RemoteFile } from '@zero/types';
 import { currentMessages } from '@zero/main/i18n';
@@ -32,7 +32,7 @@ export interface BackupProvider {
   readonly storageHidden: boolean;
   /** Dados de UI localizados; também é o que `drive.providers()` devolve. */
   describe(messages: Messages): BackupProviderInfo;
-  authorize(): Promise<{ ok: boolean; error?: string }>;
+  authorize(): Promise<AuthorizeResult>;
   listAppFiles(): Promise<RemoteFile[]>;
   uploadFile(name: string, buffer: Buffer): Promise<void>;
   downloadFile(fileId: string): Promise<Buffer>;

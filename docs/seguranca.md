@@ -123,6 +123,13 @@ nunca conteúdo em claro.
   deny-list de credenciais não pode encolher, e cada regra nova precisa de
   teste em `enforce` (negação legítima no log do kernel é sinal de regra
   faltando, nunca de regra a remover). Ciclo em `docs/build.md`.
+- **O perfil não pode voltar a negar o socket do IBus**
+  (`~/.cache/ibus/dbus-*`), nem o caminho do pendrive usado pelo seletor de
+  capa (`/media/**`, `/run/media/**`). As duas regras foram adidas porque a
+  ausência delas não derruba o app: ela apenas **muda o comportamento** (campo
+  de texto mudo no build instalado) e só aparece em digitação com IME, o que a
+  deny-list mascarava. O mesmo vale para qualquer regra nova que só afete um
+  caminho raro: "o app abriu" não é sinal de que a regra está certa.
 - Nenhum `console.log` com senha ou token; erros do cofre via código
   (`VaultErrorCode`) localizado no renderer.
 - `.deb` e segredos fora do git (`.gitignore`); assets da Release nunca

@@ -42,6 +42,11 @@ export function hasEnoughWords(phrase: string): boolean {
   return countWords(phrase) >= RECOVERY_MIN_WORDS;
 }
 
+/** Milissegundos em um segundo. O cofre grava tudo em ms, e a tela lê em s. */
+export const MS_PER_SECOND = 1_000;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+
 /**
  * Espera que falta, em notação de relógio.
  *
@@ -50,10 +55,10 @@ export function hasEnoughWords(phrase: string): boolean {
  * `30s` e não `0min30s`, porque a segunda é a unidade que a pessoa lê.
  */
 export function formatCountdown(remainingMs: number): string {
-  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
-  const seconds = totalSeconds % 60;
-  const minutes = Math.floor(totalSeconds / 60) % 60;
-  const hours = Math.floor(totalSeconds / 3600);
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / MS_PER_SECOND));
+  const seconds = totalSeconds % SECONDS_PER_MINUTE;
+  const minutes = Math.floor(totalSeconds / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
+  const hours = Math.floor(totalSeconds / (SECONDS_PER_MINUTE * MINUTES_PER_HOUR));
 
   if (hours > 0) return minutes > 0 ? `${hours}h${minutes}min` : `${hours}h`;
   if (minutes > 0) return seconds > 0 ? `${minutes}min${seconds}s` : `${minutes}min`;

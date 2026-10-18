@@ -794,6 +794,22 @@ describe('encerramento', () => {
     expect(vaultSession.isUnlocked()).toBe(false);
     expect(vaultSession.key()).toBeNull();
   });
+
+  it('desregistra o atalho global quando a janela morre', () => {
+    // O F11 é registrado no `browser-window-focus` e desregistrado no
+    // `browser-window-blur`. Fechar uma janela focada **não** emite `blur`, e
+    // o `will-quit` só chega depois do `quit()`, que vem do
+    // `window-all-closed`: entre a janela sumir e o processo morrer, um atalho
+    // global registrado é o app capturando tecla com nada na tela.
+    const janelas = BrowserWindow.instances;
+    const anterior = janelas.length;
+    expect(anterior).toBeGreaterThan(0);
+    const fechar = janelas[anterior - 1]?.on;
+    globalShortcut.unregisterAll.mockClear();
+    fechar?.mock.calls.find(([event]) => event === 'closed')?.[1]?.();
+
+    expect(globalShortcut.unregisterAll).toHaveBeenCalled();
+  });
 });
 
 describe('falha real de disco vira resposta, não crash', () => {

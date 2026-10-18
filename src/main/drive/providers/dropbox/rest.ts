@@ -1,4 +1,10 @@
-import type { RemoteFile } from '@zero/types';
+import type {
+  DropboxEntry,
+  DropboxErrorSummary,
+  DropboxListFolderResponse,
+  RemoteFile,
+} from '@zero/types';
+import { isRecord } from '@zero/shared';
 import {
   DROPBOX_API_ENDPOINT,
   DROPBOX_CONTENT_ENDPOINT,
@@ -7,24 +13,6 @@ import { accessToken, refreshAccessToken } from '@zero/main/drive/providers/drop
 import { parseJson } from '@zero/main/drive/json';
 import { currentMessages } from '@zero/main/i18n';
 
-interface DropboxEntry {
-  '.tag'?: string | undefined;
-  id?: string | undefined;
-  name?: string | undefined;
-  server_modified?: string | undefined;
-  size?: number | undefined;
-}
-
-interface ListFolderResponse {
-  entries?: DropboxEntry[] | undefined;
-  cursor?: string | undefined;
-  has_more?: boolean | undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
 /**
  * Valida a página de `list_folder` antes de ler campo algum.
  *
@@ -32,7 +20,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * (id/nome/tipos); aqui só se garante a forma da resposta como um todo:
  * corpo malformado vira erro explícito em vez de listagem vazia silenciosa.
  */
-function isListFolderResponse(value: unknown): value is ListFolderResponse {
+function isListFolderResponse(value: unknown): value is DropboxListFolderResponse {
   if (!isRecord(value)) return false;
   if ('entries' in value && !(Array.isArray(value.entries) && value.entries.every(isRecord))) {
     return false;
@@ -43,7 +31,7 @@ function isListFolderResponse(value: unknown): value is ListFolderResponse {
 }
 
 /** Lê a página de `list_folder` validada; corpo inválido é falha fechada. */
-async function listFolderPage(res: Response): Promise<ListFolderResponse> {
+async function listFolderPage(res: Response): Promise<DropboxListFolderResponse> {
   const data: unknown = await parseJson(res);
   if (!isListFolderResponse(data)) {
     throw new Error(currentMessages().driveErrors.invalidListResponse('Dropbox'));
@@ -52,7 +40,7 @@ async function listFolderPage(res: Response): Promise<ListFolderResponse> {
 }
 
 /** `error_summary` é legível como está; corpo de outro formato é ignorado. */
-function isErrorSummary(value: unknown): value is { error_summary: string } {
+function isErrorSummary(value: unknown): value is DropboxErrorSummary {
   if (!isRecord(value) || !('error_summary' in value)) return false;
   return typeof value.error_summary === 'string';
 }
@@ -85,6 +73,9 @@ async function apiFetch(path: string, body: unknown): Promise<Response> {
   return res;
 }
 
+/** Quantos caracteres do corpo cru entram na exceção quando não há `error_summary`. */
+const RAW_BODY_CHARS = 160;
+
 async function toDropboxError(res: Response): Promise<Error> {
   let detail = '';
   let raw = '';
@@ -97,7 +88,7 @@ async function toDropboxError(res: Response): Promise<Error> {
   }
   if (detail === '') {
     try {
-      raw = (await res.text()).slice(0, 160);
+      raw = (await res.text()).slice(0, RAW_BODY_CHARS);
     } catch {
       raw = '';
     }

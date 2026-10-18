@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto';
 import type { RemoteFile } from '@zero/types';
+import { isRecord } from '@zero/shared';
 import {
   GOOGLE_DRIVE_ENDPOINT,
   GOOGLE_UPLOAD_ENDPOINT,
@@ -29,7 +30,19 @@ import { currentMessages } from '@zero/main/i18n';
  * `drive/crypto.ts`, que é genérico: o provedor só entrega bytes e id.
  */
 
+/**
+ * Pasta oculta do app na conta do Google Drive (`appDataFolder`).
+ *
+ * A pasta é de uso exclusivo do app: não aparece na interface do Drive e não
+ * concorre com os arquivos do usuário.
+ */
 const APP_DATA_SPACE = 'appDataFolder';
+
+/** Máxima da API para `files.list`; pedir o teto evita paginar o acervo todo. */
+const LIST_PAGE_SIZE = 1000;
+
+/** Bytes de entropia no `boundary` do upload multipart (precisa ser único só). */
+const UPLOAD_BOUNDARY_BYTES = 16;
 
 /**
  * Objeto JSON de verdade, e não array.
@@ -37,15 +50,15 @@ const APP_DATA_SPACE = 'appDataFolder';
  * `typeof [] === 'object'`, então um guard que só olha o `typeof` deixaria
  * passar uma resposta que é lista: aí `files` daria `undefined` e a paginação
  * devolveria um acervo vazio em silêncio, que é o pior jeito de errar num
- * backup.
+ * backup. É o `isRecord` de `@zero/shared` mais a exclusão do array.
  */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && !Array.isArray(value);
 }
 
 /** Valida cada arquivo retornado pela API (falha fechada). */
 function toRemoteFile(entry: unknown): RemoteFile {
-  if (!isRecord(entry)) {
+  if (!isJsonObject(entry)) {
     throw new Error(currentMessages().driveErrors.invalidListResponse('Google Drive'));
   }
   const id = entry.id;
@@ -81,11 +94,21 @@ function toRemoteFile(entry: unknown): RemoteFile {
   };
 }
 
+/**
+ * Quantos caracteres do corpo de erro entram na exceção.
+ *
+ * A API devolve um paragrafo curto, e a exceção vai para a barra de status do
+ * app: copiar o corpo inteiro ali não ajuda ninguém e polui o log.
+ */
+const ERROR_BODY_CHARS = 200;
+
 /** Texto do corpo quando é pequeno (mensagem de erro da API), senão vazio. */
 async function errorBody(res: Response): Promise<string> {
   try {
     const text = await res.text();
-    if (text.length > 200) return `${text.slice(0, 200)}…`;
+    if (text.length > ERROR_BODY_CHARS) {
+      return `${text.slice(0, ERROR_BODY_CHARS)}…`;
+    }
     return text;
   } catch {
     return '';
@@ -126,13 +149,13 @@ export async function listAppFiles(): Promise<RemoteFile[]> {
     const query = new URLSearchParams({
       spaces: APP_DATA_SPACE,
       fields: 'nextPageToken,files(id,name,modifiedTime,size)',
-      pageSize: '1000',
+      pageSize: String(LIST_PAGE_SIZE),
       ...(pageToken !== undefined ? { pageToken } : {}),
     });
     const res = await authorizedFetch(`${GOOGLE_DRIVE_ENDPOINT}/files?${query.toString()}`);
     if (!res.ok) throw httpError(googleFlow, res.status, await errorBody(res));
     const data: unknown = await parseJson(res);
-    if (!isRecord(data) || !Array.isArray(data.files)) {
+    if (!isJsonObject(data) || !Array.isArray(data.files)) {
       throw new Error(currentMessages().driveErrors.invalidListResponse('Google Drive'));
     }
     const nextPageToken = data.nextPageToken;
@@ -157,7 +180,7 @@ export async function listAppFiles(): Promise<RemoteFile[]> {
 export async function uploadFile(name: string, buffer: Buffer): Promise<void> {
   const existentes = (await listAppFiles()).filter((file) => file.name === name);
   const existente = existentes[0];
-  const boundary = `cronologia-${randomBytes(16).toString('hex')}`;
+  const boundary = `cronologia-${randomBytes(UPLOAD_BOUNDARY_BYTES).toString('hex')}`;
   const body =
     existente === undefined
       ? Buffer.concat([

@@ -48,8 +48,9 @@ flowchart TD
 O app lê `DROPBOX_APP_KEY` durante o build; a variável é substituída por seu
 valor **somente no bundle do processo main**. Para um build local, copie
 `.env.example` para `.env` e preencha `DROPBOX_APP_KEY`. O arquivo `.env` é
-ignorado pelo Git. No workflow de publicação, configure o GitHub Actions Secret
-`DROPBOX_APP_KEY`; ele é passado ao build e não é armazenado no repositório.
+ignorado pelo Git. No workflow de publicação, configure `DROPBOX_APP_KEY` em
+**Settings → Secrets and variables → Actions** (aba Variables ou Secrets, mesmo
+nome nos dois); ele é passado ao build e não é armazenado no repositório.
 
 A App key é o identificador público do cliente OAuth: qualquer usuário pode
 extraí-la do binário instalado, e isso não é um segredo de servidor. PKCE

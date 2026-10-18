@@ -24,7 +24,7 @@
 abi <abi/4.0>,
 include <tunables/global>
 
-profile ${executable} "/opt/${sanitizedProductName}/${executable}" {
+profile ${executable} /opt/${sanitizedProductName}/${executable} {
   # O sandbox do Chromium/Electron monta namespaces de usuário.
   userns,
 
@@ -58,12 +58,16 @@ profile ${executable} "/opt/${sanitizedProductName}/${executable}" {
   @{run}/systemd/resolve/** r,
 
   # ---------- executáveis do pacote ----------
-  # Caminhos entre aspas: o pacote instala em `/opt/Cronologia`
-  # (productFilename com espaço; sem aspas o parser do AppArmor quebra).
-  "/opt/${sanitizedProductName}/**"                    mr,
-  "/opt/${sanitizedProductName}/${executable}"         mrix,
-  "/opt/${sanitizedProductName}/chrome_crashpad_handler" ux,
-  "/opt/${sanitizedProductName}/chrome-sandbox"        ux,
+  # O pacote instala em `/opt/Cronologia` e o executável se chama `cronologia`
+  # (`productName`/`executableName` em package.json, nenhum dos dois com
+  # espaço), então os caminhos dispensam aspas. O comentário antigo dizia
+  # "productFilename com espaço" e estava errado: sem espaço, as aspas só
+  # atrapalham a leitura do diff contra o perfil do Guardinha, que é a
+  # referência de onde este arquivo veio.
+  /opt/${sanitizedProductName}/**                       mr,
+  /opt/${sanitizedProductName}/${executable}            mrix,
+  /opt/${sanitizedProductName}/chrome_crashpad_handler  ux,
+  /opt/${sanitizedProductName}/chrome-sandbox           ux,
 
   # O app dispara dois programas do sistema: o abridor de URLs do navegador
   # (shell.openExternal → openExternalSafe, src/main/external.ts) e o pkexec,
@@ -95,7 +99,7 @@ profile ${executable} "/opt/${sanitizedProductName}/${executable}" {
   # a arquivos do próprio usuário. /var/lib/dbus acima é leitura; a escrita
   # negada por padrão continua valendo para o resto de /var/lib.
   /var/lib/                      r,
-  /var/lib/.cronologia/  r,
+  /var/lib/.cronologia/          r,
   owner /var/lib/.cronologia/.vault/   rw,
   owner /var/lib/.cronologia/.vault/** rwkl,
 
@@ -108,6 +112,22 @@ profile ${executable} "/opt/${sanitizedProductName}/${executable}" {
   owner @{HOME}/**   r,
   # O GTK registra o arquivo escolhido nos recentes do desktop.
   owner @{HOME}/.local/share/recently-used.xbel rw,
+
+  # ---------- mídia removível (só leitura) ----------
+  # `cover:pick` (src/main/index.ts) abre o diálogo nativo e entrega um caminho
+  # qualquer para `importCover` ler. O `owner @{HOME}/** r` acima cobre o home,
+  # mas o Linux Mint monta pendrive e cartão em `/media/$USER/<rótulo>` e, em
+  # algumas sessões, em `/run/media/$USER/` — fora das duas, escolher uma capa
+  # que está num pendrive falha com "arquivo não encontrado", sem pista do
+  # motivo.
+  #
+  # É `r` e não `rwk` (o Guardinha precisa de escrita porque grava backup no
+  # pendrive): aqui o app só lê o arquivo escolhido e escreve o resultado em
+  # `~/.local/share/cronologia/covers/`, que já tem regra própria acima. O `owner`
+  # é o que impede o app de varrer o pendrive de outra pessoa pelo mesmo ponto
+  # de montagem.
+  owner /media/**     r,
+  owner /run/media/** r,
 
   # Deny-list de credenciais: nega vence sobre qualquer allow, então as
   # regras são sempre em subpastas EXCLUSIVAS (nunca @{HOME}/.config/**,
@@ -140,10 +160,30 @@ profile ${executable} "/opt/${sanitizedProductName}/${executable}" {
   deny owner @{HOME}/.config/guardinha/**    r,
   deny owner @{HOME}/.config/Guardinha/**    r,
 
-  # ---------- cache do GTK e runtime ----------
+  # ---------- cache do GTK, IBus e runtime ----------
   # Cache de teclado do GTK (Compose table); o GTK recria se faltar.
   owner @{HOME}/.cache/gtk-3.0/   rw,
   owner @{HOME}/.cache/gtk-3.0/** rwkl,
+
+  # Socket do IBus, o método de entrada. Com `GTK_IM_MODULE=ibus` (o padrão do
+  # Cinnamon no Mint), o contexto de IME do GTK conversa com o ibus-daemon por
+  # `~/.cache/ibus/dbus-<id>`, e `<abstractions/ibus>` **não** cobre esse
+  # caminho: a única regra de socket da abstração é o peer **abstrato**
+  # `addr="@/home/*/..."`, e a regra concreta está comentada lá dentro por causa
+  # do LP#1856738.
+  #
+  # Sem estas duas linhas a conexão é negada e o **campo de texto fica mudo**:
+  # a tecla entra no IME e não volta como caractere. Os campos que dispensam
+  # IME (os de senha, `<input type="password">`) continuam aceitando digitação,
+  # e é isso que faz o defeito parecer isolado em alguns campos: num build
+  # instalado, o que fica muda é a busca (`<input type="text">` em `App.tsx`),
+  # a sinopse/notas da obra (`<textarea>` em `WorkModal.tsx`) e a frase de
+  # recuperação (`<textarea>` em `VaultCreateSteps.tsx` e
+  # `VaultUnlockSteps.tsx`), enquanto senha e PIN digitam normal. Nada disso
+  # aparece em `npm run dev`, que roda sem perfil. Sem o `r` no diretório o
+  # próprio `connect()` é negado antes de chegar no socket.
+  owner @{HOME}/.cache/ibus/       r,
+  owner @{HOME}/.cache/ibus/dbus-* rw,
 
   # ---------- memória compartilhada, terminais e runtime ----------
   /dev/shm/          rw,

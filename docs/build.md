@@ -92,11 +92,15 @@ processo instalado:
 - **escrita** só nos diretórios do app no home (`.config`/`.local/share`/
   `.cache`/`.local/state/cronologia`), no cofre de
   `/var/lib/.cronologia` (raiz `r`, vault `rw`) e no helper do pacote;
-- **leitura** do home ampla (o seletor de capa abre arquivo de qualquer pasta)
-  com deny-list de credenciais (`.ssh`, `.gnupg`, chaveiros, perfis de
+- **leitura** do home ampla (o seletor de capa abre arquivo de qualquer pasta),
+  de `/media/**` e `/run/media/**` (pendrive e cartão, que o Mint monta fora do
+  home), com deny-list de credenciais (`.ssh`, `.gnupg`, chaveiros, perfis de
   navegador inclusive Brave, cofre/Cookies do Guardinha, `.aws`, `.docker`,
   `.kube`, `.netrc`, `.git-credentials`); os diretórios críticos têm regra de
   dir porque `/**` não cobre o próprio diretório;
+- **socket do IBus** em `~/.cache/ibus/dbus-*`: `<abstractions/ibus>` só cobre
+  o peer **abstrato** `@/home/*/...`, e a regra concreta está comentada lá
+  dentro por causa do LP#1856738;
 - **exec** só do binário do pacote e do `xdg-open` (URLs externas);
 - **rede** `inet`/`inet6` em `stream` e `dgram` (HTTPS e DNS do Dropbox), sem
   sockets crudos; AppArmor clássico não filtra host de destino (aceito no
@@ -136,6 +140,26 @@ seletor de capa roda no `xdg-desktop-portal` do sistema, fora do confinamento
 (a mediação do perfil acontece na leitura que o próprio app faz do arquivo
 escolhido). O registro completo do ciclo está no `ROADMAP.md` (item 6.3, na
 raiz do monorepo).
+
+**O ciclo tem que cobrir a digitação com IME, não só as telas.** Este foi o
+defeito que a deny-list mascarou (2026-10-18): o build instalado recusava o
+socket concreto do IBus, então a tecla entrava no método de entrada e não
+voltava como caractere. Como senha e PIN são `<input type="password">` e não
+passam pelo IME, o sintoma parecia isolado: campos de texto de verdade (busca,
+sinopse, frase de recuperação) ficavam mudos enquanto os de senha digitavam
+normal, e `npm run dev` não reproduzia nada porque roda sem perfil. A regra
+para o caso é: **quando um campo de texto do produto parece quebrado só no
+build instalado, o perfil é o primeiro suspeito** — e o sintoma "só alguns
+campos" é a assinatura de um bloqueio que só alcança o caminho do IME.
+
+Verificação sem root, útil para pegar erro de digitação do arquivo antes de
+empacotar (compara as regras novas com as do projeto de referência):
+
+````bash
+sed -E 's/\$\{executable\}/cronologia/g; s/\$\{sanitizedProductName\}/Cronologia/g' \
+  build/apparmor-profile > /tmp/cronologia.profile
+apparmor_parser --skip-kernel-load --debug /tmp/cronologia.profile
+apparmor_parser --preprocess /tmp/cronologia.profile | grep -nE 'ibus|/media'
 
 ### `after-install` (postinst) e o helper do cofre
 
@@ -189,7 +213,7 @@ Localmente, o equivalente ao gate é:
 
 ```bash
 npm ci && npm run check && npm test
-```
+````
 
 ## O `quality.yml` (gate do dia a dia)
 
@@ -224,12 +248,44 @@ flowchart TD
     P --> Q["qualidade: npm run check + npm test<br/>(OSV Scanner baixado no runner)"]
     R -- "publicar = true" --> B["build-deb (needs: os dois)"]
     Q -- verdes --> B
-    B --> N["npm run build + electron-builder<br/>(--publish never)"]
-    N --> T["tag v&lt;versão&gt; (se não existir)"]
+    B --> O["junta as credenciais OAuth<br/>(Secrets ou Variables)"]
+    O --> N["npm run build + electron-builder<br/>(--publish never)"]
+    N --> C["confere a chave dentro de out/<br/>e dentro do payload do .deb"]
+    C --> T["tag v&lt;versão&gt; (se não existir)"]
     T --> D["anexa o .deb à Release"]
     D --> A["repo APT flat assinado (GPG):<br/>alias sem versão, Packages(.gz),<br/>Release, Release.gpg, InRelease, public.key"]
     A --> V["dispara o Vercel Deploy Hook<br/>(landing lê releases/latest)"]
 ```
+
+### Credenciais OAuth embutidas no `.deb`
+
+O `publish.yml` injeta as chaves de cliente do Dropbox e do Google Drive no
+bundle do processo main (o `define` de `electron.vite.config.mts`), e o passo
+**"Conferir que as credenciais entraram no bundle do main"** abre o `.deb`
+gerado e verifica que a chave está lá dentro. Sem essa conferência, uma variável
+com nome errado geraria um pacote com o provedor desabilitado e a falha só
+apareceria na máquina de quem instalou.
+
+Onde cadastrar, em **Settings → Secrets and variables → Actions** (escopo
+_Repository_):
+
+| Variável                 | Aba        | Obrigatória                                  |
+| ------------------------ | ---------- | -------------------------------------------- |
+| `DROPBOX_APP_KEY`        | Variables¹ | Sim: sem ela o Dropbox sai desabilitado      |
+| `GOOGLE_CLIENT_ID`       | Variables¹ | Sim: sem ela o Google Drive sai desabilitado |
+| `GOOGLE_CLIENT_SECRET`   | Variables¹ | Não: o cliente Desktop funciona só com o ID  |
+| `GPG_PRIVATE_KEY`        | Secrets    | Sim: assina o repo APT                       |
+| `GPG_PASSPHRASE`         | Secrets    | Só se a chave PGP tiver senha                |
+| `VERCEL_DEPLOY_HOOK_URL` | Secrets    | Não: sem hook a Release funciona igual       |
+
+¹ O workflow lê `secrets.*` **e** `vars.*` com o mesmo nome, e o secret vence se
+os dois existirem. `Variables` é o lugar certo para as três chaves OAuth porque
+elas identificam o aplicativo e não são segredos de servidor: qualquer pessoa
+consegue extraí-las do binário instalado, e é o PKCE que protege a troca de
+autorização.
+
+Faltando `DROPBOX_APP_KEY` ou `GOOGLE_CLIENT_ID`, o job **trava antes de
+empacotar**, com `::error::` apontando o lugar certo da tela.
 
 Detalhes da distribuição (por que o repo APT vive na Release, nomes dos
 assets que **nunca** se renomeiam, troubleshooting do GPG):

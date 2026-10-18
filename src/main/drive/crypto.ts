@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { field, isRecord } from '@zero/shared';
 import { currentMessages } from '@zero/main/i18n';
 import { loadSettings } from '@zero/main/settings';
 
@@ -9,19 +10,28 @@ const IV_BYTES = 12;
 const TAG_BYTES = 16;
 const HEADER_BYTES = MAGIC_BYTES + SALT_BYTES + IV_BYTES + TAG_BYTES;
 
+/** Bytes de saída da derivação (32 = chave AES-256). */
+const KEY_BYTES = 32;
+
+/** `N = 2^17`, o mínimo do OWASP Password Storage Cheat Sheet. */
+const SCRYPT_N = 131_072;
+const SCRYPT_R = 8;
+const SCRYPT_P = 1;
+/** Teto de memória do scrypt: 2x o que `N * r * 128` já usa, com folga. */
+const SCRYPT_MAXMEM = 256 * 1024 * 1024;
+
 /**
  * Custo do scrypt, sempre explícito (os padrões do Node mudam entre versões):
- * `N=2^17` é o mínimo do OWASP Password Storage Cheat Sheet, ~128 MiB por
- * derivação, 8x o padrão do Node (2^14) e pesado o bastante para inviabilizar
- * força bruta paralela (ASIC/GPU) contra a senha, sem travar o backup manual
- * (típico: <1s por arquivo em desktop).
+ * `N=2^17` dá ~128 MiB por derivação, 8x o padrão do Node (2^14), e é pesado
+ * o bastante para inviabilizar força bruta paralela (ASIC/GPU) contra a senha,
+ * sem travar o backup manual (típico: <1s por arquivo em desktop).
  */
 function deriveKey(passphrase: string, salt: Buffer | string): Buffer {
-  return crypto.scryptSync(passphrase, salt, 32, {
-    N: 131072,
-    r: 8,
-    p: 1,
-    maxmem: 256 * 1024 * 1024,
+  return crypto.scryptSync(passphrase, salt, KEY_BYTES, {
+    N: SCRYPT_N,
+    r: SCRYPT_R,
+    p: SCRYPT_P,
+    maxmem: SCRYPT_MAXMEM,
   });
 }
 
@@ -171,10 +181,10 @@ export function buildManifest(mapping: Record<string, string>, nameSalt: Buffer)
 
 /** Valida o mapa nomeRemoto → nomeLocal; qualquer forma estranha é rejeitada. */
 function parseFiles(value: unknown, invalid: Error): Record<string, string> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw invalid;
+  if (!isRecord(value) || Array.isArray(value)) throw invalid;
   const mapping: Record<string, string> = {};
   for (const remote of Object.keys(value)) {
-    const local: unknown = Reflect.get(value, remote);
+    const local: unknown = field(value, remote);
     if (remote === '' || typeof local !== 'string' || local === '') throw invalid;
     mapping[remote] = local;
   }
@@ -206,15 +216,10 @@ export function parseManifest(data: Buffer): Manifest {
   } catch {
     throw invalid;
   }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw invalid;
-  }
-  const version: unknown = 'v' in parsed ? Reflect.get(parsed, 'v') : undefined;
-  if (version !== MANIFEST_V2) throw invalid;
-  const salt: unknown = 'salt' in parsed ? Reflect.get(parsed, 'salt') : undefined;
-  const files: unknown = 'files' in parsed ? Reflect.get(parsed, 'files') : undefined;
+  if (!isRecord(parsed) || Array.isArray(parsed)) throw invalid;
+  if (field(parsed, 'v') !== MANIFEST_V2) throw invalid;
   return {
-    files: parseFiles(files, invalid),
-    nameSalt: parseNameSalt(salt, invalid),
+    files: parseFiles(field(parsed, 'files'), invalid),
+    nameSalt: parseNameSalt(field(parsed, 'salt'), invalid),
   };
 }
