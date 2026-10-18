@@ -490,7 +490,7 @@ apagados); quem usava backup reconecta a conta uma vez e recria o cofre.
   `AGENTS.md` passam a descrever o cofre em `/var/lib`, o reparo via
   PolicyKit e a inexistência de caminho legado.
 
-## [1.7.0](https://github.com/chronos-atalante/cronologia/compare/v1.6.1...v1.7.0) (2026-10-09)
+## [1.7.0](https://github.com/user-nome/cronologia/compare/v1.6.1...v1.7.0) (2026-10-09)
 
 ### Features
 
@@ -523,7 +523,7 @@ apagados); quem usava backup reconecta a conta uma vez e recria o cofre.
   ameaça do cofre e os riscos do confinamento; índices atualizados em
   `README.md` e `AGENTS.md`.
 
-## [1.6.1](https://github.com/chronos-atalante/cronologia/compare/v1.5.0...v1.6.1) (2026-10-08)
+## [1.6.1](https://github.com/user-nome/cronologia/compare/v1.5.0...v1.6.1) (2026-10-08)
 
 ### Features
 
@@ -551,7 +551,7 @@ apagados); quem usava backup reconecta a conta uma vez e recria o cofre.
   `doc/paginas.md`, `doc/README.md` e `doc/arquitetura.md` (o idioma já
   estava no app e no site desde a 1.5.0).
 
-## [1.5.0](https://github.com/chronos-atalante/cronologia/compare/v1.4.0...v1.5.0) (2026-10-07)
+## [1.5.0](https://github.com/user-nome/cronologia/compare/v1.4.0...v1.5.0) (2026-10-07)
 
 ### Features
 
@@ -600,7 +600,7 @@ base-uri 'self'; frame-ancestors 'none'; form-action 'self'` nos dois
   de trava na tabela de erros e o travamento em `drive.restore`, e
   `docs/dropbox.md` com o sintoma na tabela de problemas.
 
-## [1.4.0](https://github.com/chronos-atalante/cronologia/compare/v1.3.0...v1.4.0) (2026-10-07)
+## [1.4.0](https://github.com/user-nome/cronologia/compare/v1.3.0...v1.4.0) (2026-10-07)
 
 ### Features
 
@@ -627,7 +627,7 @@ base-uri 'self'; frame-ancestors 'none'; form-action 'self'` nos dois
   o e-mail oficiais; exemplo de instalação local usa glob de versão;
   workflow do CI no Node 24 e scripts de limpeza sem `rimraf`.
 
-## [1.3.0](https://github.com/chronos-atalante/cronologia/compare/v1.2.1...v1.3.0) (2026-10-06)
+## [1.3.0](https://github.com/user-nome/cronologia/compare/v1.2.1...v1.3.0) (2026-10-06)
 
 ### Features
 
@@ -638,7 +638,7 @@ base-uri 'self'; frame-ancestors 'none'; form-action 'self'` nos dois
   Configurações e persistido em `settings.json` (textos em `src/messages/ko.ts`;
   ver `docs/messages.md`).
 
-## [1.2.1](https://github.com/chronos-atalante/cronologia/compare/v1.1.2...v1.2.1) (2026-10-06)
+## [1.2.1](https://github.com/user-nome/cronologia/compare/v1.1.2...v1.2.1) (2026-10-06)
 
 ### Features
 
@@ -674,7 +674,7 @@ base-uri 'self'; frame-ancestors 'none'; form-action 'self'` nos dois
   `api.md`/`dropbox.md`/`README.md` refletem a chave embutida e as URLs do
   repo APT flat da Release.
 
-## [1.1.2](https://github.com/chronos-atalante/cronologia/compare/v1.1.1...v1.1.2) (2026-10-06)
+## [1.1.2](https://github.com/user-nome/cronologia/compare/v1.1.1...v1.1.2) (2026-10-06)
 
 ### Bug Fixes
 
@@ -682,21 +682,21 @@ base-uri 'self'; frame-ancestors 'none'; form-action 'self'` nos dois
   Electron o declara como `DT_NEEDED` e o 1.1.1 abria apenas o ícone,
   morrendo com "error while loading shared libraries: libffmpeg.so".
 
-## [1.1.1](https://github.com/chronos-atalante/cronologia/compare/v1.1.0...v1.1.1) (2026-10-05)
+## [1.1.1](https://github.com/user-nome/cronologia/compare/v1.1.0...v1.1.1) (2026-10-05)
 
 ### Bug Fixes
 
-- detecta escopos faltantes no Dropbox e orienta a correção ([29f009f](https://github.com/chronos-atalante/cronologia/commit/29f009fc89b67f1024534afc2b69b038c252773d))
+- detecta escopos faltantes no Dropbox e orienta a correção ([29f009f](https://github.com/user-nome/cronologia/commit/29f009fc89b67f1024534afc2b69b038c252773d))
 
-## [1.1.0](https://github.com/chronos-atalante/cronologia/compare/v1.0.2...v1.1.0) (2026-10-05)
+## [1.1.0](https://github.com/user-nome/cronologia/compare/v1.0.2...v1.1.0) (2026-10-05)
 
 ### Features
 
-- migra backup em nuvem do Google Drive para o Dropbox ([c55190e](https://github.com/chronos-atalante/cronologia/commit/c55190e62250866841bfcbf93c1d2bae2f8b020e))
+- migra backup em nuvem do Google Drive para o Dropbox ([c55190e](https://github.com/user-nome/cronologia/commit/c55190e62250866841bfcbf93c1d2bae2f8b020e))
 
 ### Bug Fixes
 
-- corrige tipos do upload no Dropbox (autorename/mute booleanos) ([59454b5](https://github.com/chronos-atalante/cronologia/commit/59454b5b630231436e6f680df9ac69e2921dbfc1))
+- corrige tipos do upload no Dropbox (autorename/mute booleanos) ([59454b5](https://github.com/user-nome/cronologia/commit/59454b5b630231436e6f680df9ac69e2921dbfc1))
 
 ## [1.0.2] - 2026-10-05
 

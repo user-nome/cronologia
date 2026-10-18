@@ -196,7 +196,7 @@ jobs:
           # provedor desabilitado e ninguém descobre até alguém instalar e
           # tentar conectar. A mensagem diz onde cadastrar.
           if [ -z "$(pick "$SEC_DROPBOX_APP_KEY" "$VAR_DROPBOX_APP_KEY")" ]; then
-            echo "::error::DROPBOX_APP_KEY ausente. Cadastre em Settings → Secrets and variables → Actions (aba Secrets ou Variables, escopo Repository) no repo chronos-atalante/cronologia."
+            echo "::error::DROPBOX_APP_KEY ausente. Cadastre em Settings → Secrets and variables → Actions (aba Secrets ou Variables, escopo Repository) no repo user-nome/cronologia."
             exit 1
           fi
           if [ -z "$(pick "$SEC_GOOGLE_CLIENT_ID" "$VAR_GOOGLE_CLIENT_ID")" ]; then
