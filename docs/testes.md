@@ -163,20 +163,28 @@ de DOM em `tests/setup.ts`: `setupFiles` roda para ele também.
 
 `vitest.config.mts` mede `src/**/*.{ts,tsx}` com o provedor v8 (relatórios em
 texto e HTML em `coverage/`) e exige **95% por arquivo** (`perFile: true`) de
-linhas, instruções, funções e ramos. Estado atual na 1.9.2 (780 testes em 52
+linhas, instruções, funções e ramos. Estado medido na 2.0.0 (983 testes em 65
 arquivos):
 
-| Métrica    | Global | Pior arquivo |
-| ---------- | ------ | ------------ |
-| Statements | 99,5%  | 96,3%        |
-| Branches   | 99,5%  | 95,4%        |
-| Functions  | 98,8%  | 95,2%        |
-| Lines      | 99,7%  | 97,8%        |
+| Métrica    | Global | Pior arquivo                   |
+| ---------- | ------ | ------------------------------ |
+| Statements | 98,31% | 66,66% (`dropbox/provider.ts`) |
+| Branches   | 97,16% | 63,63% (`google/oauth.ts`)     |
+| Functions  | 98,79% | 50% (`dropbox/provider.ts`)    |
+| Lines      | 98,62% | 66,66% (`dropbox/provider.ts`) |
 
-Nenhum arquivo fica abaixo de 95% em nenhuma métrica. O piso subiu de 50%
-agregado para 95% por arquivo depois da varredura de baixo para cima: o piso
-agregado perdoa o arquivo esquecido, e era isso que acontecia, com o entry do
-renderer em 0%, os bundles de idioma em 10% e o scheme da SPA em 35%.
+Os testes passam, mas `npm run test:coverage` termina com erro porque estes
+arquivos ainda não atingem 95% em todas as métricas: `src/main/drive/oauth-flow.ts`,
+`src/main/drive/providers/dropbox/provider.ts`,
+`src/main/drive/providers/google/credentials.ts`,
+`src/main/drive/providers/google/oauth.ts`,
+`src/main/drive/providers/google/rest.ts`,
+`src/main/drive/providers/google/session.ts`,
+`src/renderer/src/components/Select.tsx` e
+`src/renderer/src/components/SettingsModal.tsx`. O piso subiu de 50% agregado
+para 95% por arquivo depois da varredura de baixo para cima: o piso agregado
+perdoa o arquivo esquecido, e era isso que acontecia, com o entry do renderer
+em 0%, os bundles de idioma em 10% e o scheme da SPA em 35%.
 
 Os módulos de destruição ficaram em 100% nas quatro métricas (`shred.ts`,
 `store-crypto.ts`, `vault/container.ts`, `vault/vault.ts`, `drive/rest.ts`,

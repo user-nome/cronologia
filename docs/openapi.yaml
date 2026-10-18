@@ -12,7 +12,7 @@
 openapi: 3.1.0
 info:
   title: 'Cronologia: API interna (ponte IPC)'
-  version: 1.9.1
+  version: 2.0.0
   description: >
     Ponte `window.api` (contextBridge) entre o renderer e o processo main:
     biblioteca de obras, capas, configurações, cofre de segredos e backup no

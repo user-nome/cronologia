@@ -4,7 +4,7 @@ Todos os lançamentos seguem [versionamento semântico](https://semver.org/lang/
 (`MAJOR.MINOR.PATCH`) e o formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 em português do Brasil.
 
-## [Não lançado]
+## [2.0.0]
 
 ### Mudado
 
@@ -123,8 +123,6 @@ error?: string }` aparecia em **cinco** arquivos como retorno de
   de empacotar, ele abre o `.deb`, extrai o `app.asar` e confirma que a App key
   está dentro do artefato. É o teste que pega nome de variável errado, empacotar
   antes de compilar e `afterPack` apagando o `out/`.
-
-## [2.0.0]
 
 ### Mudado
 
