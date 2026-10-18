@@ -68,11 +68,16 @@ export const zhCN: Messages = {
 
   settings: {
     title: '设置',
-    bannerTitle: 'Dropbox备份。',
-    bannerBody:
+    bannerTitle: (label: string): string => `${label}备份。`,
+    bannerBodyDropbox:
       '书库保存在应用专属文件夹中（您账号下的`/Apps/`内）：通过API，只有本应用能看到' +
       '这个文件夹，Dropbox的其余部分对它完全不可见。该文件夹在您的账号内可见，所有文件都以' +
       '不可读的文件名和加密内容（AES-256-GCM）上传，因此请在首次备份前在下方设置加密密码。',
+    bannerBodyGoogle:
+      '此构建将书库保存在应用的隐藏文件夹中（Google Drive 的 `appDataFolder`）。该' +
+      '文件夹不会出现在 Google Drive 的界面中，只有本应用能看到：请求的范围只有这一个。' +
+      '所有文件都以不可读的文件名和加密内容（AES-256-GCM）上传，因此请在首次备份前在' +
+      '下方设置加密密码。',
     languageLabel: '语言',
     providersLabel: '备份服务商',
     hiddenFolder: '隐藏文件夹',
@@ -80,32 +85,34 @@ export const zhCN: Messages = {
     notOperational: '不可用',
     backupIn: (target: string): string => `备份至${target}`,
     passphraseLabel: '备份加密密码',
-    passphrasePlaceholder: '用于加密Dropbox中的备份',
+    passphrasePlaceholder: (label: string): string => `用于加密${label}中的备份`,
     connected: '已连接',
     disconnected: '未连接',
-    accountFallback: 'Dropbox账号',
+    accountFallback: (label: string): string => `${label}账号`,
     lastBackup: '上次备份',
-    inDropboxBackup: 'Dropbox备份中',
+    inBackup: (label: string): string => `${label}备份中`,
     worksInBackup: (works: number): string => `${works} 部作品`,
-    syncingBanner: '正在与Dropbox同步…',
-    disconnectTitle: '断开本应用的Dropbox账号',
+    syncingBanner: (label: string): string => `正在与${label}同步…`,
+    disconnectTitle: (label: string): string => `断开本应用的${label}账号`,
     disconnectAction: '断开连接',
     authorizing: '授权中…',
-    connectAction: '连接Dropbox',
-    restoreTitle: '下载Dropbox备份并替换当前书库',
+    connectAction: (label: string): string => `连接${label}`,
+    restoreTitle: (label: string): string => `下载${label}备份并替换当前书库`,
     restoreAction: '恢复',
     restoring: '恢复中…',
     backupAction: '立即备份',
     sending: '上传中…',
     toastSaved: '设置已保存。',
     toastAuthFailed: '授权失败。',
-    toastConnected: 'Dropbox账号连接成功。',
+    toastConnected: (label: string): string => `${label}账号连接成功。`,
     toastBackupFailed: '备份失败。',
-    toastBackupDone: '已备份到Dropbox的应用文件夹。',
+    toastBackupDone: (label: string): string => `已备份到${label}的应用文件夹。`,
     toastRestoreFailed: '恢复失败。',
     toastRestored: (works: number): string => `已恢复备份，共${works} 部作品。`,
-    toastDisconnected: 'Dropbox账号已断开。',
+    toastDisconnected: (label: string): string => `${label}账号已断开。`,
     toastPurgeFailed: '无法从云端删除备份。',
+    providerSwitched: (label: string): string => `备份现在将前往${label}。`,
+    providerSwitchFailed: '无法切换备份服务商。',
     translationNotice: {
       title: '翻译提示',
       text: '这些语言中只有葡萄牙语我会说，所有翻译都是由AI完成的。像世间万物一样，可能会有错误，请多包涵。',
@@ -115,7 +122,8 @@ export const zhCN: Messages = {
 
   restore: {
     title: '备份密码',
-    banner: '请输入**备份时**在Dropbox中使用的加密密码。解密下载的文件必须提供该密码。',
+    banner: (label: string): string =>
+      `请输入**备份时**在${label}中使用的加密密码。解密下载的文件必须提供该密码。`,
     passphraseLabel: '加密密码',
     passphrasePlaceholder: '备份时使用的密码',
     action: '恢复',
@@ -219,9 +227,9 @@ export const zhCN: Messages = {
   providers: {
     dropboxStorageTarget: '/Apps/Cronologia（您账号中可见的文件夹）',
     googleStorageTarget: 'appDataFolder（隐藏文件夹，不显示在Google云端硬盘界面中）',
-    googleUnavailable:
-      'Google云端硬盘暂不可用：只有当Cronologia满足Google的要求（应用验证、同意屏幕、' +
-      '范围审核）后才会启用集成。在此之前，备份使用Dropbox。',
+    googleNoCredentials:
+      '此构建未包含 Google Drive 凭据：应用由一对在发布时写入二进制的密钥标识。' +
+      '在该密钥对发布之前，备份使用 Dropbox。',
   },
 
   driveErrors: {
@@ -236,25 +244,28 @@ export const zhCN: Messages = {
     emptyLibrary: '没有可备份的本地书库。请至少添加一部作品。',
     noBackupFound: (provider: string): string => `在${provider}的应用文件夹中没有找到备份。`,
     invalidLibrary: '备份无效（library.json已损坏）。',
-    invalidListResponse: 'Dropbox API 返回无效的响应（文件列表）。',
+    invalidListResponse: (provider: string): string =>
+      `${provider} API 返回无效的响应（文件列表）。`,
     tokenTimeout: '等待授权超时。',
     authCancelled: '授权已取消。',
+    csrfRejected: '授权回调来自其他来源，已拒绝连接。',
     tokenFailed: (status: number): string => `获取令牌失败（${status}）。`,
     invalidTokenResponse: (status: number): string => `令牌响应无效（${status}）。`,
-    configureAppKey: '请在设置中配置Dropbox应用密钥。',
-    sessionExpired: '会话已过期。请重新连接Dropbox账号。',
-    refreshFailed: '无法刷新Dropbox会话。',
-    noAccount: '未连接Dropbox账号。',
-    permissionsUpdated: 'Dropbox权限已更新。请重新连接Dropbox账号。',
-    missingScopes:
-      'Dropbox应用缺少权限。请在App Console的Permissions选项卡中勾选所有范围，然后断开并重新连接。',
-    missingScopesList: (missing: string): string =>
-      `Dropbox应用缺少权限（${missing}）。` +
-      '请在App Console的Permissions选项卡中勾选所有范围，然后重新连接。',
-    dropboxHttp: (status: number, response: string): string =>
+    configureAppKey: '此构建没有 DROPBOX_APP_KEY。请设置该变量并重新构建。',
+    sessionExpired: (provider: string): string => `会话已过期。请重新连接${provider}账号。`,
+    refreshFailed: (provider: string): string => `无法刷新${provider}会话。`,
+    noAccount: (provider: string): string => `未连接${provider}账号。`,
+    permissionsUpdated: (provider: string): string =>
+      `${provider}权限已更新。请重新连接${provider}账号。`,
+    missingScopes: (provider: string): string =>
+      `${provider}应用缺少权限。请在该应用的开发者控制台中勾选所有范围，然后断开并重新连接。`,
+    missingScopesList: (provider: string, missing: string): string =>
+      `${provider}应用缺少权限（${missing}）。请在该应用的开发者控制台中勾选所有范围，` +
+      '然后重新连接。',
+    providerHttp: (label: string, status: number, response: string): string =>
       response === ''
-        ? `Dropbox错误（HTTP ${status}）。`
-        : `Dropbox错误（HTTP ${status}）。响应：${response}`,
+        ? `${label}错误（HTTP ${status}）。`
+        : `${label}错误（HTTP ${status}）。响应：${response}`,
     restoreLocked: (seconds: number): string =>
       seconds < 60
         ? `恢复时密码错误尝试次数过多，请在 ${seconds} 秒后重试。`

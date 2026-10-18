@@ -37,6 +37,7 @@ import {
   onStatus,
   purgeRemote,
   restoreNow,
+  switchProvider,
 } from '@zero/main/drive';
 import {
   createVault,
@@ -54,6 +55,7 @@ import { openExternalSafe } from '@zero/main/external';
 import { APP_ORIGIN, registerAppProtocol, registerCoverProtocol } from '@zero/main/protocols';
 import type {
   AppSettings,
+  BackupProviderId,
   DriveStatus,
   LibraryReset,
   PurgeResult,
@@ -279,6 +281,13 @@ function registerIpc(): void {
   ipcMain.handle('drive:providers', (event) => {
     assertAppFrame(event);
     return listProviders();
+  });
+  ipcMain.handle('drive:set-provider', (event, id: BackupProviderId) => {
+    assertAppFrame(event);
+    // O catálogo fecha a lista de ids (`BackupProviderId`), e `switchProvider`
+    // normaliza o que não reconhecer de volta ao Dropbox, então um id forjado
+    // não consegue apontar o backup para fora do catálogo.
+    return switchProvider(id);
   });
   ipcMain.handle('drive:auth', (event) => {
     assertAppFrame(event);

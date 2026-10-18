@@ -16,7 +16,7 @@ info:
   description: >
     Ponte `window.api` (contextBridge) entre o renderer e o processo main:
     biblioteca de obras, capas, configurações, cofre de segredos e backup no
-    Dropbox. Respostas do Drive usam o envelope `{ ok, error?, ... }` e nunca
+    Dropbox ou Google Drive. Respostas do Drive usam o envelope `{ ok, error?, ... }` e nunca
     lançam; mensagens de erro saem no idioma corrente (pt-BR por padrão; ver
     `docs/api.md` e `docs/messages.md`). A versão desta especificação acompanha
     a do app em `package.json`.
@@ -39,7 +39,7 @@ tags:
   - name: cofre
     description: Cofre de segredos (Argon2id + AES-256-GCM) e a sessão de chave
   - name: drive
-    description: Sessão Dropbox, backup criptografado e restauração
+    description: Sessão do provedor escolhido, backup criptografado e restauração
 paths:
   /library/get:
     post:
@@ -352,9 +352,9 @@ paths:
       tags: [drive]
       summary: Catálogo de provedores de backup
       description: >
-        Lista os provedores catalogados (`BackupProviderInfo`): Dropbox
-        operante e Google Drive não operante, com o motivo e o destino do
-        backup (pasta oculta `appDataFolder` no Google). Textos no idioma
+        Lista os provedores catalogados (`BackupProviderInfo`), seu estado de
+        disponibilidade neste build, o motivo quando indisponível e o destino
+        do backup (pasta oculta `appDataFolder` no Google). Textos no idioma
         corrente (`AppSettings.language`).
       x-ipc-channel: drive:providers
       responses:
@@ -617,7 +617,7 @@ components:
       properties:
         driveClientId:
           type: string
-          description: App key alternativa do Dropbox ('' usa a embutida; sem campo na UI, lido do cofre)
+          description: App key alternativa do Dropbox ('' usa DROPBOX_APP_KEY injetada no build; sem campo na UI, lida do cofre)
         drivePassphrase:
           type: string
           description: Senha de criptografia do backup (obrigatória para enviar; guardada no cofre)

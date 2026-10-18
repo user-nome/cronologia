@@ -8,6 +8,16 @@ em português do Brasil.
 
 ### Cobertura de teste
 
+- **cobertura de 95% por arquivo** nas quatro métricas (`perFile: true` em
+  `vitest.config.mts`), subindo de 50% agregado. Estado medido na 1.9.2:
+  **99,7% de linhas, 99,5% de comandos, 99,5% de ramos e 98,8% de funções**, com
+  **0 de 53 arquivos** abaixo de 95%. A varredura foi de baixo para cima, e ela
+  expôs o que o piso agregado escondia: o entry do renderer (`main.tsx`) estava
+  em 0% (a suíte renderiza `<App/>` direto e nunca importava o entry), os cinco
+  bundles de idioma em 10%, o scheme `cronologia://` em 35% (a tabela de MIME e o
+  403 de path traversal não tinham teste), `DangerZone` sem os caminhos de falha
+  e `external.ts` com o `catch` da recusa do shell sem cobertura. A suíte foi de
+  428 para **780 testes em 52 arquivos**, com 15 arquivos de teste novos.
 - **testes ponta a ponta** (`e2e/`, `npm run test:e2e`): Playwright
   (`playwright-core`, sem download de browser) sobe o app **de verdade** em dois
   alvos, o bundle compilado (`out/`) pelo `_electron.launch` e o payload do
@@ -34,6 +44,30 @@ em português do Brasil.
   a varredura medir o mutante errado. `tests/tools/mutation-runner.test.ts`
   trava splicing, cache, nomes de nó da AST e ausência de órfão em escopo.
   Guia em `docs/mutation.md`.
+- `tests/messages/bundles.test.ts` e `tests/messages/branch-coverage.test.ts`:
+  varredura das cinco traduções folha a folha. O que pega é o que a paridade de
+  chave do tipo **não** pega: tradução vazia, `**` ou crase sem par, reticência
+  de três pontos no lugar da elipse e mensagem com parâmetro devolvendo string
+  vazia.
+- `tests/main/node-loader.test.ts`: o loader de aliases `@zero/*` verificado
+  rodando o Node de verdade em processo filho (barrel sem extensão, arquivo com
+  subcaminho, extensão explícita, especificador que não é alias e alias
+  inexistente). `node.loader.ts` ficou fora do denominador de cobertura, que
+  mede execução entre processos e portanto não enxerga esse teste.
+- `tests/main/protocols.test.ts`: tabela de MIME por extensão, 403 em traversal
+  percent-encoded (o `..` declarado é normalizado pelo parser de URL e vira 404,
+  então o 403 é justamente do caso codificado), 404 de arquivo e de diretório,
+  500 de URL inválida e caminho com espaço percent-encoded.
+- `tests/main/drive-rest.test.ts`, `drive-oauth.test.ts`, `cleanup.test.ts`,
+  `external.test.ts` e `store-crypto.test.ts`: paginação e corpo inválido do
+  Dropbox falhando fechado, renovação e repetição após 401, loopback com PKCE sem
+  secret, varredura de legado do boot com a contagem real de falha, guarda de
+  URL externa e o formato `CLIB1`.
+- renderer: fila de gravação por obra no `App` (debounce × "Salvar" do modal),
+  os três caminhos de falha da zona de risco, recontagem da trava do cofre,
+  badge/prompt/ação adiada do cofre nas configurações, pausa dos créditos,
+  cópia do link de doação sem clipboard, `RestorePasswordModal`, teclado e menu
+  vazio do `Select`, e o entry `main.tsx`.
 - `quality.yml` novo: **Verificar qualidade**, **Testes e cobertura** e **Testes
   E2E** em push na `main` e pull request, mais **Testes de mutação** por
   disparo manual (leva horas; `min_score` e `mutation_file` são inputs). O
@@ -54,6 +88,11 @@ em português do Brasil.
 
 ### Corrigido
 
+- A integração do Google Drive agora cria arquivos com nome e parent
+  `appDataFolder`, atualiza o backup existente sem apagá-lo antes do upload,
+  valida a resposta da listagem fail-closed e repete após renovar token em 401
+  para métodos autenticados. O workflow de publicação injeta as credenciais
+  OAuth de build sem colocá-las no repositório.
 - **a gravação atrasada do cartão atropelava o "Salvar" do modal.** O cartão
   agenda a gravação com 450 ms de atraso e o modal grava na hora; sem serializar
   as duas pela mesma obra, a gravação atrasada saía depois e trazia o rascunho
@@ -70,6 +109,16 @@ em português do Brasil.
   verdadeiro só no auto-lock. Regressão em `tests/main/index-vault.test.ts` e
   `tests/renderer/src/App.test.tsx`. Ambos os bugs foram encontrados pela
   jornada E2E, não por leitura.
+- `tests/preload/index.test.ts` passou a conferir a lista **completa** de canais
+  de cada grupo. Quatro deles (`library:reset`, `drive:purge`, `vault:destroy`,
+  `vault:touch`) não eram conferidos por ninguém, e a primeira varredura de
+  mutação apontou: trocar o nome do canal por `''` não quebrava nada, porque o
+  mock de `ipcRenderer.invoke` devolve o que quiser. Um canal digitado errado só
+  falharia em runtime, no clique do usuário.
+- a rampa da trava de restauração (`restore-lock.ts`) era um índice numa tabela
+  com `??` defensivo, que o `noUncheckedIndexedAccess` exige e que nenhum valor
+  de `attempts` alcança. Virou um `switch` total, com o `default` sendo o teto
+  de 15 min: sem índice, sem ramo morto.
 
 ### Comportamento interno
 
@@ -77,12 +126,8 @@ em português do Brasil.
   ouvinte (assinatura de `src/types/api.ts`, do preload e do mock de teste).
 - `src/renderer/src/components/SettingsModal.tsx`: o estado do cofre lido em
   `ensureVault` deixou de se chamar `status`, que sombreava o estado do Drive.
-- `tests/preload/index.test.ts` passou a conferir a lista **completa** de canais
-  de cada grupo. Quatro deles (`library:reset`, `drive:purge`, `vault:destroy`,
-  `vault:touch`) não eram conferidos por ninguém, e a primeira varredura de
-  mutação apontou: trocar o nome do canal por `''` não quebrava nada, porque o
-  mock de `ipcRenderer.invoke` devolve o que quiser. Um canal digitado errado só
-  falharia em runtime, no clique do usuário.
+- `richText` não faz mais `match[2] ?? ''` ao montar o nó `<code>`: o React já
+  renderiza `undefined` como nada, e o `??` só existia para o tipo.
 
 ## [1.9.2]
 

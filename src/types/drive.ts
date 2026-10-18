@@ -18,6 +18,23 @@ export interface BackupProviderInfo {
   storageHidden: boolean;
 }
 
+/**
+ * Um arquivo de backup visto pela nuvem, já normalizado.
+ *
+ * É o mesmo contrato para os dois provedores: o Dropbox vem de `list_folder`, o
+ * Google Drive de `files.list`, e `drive/backup.ts` só conhece esta forma.
+ */
+export interface RemoteFile {
+  /** Id opaco do arquivo na nuvem (o nome local nunca é assumido). */
+  id: string;
+  /** Nome remoto, que é opaco (HMAC) quando o backup tem manifesto. */
+  name: string;
+  /** ISO 8601 da última modificação. */
+  modifiedTime: string;
+  /** Tamanho em bytes, quando o provedor informa. */
+  size?: number | undefined;
+}
+
 export interface DriveStatus {
   connected: boolean;
   syncing: boolean;

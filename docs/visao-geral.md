@@ -3,12 +3,13 @@
 O Cronologia é um aplicativo desktop para anotar o **progresso das suas
 leituras** (webtoons, manhwas, manhuas, mangás, livros e outros): capa, título,
 descrição, barra de progresso em capítulos e marcação de conclusão, com
-**backup manual criptografado no Dropbox**. Roda em Electron, é escrito em
+**backup manual criptografado no Dropbox ou Google Drive**. Roda em Electron, é escrito em
 TypeScript com React na interface e é empacotado como `.deb` para o Linux Mint.
 
 Tudo é local: a biblioteca mora na sua máquina, e a nuvem só é usada quando
 você mesmo clica em **Fazer backup agora** (ou **Restaurar**), pela pasta do
-app no Dropbox.
+app no Dropbox ou pela pasta oculta `appDataFolder` do Google Drive. O Google
+Drive só fica selecionável quando o build tem `GOOGLE_CLIENT_ID`.
 
 ## O que o app não é
 
@@ -18,7 +19,7 @@ app no Dropbox.
 - Não sincroniza em tempo real: o backup é manual, por escolha sua, e o
   restaurar substitui a biblioteca local pela versão da nuvem.
 - Não é gerenciador de senhas para o usuário: o cofre de segredos interno
-  protege **os dados do próprio app** (tokens do Dropbox e a senha de
+  protege **os dados do próprio app** (tokens dos provedores e a senha de
   criptografia do backup), não credenciais de sites suas.
 - Não preenche formulários nem abre o conteúdo da obra dentro do app: capas são
   imagens locais servidas pelo protocolo `cover://`.
@@ -33,11 +34,10 @@ app no Dropbox.
 - Copia a imagem de capa escolhida do disco para a biblioteca local e a serve
   pelo protocolo interno `cover://`.
 - Faz backup do `library.json` e das capas **sempre criptografados**
-  (AES-256-GCM com nomes de arquivo opacos) na pasta do app do Dropbox
-  (`/Apps/Cronologia`), com OAuth + PKCE direto no app, sem segredo
-  embutido.
-- Restaura um backup pedindo a senha de criptografia, e desconecta o Dropbox
-  quando você quiser.
+  (AES-256-GCM com nomes de arquivo opacos) no Dropbox (`/Apps/Cronologia`) ou
+  no Google Drive (`appDataFolder`), com OAuth + PKCE direto no app.
+- Restaura um backup pedindo a senha de criptografia e desconecta o provedor
+  escolhido quando você quiser.
 - Fala português do Brasil (canônico), inglês, coreano, chinês simplificado e
   japonês, com o idioma escolhido em Configurações.
 
@@ -66,7 +66,7 @@ desenvolvimento e também não entra no pacote.
 2. Uso corrente: adicionar/editar obras, mover a barra de progresso, buscar e
    filtrar; tudo local e instantâneo (gravação com debounce).
 3. Backup opcional: crie o **cofre de segredos** e defina a senha de
-   criptografia em Configurações, conecte o Dropbox (OAuth + PKCE) e faça
+   criptografia em Configurações, conecte um provedor (OAuth + PKCE) e faça
    backup; restaurar pede a senha. Tokens e senha de backup moram no cofre e
    todo fluxo pede a senha mestra quando ele estiver fechado (sem cofre
    aberto não há backup).
@@ -84,12 +84,12 @@ desenvolvimento e também não entra no pacote.
 - **Capa / `cover://`**: imagem copiada do disco para `covers/` e servida pela
   interface pelo protocolo interno `cover://`.
 - **Backup criptografado**: envio do `library.json` + capas em AES-256-GCM,
-  com nomes de arquivo opacos (HMAC), para a pasta do app no Dropbox.
+  com nomes de arquivo opacos (HMAC), para o Dropbox ou Google Drive.
 - **Senha de criptografia do backup**: segredo que você cria em Configurações;
   cifra o backup e é exigida para restaurar (`settings.drivePassphrase`).
-- **App key (PKCE)**: chave que identifica o app no Dropbox; sem `app secret`
-  (fluxo público PKCE). A embutida é `EMBEDDED_APP_KEY` e uma alternativa pode
-  ser gravada no cofre (`settings.driveClientId`; sem campo na UI).
+- **App key (PKCE)**: identificador público OAuth do app Dropbox, injetado no
+  bundle main por `DROPBOX_APP_KEY`; uma alternativa pode ser gravada no cofre
+  (`settings.driveClientId`; sem campo na UI).
 - **Tokens do Dropbox**: `access_token` curto + `refresh_token` duradouro
   devolvidos pela autorização, guardados só como segredo `dropbox.tokens` do
   cofre (nunca em arquivo em claro).
@@ -98,8 +98,9 @@ desenvolvimento e também não entra no pacote.
   do app (tokens do Dropbox, senha de backup, App key alternativa); abre por
   sessão e sofre auto-lock após 5 minutos (`docs/cofre.md`).
 - **Provedor de backup**: implementação do contrato `BackupProvider`
-  (`authorize` + 4 operações de arquivo); Dropbox operante, Google Drive não
-  operante (`docs/backup-providers.md`).
+  (`authorize` + 4 operações de arquivo); Dropbox operante e Google Drive
+  disponível nos builds que incluem `GOOGLE_CLIENT_ID`
+  (`docs/backup-providers.md`).
 - **Protocolos internos**: `cover://` (capas) e `cronologia://` (SPA em produção);
   nada fora disso é navegável dentro do app.
 - **Aliases `@zero/*`**: atalhos de import usados dentro de `src/`

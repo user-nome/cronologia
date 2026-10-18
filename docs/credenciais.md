@@ -11,10 +11,16 @@ do tempo. O destino de todos é o **cofre** ([`cofre.md`](cofre.md)) em
 | -------------------------- | ------------------------------------------- | ------------------------------------ | ------------------------------ |
 | `dropbox.tokens`           | access/refresh token da sessão OAuth (JSON) | `src/main/drive/state.ts`            | `dropbox-tokens.json` (`0600`) |
 | `settings.drivePassphrase` | senha de criptografia do backup (scrypt)    | `drive/backup.ts`, `drive/crypto.ts` | `settings.json` (`enc:`/claro) |
-| `settings.driveClientId`   | App key alternativa do Dropbox (override)   | `src/main/drive/state.ts`            | `settings.json` (em claro)     |
+| `settings.driveClientId`   | App key alternativa do Dropbox (override)   | `src/main/drive/state.ts`            | Cofre de segredos              |
 
 Os nomes canônicos são a constante `VAULT_SECRET`
 (`src/main/vault/secrets.ts`); nenhum consumidor usa string solta.
+
+`DROPBOX_APP_KEY` e `GOOGLE_CLIENT_ID` são variáveis de build: os seus valores
+são inseridos no bundle do processo main e não ficam em arquivos do código-fonte.
+São identificadores públicos de clientes desktop, não segredos confidenciais.
+O `GOOGLE_CLIENT_SECRET`, se configurado, também pode ser extraído do binário;
+tokens de usuário e a senha do backup continuam protegidos pelo cofre.
 
 **Não** são segredos do cofre no sentido de _guardados nele como texto_: a biblioteca (`library.enc`), as capas e o
 conteúdo cifrado do backup na nuvem e as preferências comuns, inclusive o

@@ -150,7 +150,7 @@ decifrada sob demanda pelo protocolo interno (§7).
 type Language = 'pt-BR' | 'en' | 'ko' | 'zh-CN' | 'ja';
 
 interface AppSettings {
-  driveClientId: string; // App key alternativa ('' = usa a embutida; sem campo na UI)
+  driveClientId: string; // App key alternativa ('' = usa a chave injetada no build)
   drivePassphrase: string; // senha de criptografia do backup (obrigatória p/ backup)
   language: Language; // idioma da interface e das mensagens
 }

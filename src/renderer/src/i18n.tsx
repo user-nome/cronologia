@@ -60,7 +60,12 @@ export function richText(text: string): ReactNode[] {
     if (bold !== undefined) {
       nodes.push(<strong key={key}>{bold}</strong>);
     } else {
-      nodes.push(<code key={key}>{match[2] ?? ''}</code>);
+      // `match[2]` só é `undefined` se o negrito não casou, e nesse caso o
+      // grupo de acentos graves casou com `[^`]+` (pelo menos um caractere).
+      // O React renderiza `undefined` como nada, então o nó não precisa de
+      // `?? ''`: o ramo defensivo aqui seria um branch que nenhum teste
+      // alcança.
+      nodes.push(<code key={key}>{match[2]}</code>);
     }
     key += 1;
     cursor = index + match[0].length;

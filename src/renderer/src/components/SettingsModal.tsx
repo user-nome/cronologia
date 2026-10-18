@@ -43,12 +43,13 @@ export default function SettingsModal({
 }: SettingsModalProps): JSX.Element {
   const m = useMessages();
   const language = useLanguage();
-  // driveClientId é a App key alternativa (override via cofre, sem campo na
-  // UI: a chave padrão é a embutida). Os segredos vêm e vão pelo cofre.
+  // driveClientId é a App key alternativa (override via cofre, sem campo na UI).
+  // Os segredos vêm e vão pelo cofre.
   const [settings, setSettings] = useState<AppSettings>({
     driveClientId: '',
     drivePassphrase: '',
     language: 'pt-BR',
+    backupProvider: 'dropbox',
   });
   const [status, setStatus] = useState<DriveStatus | null>(null);
   const [info, setInfo] = useState<BackupSummary | null>(null);
@@ -176,7 +177,7 @@ export default function SettingsModal({
       void run('auth', async () => {
         const result = await window.api.drive.auth();
         if (!result.ok) notify(result.error ?? m.settings.toastAuthFailed, 'error');
-        else notify(m.settings.toastConnected);
+        else notify(m.settings.toastConnected(providerLabel));
         await refreshDriveStatus();
       });
     });
@@ -186,7 +187,7 @@ export default function SettingsModal({
       void run('backup', async () => {
         const result = await window.api.drive.backup();
         if (!result.ok) notify(result.error ?? m.settings.toastBackupFailed, 'error');
-        else notify(m.settings.toastBackupDone);
+        else notify(m.settings.toastBackupDone(providerLabel));
         await refreshDriveStatus();
       });
     });
@@ -207,7 +208,7 @@ export default function SettingsModal({
       void run('disconnect', async () => {
         setStatus(await window.api.drive.disconnect());
         setInfo(null);
-        notify(m.settings.toastDisconnected);
+        notify(m.settings.toastDisconnected(providerLabel));
       });
     });
 
@@ -215,6 +216,42 @@ export default function SettingsModal({
     value: item,
     label: LANGUAGE_LABELS[item],
   }));
+
+  /**
+   * Provedor em uso, resolvido pelo id escolhido.
+   *
+   * Os textos de nuvem (banner, botões, avisos) saem daqui em vez de repetir a
+   * marca em cada string: com dois destinos no catálogo, um texto fixo dizendo
+   * "Dropbox"-mentiria para quem conectou o Google Drive.
+   */
+  const activeProvider = providers.find((item) => item.id === settings.backupProvider) ?? null;
+  const providerLabel = activeProvider?.label ?? 'Dropbox';
+
+  /**
+   * Só entram no seletor os provedores que este build consegue usar.
+   *
+   * Listar o Google Drive como opção e recusar na conexão seria pior que não
+   * oferecer: o usuário escolheria e receberia um erro sem entender o motivo. O
+   * catálogo completo, com o porquê de cada um, continua na lista abaixo.
+   */
+  const providerOptions: SelectOption<BackupProviderId>[] = providers
+    .filter((item) => item.operational)
+    .map((item) => ({ value: item.id, label: item.label }));
+
+  const switchProvider = (id: BackupProviderId): Promise<void> =>
+    ensureVault(() => {
+      void run('provider', async () => {
+        const result = await window.api.drive.setProvider(id);
+        if (!result.ok) {
+          notify(result.error ?? m.settings.providerSwitchFailed, 'error');
+          return;
+        }
+        setSettings({ ...settings, backupProvider: id });
+        const label = providers.find((item) => item.id === id)?.label ?? '';
+        notify(m.settings.providerSwitched(label));
+        await Promise.all([refreshProviders(), refreshDriveStatus()]);
+      });
+    });
 
   const connected = status?.connected === true;
   const lastError = status?.lastError ?? '';
@@ -241,7 +278,12 @@ export default function SettingsModal({
 
           <div className="modal-body">
             <div className="banner info">
-              <strong>{m.settings.bannerTitle}</strong> {richText(m.settings.bannerBody)}
+              <strong>{m.settings.bannerTitle(providerLabel)}</strong>{' '}
+              {richText(
+                settings.backupProvider === 'google-drive'
+                  ? m.settings.bannerBodyGoogle
+                  : m.settings.bannerBodyDropbox,
+              )}
             </div>
             <div className="banner info">
               <i className="fa-solid fa-circle-info" /> {m.settings.translationNotice.text}
@@ -258,8 +300,21 @@ export default function SettingsModal({
               </div>
             </div>
 
+            <div className="form-row">
+              <div className="field">
+                <label>{m.settings.providersLabel}</label>
+                <Select
+                  value={settings.backupProvider}
+                  options={providerOptions}
+                  disabled={working || providerOptions.length === 0}
+                  onChange={(next) => {
+                    void switchProvider(next);
+                  }}
+                />
+              </div>
+            </div>
+
             <div className="field">
-              <label>{m.settings.providersLabel}</label>
               <ul className="provider-list">
                 {providers.map((provider) => (
                   <li key={provider.id} className="provider-item">
@@ -287,7 +342,7 @@ export default function SettingsModal({
                 <input
                   type="password"
                   value={settings.drivePassphrase}
-                  placeholder={m.settings.passphrasePlaceholder}
+                  placeholder={m.settings.passphrasePlaceholder(providerLabel)}
                   disabled={working}
                   onChange={(event) =>
                     setSettings({ ...settings, drivePassphrase: event.target.value })
@@ -344,7 +399,7 @@ export default function SettingsModal({
             <div className="drive-meta">
               <div className="stat">
                 <b>{connected ? m.settings.connected : m.settings.disconnected}</b>
-                <span>{status?.accountEmail ?? m.settings.accountFallback}</span>
+                <span>{status?.accountEmail ?? m.settings.accountFallback(providerLabel)}</span>
               </div>
               <div className="stat">
                 <b>{formatDate(status?.lastSync ?? null, language)}</b>
@@ -352,14 +407,15 @@ export default function SettingsModal({
               </div>
               <div className="stat">
                 <b>{info?.works != null ? m.settings.worksInBackup(info.works) : '-'}</b>
-                <span>{m.settings.inDropboxBackup}</span>
+                <span>{m.settings.inBackup(providerLabel)}</span>
               </div>
             </div>
 
             {lastError !== '' ? <div className="banner error">{lastError}</div> : null}
             {syncing ? (
               <div className="banner info">
-                <i className="fa-solid fa-spinner fa-spin" /> {m.settings.syncingBanner}
+                <i className="fa-solid fa-spinner fa-spin" />{' '}
+                {m.settings.syncingBanner(providerLabel)}
               </div>
             ) : null}
 
@@ -383,7 +439,7 @@ export default function SettingsModal({
                 void disconnect();
               }}
               disabled={!connected || working}
-              title={m.settings.disconnectTitle}
+              title={m.settings.disconnectTitle(providerLabel)}
             >
               <i className="fa-solid fa-link-slash" /> {m.settings.disconnectAction}
             </button>
@@ -412,14 +468,14 @@ export default function SettingsModal({
               }}
               disabled={working}
             >
-              <i className="fa-brands fa-dropbox" />{' '}
-              {busy === 'auth' ? m.settings.authorizing : m.settings.connectAction}
+              <i className={PROVIDER_ICONS[settings.backupProvider]} />{' '}
+              {busy === 'auth' ? m.settings.authorizing : m.settings.connectAction(providerLabel)}
             </button>
             <button
               className="btn"
               onClick={() => setPromptRestore(true)}
               disabled={!connected || working}
-              title={m.settings.restoreTitle}
+              title={m.settings.restoreTitle(providerLabel)}
             >
               <i className="fa-solid fa-clock-rotate-left" />{' '}
               {busy === 'restore' ? m.settings.restoring : m.settings.restoreAction}
@@ -443,6 +499,7 @@ export default function SettingsModal({
 
       {promptRestore ? (
         <RestorePasswordModal
+          provider={providerLabel}
           onCancel={() => setPromptRestore(false)}
           onConfirm={(passphrase) => {
             setPromptRestore(false);

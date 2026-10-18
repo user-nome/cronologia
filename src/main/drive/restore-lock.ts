@@ -11,10 +11,35 @@
  * Zerar também no sucesso evita punir quem acertou a senha depois de errar.
  */
 const FREE_ATTEMPTS = 2;
-const PENALTY_DELAYS_SECONDS = [10, 30, 60, 300, 900];
 
 let attempts = 0;
 let lockUntil = 0;
+
+/**
+ * Rampa da espera por tentativa (contando a partir da 3ª falha): 10 s, 30 s,
+ * 1 min, 5 min e 15 min, onde satura.
+ *
+ * A forma é `switch` e não "índice numa tabela" por um motivo concreto: com
+ * `noUncheckedIndexedAccess`, `TABELA[indice]` com `indice: number` continua
+ * sendo `number | undefined`, e o `??` defensivo que isso exige é um branch que
+ * **nenhum** valor de `attempts` alcança, porque o `Math.min` já prende o índice
+ * ao intervalo. O `switch` é total por construção (o `default` é o teto), tem
+ * todos os ramos alcançáveis por teste e deixa a rampa em um lugar só.
+ */
+function penaltySeconds(tentativa: number): number {
+  switch (tentativa) {
+    case 1:
+      return 10;
+    case 2:
+      return 30;
+    case 3:
+      return 60;
+    case 4:
+      return 300;
+    default:
+      return 900;
+  }
+}
 
 /** Segundos até a trava liberar; 0 quando destravado. */
 export function restoreLockRemainingSec(): number {
@@ -25,9 +50,7 @@ export function restoreLockRemainingSec(): number {
 export function registerRestoreFailure(): void {
   attempts += 1;
   if (attempts <= FREE_ATTEMPTS) return;
-  const index = Math.min(attempts - FREE_ATTEMPTS - 1, PENALTY_DELAYS_SECONDS.length - 1);
-  const delaySec = PENALTY_DELAYS_SECONDS[index] ?? 10;
-  lockUntil = Date.now() + delaySec * 1000;
+  lockUntil = Date.now() + penaltySeconds(attempts - FREE_ATTEMPTS) * 1000;
 }
 
 /** Zera tentativas e trava (sucesso ou reinício do processo). */

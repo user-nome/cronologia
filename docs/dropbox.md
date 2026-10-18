@@ -1,8 +1,8 @@
 # Backup no Dropbox
 
 Guia completo de como conectar o **Cronologia** ao Dropbox e proteger sua
-biblioteca na nuvem. O mapa dos provedores de backup (quem está operante e por
-que o Google Drive ainda não) está em [`backup-providers.md`](backup-providers.md).
+biblioteca na nuvem. O mapa dos provedores de backup está em
+[`backup-providers.md`](backup-providers.md).
 
 O app usa **OAuth 2.0 direto no aplicativo** (fluxo loopback + PKCE, sem servidor
 intermediário e sem bibliotecas pesadas, apenas `fetch` nativo) e guarda tudo na
@@ -45,19 +45,20 @@ flowchart TD
 
 ## 1. Chave do aplicativo no Dropbox
 
-> **A chave padrão já vem embutida no app** (`EMBEDDED_APP_KEY` em
-> `src/main/drive/constants.ts`) e não há mais campo nas Configurações: dá para
-> pular esta seção e conectar direto. A App key é identificador público de
-> cliente OAuth; com PKCE não existe `app secret`, então embuti-la não cria
-> segredo algum; o `refresh_token` continua só na sua máquina.
->
-> Esta seção é para quem quiser rodar com um **app Dropbox próprio**
-> (desenvolvimento): não há campo na UI nem arquivo de configuração. O
-> override é o segredo `settings.driveClientId` **no cofre**, com prioridade
-> sobre a embutida; para gravá-lo, com o cofre aberto, rode no devtools
-> `await window.api.settings.set({ ...(await window.api.settings.get()), driveClientId: 'sua-chave' })`.
-> O **Salvar** da janela não apaga o valor: ele manda `''` (a janela não tem
-> campo) e o main mantém a chave já gravada.
+O app lê `DROPBOX_APP_KEY` durante o build; a variável é substituída por seu
+valor **somente no bundle do processo main**. Para um build local, copie
+`.env.example` para `.env` e preencha `DROPBOX_APP_KEY`. O arquivo `.env` é
+ignorado pelo Git. No workflow de publicação, configure o GitHub Actions Secret
+`DROPBOX_APP_KEY`; ele é passado ao build e não é armazenado no repositório.
+
+A App key é o identificador público do cliente OAuth: qualquer usuário pode
+extraí-la do binário instalado, e isso não é um segredo de servidor. PKCE
+protege a troca de autorização; o token de atualização da conta permanece
+guardado no cofre. Sem `DROPBOX_APP_KEY`, o Dropbox aparece indisponível naquele
+build, a menos que uma App key alternativa `settings.driveClientId` já esteja
+gravada no cofre. Esse override legado pode ser gravado com o cofre aberto no
+DevTools:
+`await window.api.settings.set({ ...(await window.api.settings.get()), driveClientId: 'sua-chave' })`.
 
 Para criar o seu:
 
@@ -167,7 +168,7 @@ sequenceDiagram
 
 | Sintoma                                                            | Causa provável / solução                                                                                                                                                                                              |
 | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| “Configure a chave do aplicativo Dropbox…”                         | Este build saiu sem chave embutida e o cofre não tem `settings.driveClientId`. Rebuild com a chave ou grave a chave no cofre (§1).                                                                                    |
+| “Este build não tem DROPBOX_APP_KEY…”                              | O build não incluiu a variável e o cofre não tem `settings.driveClientId`. Recompile com a variável ou grave uma App key alternativa no cofre (§1).                                                                   |
 | `redirect_uri_mismatch` ao conectar                                | A URI `http://localhost:17431/callback` não está em **Redirect URIs** no App Console, ou a `settings.driveClientId` do cofre é de outro app. Confira.                                                                 |
 | Porta `17431` ocupada ao conectar                                  | Outro programa usa a porta do callback. Feche-o e tente de novo (o app é de instância única, então normalmente é outra coisa).                                                                                        |
 | “Permissões do Dropbox atualizadas. Reconecte a conta Dropbox.”    | Os escopos pedidos pelo app mudaram. Clique em **Conectar ao Dropbox** de novo (uma vez).                                                                                                                             |

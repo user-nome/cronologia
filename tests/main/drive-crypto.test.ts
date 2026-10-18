@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { decryptWith, isEncrypted, maybeEncrypt } from '@zero/main/drive/crypto';
+import {
+  buildManifest,
+  decryptWith,
+  isEncrypted,
+  maybeEncrypt,
+  parseManifest,
+} from '@zero/main/drive/crypto';
 import { saveSettings } from '@zero/main/settings';
 import { resetSandbox } from '../helpers/sandbox.ts';
 import { PASSPHRASE } from '../helpers/drive.ts';
@@ -11,6 +17,7 @@ function withPassphrase(passphrase = PASSPHRASE): void {
   saveSettings({
     driveClientId: '',
     drivePassphrase: passphrase,
+    backupProvider: 'dropbox',
     language: 'pt-BR',
   });
 }
@@ -78,6 +85,76 @@ describe('formato WTENC3 (único)', { timeout: 30_000 }, () => {
       const old = Buffer.concat([Buffer.from(magic), Buffer.alloc(44), Buffer.from('x')]);
       expect(isEncrypted(old)).toBe(false);
       expect(decryptWith(old, PASSPHRASE).equals(old)).toBe(true);
+    }
+  });
+});
+
+// O manifesto é o "commit" do backup: quem o lê decide os nomes locais de cada
+// blob. `parseManifest` é a única fronteira antes dessa decisão, então cada
+// forma estranha precisa virar recusa explícita, nunca um mapa adivinhado.
+describe('formato do manifesto', () => {
+  const INVALID = 'Manifesto do backup inválido.';
+  const SALT = Buffer.alloc(16, 3);
+  const SALT_B64 = SALT.toString('base64');
+
+  beforeEach(() => {
+    resetSandbox();
+  });
+
+  function manifestJson(payload: unknown): Buffer {
+    return Buffer.from(JSON.stringify(payload), 'utf-8');
+  }
+
+  it('lê o formato atual com o salt da chave de nomes embutido', () => {
+    const mapping = { 'hash-remoto': 'library.json' };
+    expect(parseManifest(buildManifest(mapping, SALT))).toEqual({
+      files: mapping,
+      nameSalt: SALT,
+    });
+  });
+
+  it('aceita o formato antigo sem salt próprio (nameSalt nulo)', () => {
+    expect(parseManifest(manifestJson({ 'hash-antigo': 'library.json' }))).toEqual({
+      files: { 'hash-antigo': 'library.json' },
+      nameSalt: null,
+    });
+  });
+
+  it('recusa corpo que nem é JSON', () => {
+    expect(() => parseManifest(Buffer.from('não é json'))).toThrow(INVALID);
+  });
+
+  it('recusa JSON que não é objeto', () => {
+    for (const body of [null, 42, 'texto', true, ['a']]) {
+      expect(() => parseManifest(manifestJson(body))).toThrow(INVALID);
+    }
+  });
+
+  it('recusa versão que não é a atual', () => {
+    expect(() => parseManifest(manifestJson({ v: 1, salt: SALT_B64, files: {} }))).toThrow(INVALID);
+  });
+
+  it('recusa o formato atual sem salt ou sem o mapa de arquivos', () => {
+    expect(() => parseManifest(manifestJson({ v: 2, files: {} }))).toThrow(INVALID);
+    expect(() => parseManifest(manifestJson({ v: 2, salt: SALT_B64 }))).toThrow(INVALID);
+  });
+
+  it('recusa salt fora do formato (não texto ou tamanho diferente de 16 bytes)', () => {
+    const files = { hash: 'library.json' };
+    expect(() => parseManifest(manifestJson({ v: 2, salt: 7, files }))).toThrow(INVALID);
+    expect(() => parseManifest(manifestJson({ v: 2, salt: 'curto', files }))).toThrow(INVALID);
+  });
+
+  it('recusa mapa de arquivos que não é objeto de nome para nome', () => {
+    for (const files of [null, ['x'], 'x', 3]) {
+      expect(() => parseManifest(manifestJson({ v: 2, salt: SALT_B64, files }))).toThrow(INVALID);
+    }
+  });
+
+  it('recusa entrada com nome local vazio, não texto ou nome remoto vazio', () => {
+    const invalidos = [{ hash: '' }, { hash: 3 }, { '': 'library.json' }];
+    for (const files of invalidos) {
+      expect(() => parseManifest(manifestJson({ v: 2, salt: SALT_B64, files }))).toThrow(INVALID);
     }
   });
 });

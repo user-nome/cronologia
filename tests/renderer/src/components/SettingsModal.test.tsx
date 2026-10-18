@@ -82,20 +82,36 @@ describe('SettingsModal: carregamento', () => {
     expect(screen.getByText(/Backup no Dropbox/)).toBeInTheDocument();
   });
 
-  it('lista os provedores e marca o Google Drive como não operante', async () => {
+  it('escolhe o destino do backup e catálogo mostra os dois provedores', async () => {
     setup();
-    const label = await screen.findByText('Provedores de backup');
-    const section = label.closest<HTMLElement>('.field');
-    if (section === null) throw new Error('Seção de provedores ausente.');
+    // O rótulo agora fica no seletor (que é o que escolhe), e a lista
+    // informativa é a irmã seguinte: é onde ficam os selos e os motivos.
+    const rotulo = await screen.findByText('Provedores de backup');
+    const seletor = screen.getByRole('button', { name: 'Dropbox' });
+    expect(rotulo.closest('.field')?.contains(seletor)).toBe(true);
 
-    expect(within(section).getByText('Dropbox')).toBeInTheDocument();
-    expect(within(section).getByText('Operante')).toBeInTheDocument();
-    expect(within(section).getByText('Google Drive')).toBeInTheDocument();
-    expect(within(section).getByText('Não operante')).toBeInTheDocument();
-    expect(within(section).getByText('Pasta oculta')).toBeInTheDocument();
-    expect(within(section).getByText(/Backup em appDataFolder/)).toBeInTheDocument();
-    expect(within(section).getByText(/exigências do Google/)).toBeInTheDocument();
-    expect(within(section).getByText(/backup usa o Dropbox/)).toBeInTheDocument();
+    const lista = document.querySelector<HTMLElement>('.provider-list');
+    if (lista === null) throw new Error('Catálogo de provedores ausente.');
+
+    expect(within(lista).getByText('Dropbox')).toBeInTheDocument();
+    expect(within(lista).getByText('Operante')).toBeInTheDocument();
+    expect(within(lista).getByText('Google Drive')).toBeInTheDocument();
+    expect(within(lista).getByText('Não operante')).toBeInTheDocument();
+    expect(within(lista).getByText('Pasta oculta')).toBeInTheDocument();
+    expect(within(lista).getByText(/Backup em appDataFolder/)).toBeInTheDocument();
+    expect(within(lista).getByText(/build/)).toBeInTheDocument();
+    expect(within(lista).getByText(/backup usa o Dropbox/)).toBeInTheDocument();
+  });
+
+  it('só oferece no seletor o provedor que este build consegue usar', async () => {
+    setup();
+    await screen.findByText('Provedores de backup');
+    // O catálogo mostra o Google Drive (com o motivo), mas o seletor não:
+    // oferecer e recusar seria pior que não oferecer.
+    const seletor = screen.getByRole('button', { name: 'Dropbox' });
+    await userEvent.click(seletor);
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    expect(screen.getByRole('option', { name: 'Dropbox' })).toBeInTheDocument();
   });
 
   it('mostra o estado vazio quando não há conexão nem backup', async () => {
@@ -168,6 +184,7 @@ describe('SettingsModal: credenciais', () => {
     expect(mock.settingsSet).toHaveBeenCalledWith({
       driveClientId: '',
       drivePassphrase: 'frase',
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     });
     await waitFor(() => expect(notify).toHaveBeenCalledWith('Configurações salvas.'));
@@ -193,6 +210,7 @@ describe('SettingsModal: ações do Dropbox', () => {
       settings: {
         driveClientId: 'id',
         drivePassphrase: 'frase',
+        backupProvider: 'dropbox',
         language: 'pt-BR',
       },
       status: CONNECTED,
@@ -212,6 +230,7 @@ describe('SettingsModal: ações do Dropbox', () => {
       settings: {
         driveClientId: 'id',
         drivePassphrase: 'frase',
+        backupProvider: 'dropbox',
         language: 'pt-BR',
       },
     });
@@ -227,6 +246,7 @@ describe('SettingsModal: ações do Dropbox', () => {
       settings: {
         driveClientId: 'id',
         drivePassphrase: 'frase',
+        backupProvider: 'dropbox',
         language: 'pt-BR',
       },
     });
@@ -321,6 +341,7 @@ describe('SettingsModal: configurações exibidas', () => {
     const saved: AppSettings = {
       driveClientId: 'id-salvo',
       drivePassphrase: 'frase-salva',
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     };
     setup({ settings: saved });

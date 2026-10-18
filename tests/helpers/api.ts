@@ -47,6 +47,7 @@ export interface ApiMock {
   vaultStatus: Mock<() => Promise<VaultStatus>>;
   vaultCreate: Mock<(password: string) => Promise<VaultResult>>;
   vaultUnlock: Mock<(password: string) => Promise<VaultResult>>;
+  driveSetProvider: Mock<() => Promise<{ ok: boolean; error?: string }>>;
   vaultLock: Mock<() => Promise<VaultStatus>>;
   vaultDestroy: Mock<() => Promise<VaultResult>>;
   vaultTouch: Mock<() => Promise<void>>;
@@ -59,6 +60,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   driveClientId: '',
   drivePassphrase: '',
   language: 'pt-BR',
+  backupProvider: 'dropbox',
 };
 
 const DEFAULT_STATUS: DriveStatus = {
@@ -73,7 +75,11 @@ const DEFAULT_STATUS: DriveStatus = {
  * Catálogo usado pela UI nos testes: o mesmo do processo main
  * (`drive.providers()`), com o Google Drive catalogado e não operante.
  */
-const DEFAULT_PROVIDERS: BackupProviderInfo[] = listProviders();
+const DEFAULT_PROVIDERS: BackupProviderInfo[] = listProviders().map((provider) =>
+  provider.id === 'dropbox'
+    ? { ...provider, operational: true, unavailableReason: null }
+    : provider,
+);
 
 /**
  * Cria uma `window.api` fake com estado interno equivalente ao backend real:
@@ -122,6 +128,12 @@ export function createApiMock(options: ApiMockOptions = {}): ApiMock {
 
   const driveProviders = vi.fn((): Promise<BackupProviderInfo[]> =>
     Promise.resolve(options.providers ?? DEFAULT_PROVIDERS),
+  );
+
+  // A troca de provedor é a única ação de Drive que devolve só `ok`: o
+  // destino vem no `settings.get`, e o erro do cofre volta como `error`.
+  const driveSetProvider = vi.fn((): Promise<{ ok: boolean; error?: string }> =>
+    Promise.resolve({ ok: true }),
   );
 
   const driveAuth = vi.fn((): Promise<{ ok: boolean; error?: string }> =>
@@ -214,6 +226,7 @@ export function createApiMock(options: ApiMockOptions = {}): ApiMock {
     drive: {
       status: driveStatus,
       providers: driveProviders,
+      setProvider: driveSetProvider,
       auth: driveAuth,
       backup: driveBackup,
       restore: driveRestore,
@@ -235,6 +248,7 @@ export function createApiMock(options: ApiMockOptions = {}): ApiMock {
 
   return {
     api,
+    driveSetProvider,
     libraryGet,
     librarySave,
     libraryRemove,

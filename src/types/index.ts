@@ -4,6 +4,7 @@ export type {
   BackupProviderInfo,
   BackupSummary,
   DriveStatus,
+  RemoteFile,
 } from '@zero/types/drive';
 export type { AppSettings, Language } from '@zero/types/settings';
 export type { VaultErrorCode, VaultKdfParams, VaultResult, VaultStatus } from '@zero/types/vault';

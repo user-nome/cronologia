@@ -1,4 +1,9 @@
-import type { BackupProviderInfo, BackupSummary, DriveStatus } from '@zero/types/drive';
+import type {
+  BackupProviderId,
+  BackupProviderInfo,
+  BackupSummary,
+  DriveStatus,
+} from '@zero/types/drive';
 import type { AppSettings } from '@zero/types/settings';
 import type { VaultErrorCode, VaultResult, VaultStatus } from '@zero/types/vault';
 import type { Work } from '@zero/types/work';
@@ -21,6 +26,14 @@ export interface ElectronApi {
   drive: {
     status: () => Promise<DriveStatus>;
     providers: () => Promise<BackupProviderInfo[]>;
+    /**
+     * Troca o destino do backup e carrega a sessão daquele provedor.
+     *
+     * A escolha vale na hora (e não no "Salvar" do formulário) porque o efeito
+     * é visível na hora: o estado do Drive na tela inteira muda de provedor.
+     * O erro vem de quem está no cofre; ver `switchProvider` em `drive/state.ts`.
+     */
+    setProvider: (id: BackupProviderId) => Promise<{ ok: boolean; error?: string }>;
     auth: () => Promise<{ ok: boolean; error?: string }>;
     backup: () => Promise<{ ok: boolean; error?: string; summary?: BackupSummary }>;
     restore: (passphrase: string) => Promise<{ ok: boolean; error?: string; works?: number }>;

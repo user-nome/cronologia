@@ -135,6 +135,40 @@ describe('Select', () => {
     fireEvent.click(screen.getByRole('option', { name: /Beta/ }));
     expect(onChange).toHaveBeenCalledWith('b');
   });
+
+  it('sobe o item ativo com ArrowUp e trava na primeira opção', () => {
+    const onChange = vi.fn<(value: 'a' | 'b' | 'c') => void>();
+    const { container } = render(<Select value="a" options={OPTIONS} onChange={onChange} />);
+    const element = root(container);
+
+    fireEvent.keyDown(element, { key: 'ArrowDown' });
+    fireEvent.keyDown(element, { key: 'End' });
+    fireEvent.keyDown(element, { key: 'ArrowUp' });
+    fireEvent.keyDown(element, { key: 'ArrowUp' });
+    fireEvent.keyDown(element, { key: 'ArrowUp' });
+    fireEvent.keyDown(element, { key: 'Enter' });
+    // Três setas para cima a partir da última opção só chegam na primeira: o
+    // item ativo nunca "passa" do começo da lista.
+    expect(onChange).toHaveBeenLastCalledWith('a');
+  });
+
+  it('abre na primeira opção quando o valor atual não está na lista', async () => {
+    const user = userEvent.setup();
+    render(<Select value="zz" options={OPTIONS} onChange={() => undefined} />);
+    // Sem opção correspondente, o gatilho mostra o texto genérico do bundle.
+    expect(screen.getByText('Selecione')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button'));
+    expect(screen.getByRole('option', { name: /Alpha/ })).toHaveAttribute('data-active', 'true');
+  });
+
+  it('a seta para baixo também abre na primeira opção sem valor correspondente', () => {
+    const { container } = render(
+      <Select value="zz" options={OPTIONS} onChange={() => undefined} placeholder="Escolha" />,
+    );
+    fireEvent.keyDown(root(container), { key: 'ArrowDown' });
+    expect(screen.getByRole('option', { name: /Alpha/ })).toHaveAttribute('data-active', 'true');
+  });
 });
 
 describe('Select pesquisável', () => {
@@ -205,5 +239,50 @@ describe('Select pesquisável', () => {
     render(<Select value="a" options={OPTIONS} onChange={() => undefined} />);
     await user.click(screen.getByRole('button'));
     expect(screen.queryByLabelText('Digite para filtrar…')).not.toBeInTheDocument();
+  });
+
+  it('o espaço digitado na busca não escolhe a opção', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn<(value: string) => void>();
+    render(<Select value="" options={GENRES} onChange={onChange} searchable />);
+    await user.click(screen.getByRole('button', { name: /Nenhuma/ }));
+
+    const search = screen.getByLabelText('Digite para filtrar…');
+    await user.type(search, 'rom');
+    fireEvent.keyDown(search, { key: ' ' });
+    // Com o cursor no campo de busca, espaço é parte do termo digitado: não pode
+    // confirmar a opção nem fechar o menu.
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    expect(search).toHaveValue('rom');
+  });
+
+  it('Enter não escolhe nada quando o filtro não tem resultado', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn<(value: string) => void>();
+    render(<Select value="" options={GENRES} onChange={onChange} searchable />);
+    await user.click(screen.getByRole('button', { name: /Nenhuma/ }));
+
+    const search = screen.getByLabelText('Digite para filtrar…');
+    await user.type(search, 'zzz');
+    expect(screen.queryByRole('option')).not.toBeInTheDocument();
+
+    fireEvent.keyDown(search, { key: 'Enter' });
+    // O item ativo aponta para uma posição que não existe: nenhum erro, o menu
+    // segue aberto com a mensagem de busca vazia.
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByText('Nenhuma opção encontrada')).toBeInTheDocument();
+  });
+
+  it('o espaço não escolhe nada com a lista de opções vazia', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn<(value: 'a' | 'b' | 'c') => void>();
+    const { container } = render(<Select value="a" options={[]} onChange={onChange} />);
+    await user.click(screen.getByRole('button'));
+
+    fireEvent.keyDown(root(container), { key: ' ' });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    expect(screen.getByText('Nenhuma opção encontrada')).toBeInTheDocument();
   });
 });

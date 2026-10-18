@@ -2,23 +2,33 @@ import fs from 'fs';
 import path from 'path';
 import { writeJsonAtomic } from '@zero/main/jsonfile';
 import { configDir } from '@zero/main/paths';
-import type { AppSettings, Language } from '@zero/types';
+import type { AppSettings, BackupProviderId, Language } from '@zero/types';
 import { VAULT_SECRET, vaultUnlocked } from '@zero/main/vault/secrets';
 import { getSecret, setSecret } from '@zero/main/vault/vault';
 
 /**
- * Configurações persistidas. O disco guarda **só** o `language`: os segredos
- * (`drivePassphrase`, `driveClientId`) moram no cofre de segredos em
+ * Configurações persistidas. O disco guarda `language` e `backupProvider`: os
+ * segredos (`drivePassphrase`, `driveClientId`) moram no cofre de segredos em
  * `/var/lib/.cronologia/.vault` e são lidos dele quando o cofre está
  * desbloqueado (sem cofre aberto voltam `''`, falha fechada). Um `settings.json`
  * antigo com `enc:`/keyring é simplesmente ignorado no primeiro salvamento.
  * Ver `docs/credenciais.md`.
+ *
+ * O provedor é dos poucos que fica **fora** do cofre de propósito: ele não é
+ * segredo, e o app precisa saber para onde enviar a biblioteca mesmo com o
+ * cofre fechado, para mostrar o estado certo em vez de "desconectado".
  */
 const DEFAULTS: AppSettings = {
   driveClientId: '',
   drivePassphrase: '',
   language: 'pt-BR',
+  backupProvider: 'dropbox',
 };
+
+/** Catálogo fechado de provedores; qualquer outra coisa cai no padrão. */
+function isProviderId(value: unknown): value is BackupProviderId {
+  return value === 'dropbox' || value === 'google-drive';
+}
 
 function ensureConfigDir(): void {
   fs.mkdirSync(configDir(), { recursive: true });
@@ -41,16 +51,33 @@ function languageField(record: object): Language {
     : DEFAULTS.language;
 }
 
-/** Idioma do disco (o único campo persistido fora do cofre). */
-function readLanguage(): Language {
+/** Campos do disco (fora do cofre): idioma e provedor escolhido. */
+interface OnDisk {
+  language: Language;
+  backupProvider: BackupProviderId;
+}
+
+function onDiskField(record: object): OnDisk {
+  const provider: unknown = Reflect.get(record, 'backupProvider');
+  return {
+    language: languageField(record),
+    backupProvider: isProviderId(provider) ? provider : DEFAULTS.backupProvider,
+  };
+}
+
+function readOnDisk(): OnDisk {
   try {
     const file = settingsPath();
-    if (!fs.existsSync(file)) return DEFAULTS.language;
+    if (!fs.existsSync(file)) {
+      return { language: DEFAULTS.language, backupProvider: DEFAULTS.backupProvider };
+    }
     const parsed: unknown = JSON.parse(fs.readFileSync(file, 'utf-8'));
-    if (typeof parsed !== 'object' || parsed === null) return DEFAULTS.language;
-    return languageField(parsed);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return { language: DEFAULTS.language, backupProvider: DEFAULTS.backupProvider };
+    }
+    return onDiskField(parsed);
   } catch {
-    return DEFAULTS.language;
+    return { language: DEFAULTS.language, backupProvider: DEFAULTS.backupProvider };
   }
 }
 
@@ -69,7 +96,7 @@ function readSecrets(): Pick<AppSettings, 'driveClientId' | 'drivePassphrase'> {
 }
 
 export function loadSettings(): AppSettings {
-  return { ...DEFAULTS, ...readSecrets(), language: readLanguage() };
+  return { ...DEFAULTS, ...readSecrets(), ...readOnDisk() };
 }
 
 /**
@@ -89,11 +116,18 @@ export function saveSettings(settings: AppSettings): AppSettings {
       settings.language === 'ja'
         ? settings.language
         : 'pt-BR',
+    backupProvider: isProviderId(settings.backupProvider)
+      ? settings.backupProvider
+      : DEFAULTS.backupProvider,
   };
   // Segredos primeiro: se o cofre estiver fechado, a exceção aborta antes de
   // qualquer escrita em disco.
   setSecret(VAULT_SECRET.drivePassphrase, next.drivePassphrase);
   setSecret(VAULT_SECRET.driveClientId, next.driveClientId);
-  writeJsonAtomic(settingsPath(), { language: next.language }, 0o600);
+  writeJsonAtomic(
+    settingsPath(),
+    { language: next.language, backupProvider: next.backupProvider },
+    0o600,
+  );
   return next;
 }

@@ -2,8 +2,8 @@
 
 Aplicativo desktop (Electron + TypeScript + React) para anotar o progresso das suas leituras de
 **webtoons, manhwas, manhuas, mangás, livros e outros**: capa da obra, título, descrição, barra de
-progresso em capítulos e marcação de conclusão, com **backup manual no Dropbox** na pasta do
-app.
+progresso em capítulos e marcação de conclusão, com **backup manual no Dropbox ou Google
+Drive**.
 
 Feito para **Linux Mint 22.3 (Zena)** e distribuído como pacote **`.deb`**.
 
@@ -31,11 +31,11 @@ Feito para **Linux Mint 22.3 (Zena)** e distribuído como pacote **`.deb`**.
 - **Busca** por título ou descrição e **filtros** por status (Lendo, Planejados, Pausados,
   Concluídos, Cancelados); o contador e o progresso médio do cabeçalho acompanham o que está
   sendo exibido, e o bloco de estatísticas continua mostrando o total da biblioteca.
-- **Backup no Dropbox**: grava na **pasta do app** (`/Apps/Cronologia`, um espaço
-  que só este app acessa via API), com login **OAuth + PKCE direto no app** (sem segredo
-  embutido e sem servidor intermediário). Arquivos sempre **criptografados** (nomes opacos +
-  AES-256-GCM), com **Fazer backup agora**, **Restaurar** (pede a senha), **Desconectar** e
-  **Apagar backup** (que apaga de fato os arquivos na nuvem; desconectar só corta o acesso).
+- **Backup na nuvem**: Dropbox (`/Apps/Cronologia`) ou Google Drive (`appDataFolder`,
+  pasta oculta, disponível quando o build tem `GOOGLE_CLIENT_ID`). Login **OAuth + PKCE
+  direto no app**, sem servidor intermediário. Arquivos sempre **criptografados** (nomes
+  opacos + AES-256-GCM), com **Fazer backup agora**, **Restaurar** (pede a senha),
+  **Desconectar** e **Apagar backup**.
 - **Janela nativa sem barra de menus**: sem botões File/Edit/View no topo (menu da
   aplicação removido por completo); decorações do gerenciador de janelas (encaixe em cantos
   para dividir a tela, maximizar/fechar) e `F11` alterna tela cheia.
@@ -140,7 +140,7 @@ qualquer outro aplicativo que passe a falhar depois que `/tmp` for apagada.
 | `npm run format`          | Formata tudo com Prettier                                                        |
 | `npm run format:check`    | Verifica a formatação (CI)                                                       |
 | `npm test`                | Roda a suíte Vitest (`tests/**/*.test.{ts,tsx}`)                                 |
-| `npm run test:coverage`   | A suíte com medição de cobertura (limiar de 50% por métrica)                     |
+| `npm run test:coverage`   | A suíte com medição de cobertura (95% **por arquivo** nas 4 métricas)            |
 | `npm run test:e2e`        | E2E com Playwright: app compilado e payload do `.deb` (veja `docs/e2e.md`)       |
 | `npm run test:mutation`   | Varredura de mutação de `src/` (veja `docs/mutation.md`)                         |
 | `npm run security:audit`  | Auditoria de vulnerabilidades via OSV Scanner                                    |
@@ -220,11 +220,14 @@ O projeto roda com o máximo de rigor disponível:
 | Ponta a ponta (E2E) | "o app de verdade funciona depois que tudo monta?"       | `e2e/**`          |
 | Mutação             | "se esta linha fizesse outra coisa, a suíte perceberia?" | `tools/mutation/` |
 
-Cobertura de linha é o piso (50% por métrica, em `vitest.config.mts`); a
-mutação é o que diz se esse piso significa alguma coisa, e o E2E é o único lugar
-onde o bundle, o `cronologia://`, o IPC real e o Argon2id de produção aparecem
-juntos. Detalhes em [`docs/testes.md`](docs/testes.md), [`docs/e2e.md`](docs/e2e.md)
-e [`docs/mutation.md`](docs/mutation.md).
+Cobertura de linha é o piso, e ela é **por arquivo** (95% nas quatro métricas,
+`perFile: true`): o piso agregado perdoa o arquivo esquecido, e era isso que
+acontecia, com o entry do renderer em 0% e o scheme da SPA em 35% antes da
+varredura de baixo para cima. A mutação é o que diz se esse piso significa
+alguma coisa, e o E2E é o único lugar onde o bundle, o `cronologia://`, o IPC real
+e o Argon2id de produção aparecem juntos. Detalhes em
+[`docs/testes.md`](docs/testes.md), [`docs/e2e.md`](docs/e2e.md) e
+[`docs/mutation.md`](docs/mutation.md).
 
 ---
 
@@ -299,7 +302,7 @@ flowchart TD
         PRT["protocols.ts: cover:// (capas) e cronologia:// (SPA)"]
         LIB["library.ts + store-crypto.ts:<br/>acervo cifrado"]
         SET["settings.ts: App key, senha do backup e idioma"]
-        DRV["drive/: provedor Dropbox, OAuth PKCE, backup (AES-256-GCM)"]
+        DRV["drive/: Dropbox + Google Drive, OAuth PKCE, backup (AES-256-GCM)"]
     end
 
     subgraph MSG["Mensagens (src/messages)"]
@@ -310,7 +313,7 @@ flowchart TD
         LOKAL[("~/.local/share/cronologia/<br/>library.enc · covers/*.enc<br/>(cifrados)")]
         CFG[("~/.config/cronologia/<br/>settings.json (só idioma)")]
         VAULT[("/var/lib/.cronologia/<br/>.vault/ · vault.zkv")]
-        DRIVE[("Dropbox · pasta do app /Apps/Cronologia")]
+        DRIVE[("Dropbox /Apps/Cronologia · Google Drive appDataFolder")]
     end
 
     BRIDGE -->|"ipcRenderer.invoke"| IDX
@@ -416,8 +419,10 @@ cronologia/
 │   │   └── drive/            # provedores de nuvem, OAuth PKCE, backup/restauração
 │   │       ├── index.ts      # barrel da API pública (authorize, backupNow…)
 │   │       ├── provider.ts   # contrato BackupProvider + catálogo de provedores
-│   │       ├── providers/    # dropbox.ts (operante) · google-drive.ts (não operante)
-│   │       ├── constants.ts  # escopos, App key, loopback fixo
+│   │       ├── providers/    # Dropbox e Google Drive (appDataFolder)
+│   │       ├── oauth-flow.ts # PKCE + loopback compartilhados
+│   │       ├── constants.ts  # escopos, endpoints, loopback fixo
+│   │       ├── dropbox-credentials.ts # App key injetada no bundle main
 │   │       ├── state.ts      # sessão, App key e listener de status
 │   │       ├── oauth.ts      # autorização (PKCE sem secret) + refresh
 │   │       ├── rest.ts       # chamadas REST do Dropbox (pasta do app)
@@ -518,9 +523,9 @@ Detalhes da configuração (campo `build` do `package.json`):
 Fluxo resumido (passo a passo completo em [`docs/dropbox.md`](docs/dropbox.md)):
 
 1. ⚙ → crie o **cofre de segredos** (senha mestra) e defina a **senha de criptografia do
-   backup** (obrigatória). A App key do Dropbox já vem embutida no app (com PKCE não
-   existe segredo: só a chave identifica o app, e o acesso real fica no `refresh_token`
-   guardado na sua máquina).
+   backup** (obrigatória). A App key do Dropbox vem da variável `DROPBOX_APP_KEY`
+   injetada no bundle main durante o build; com PKCE ela é um identificador público,
+   e o acesso real fica no `refresh_token` guardado na sua máquina.
 2. **Conectar ao Dropbox** → janela do navegador → consentimento → tokens gravados no
    cofre (`dropbox.tokens`; PKCE + callback fixo em `localhost:17431`, a URI
    que o Dropbox exige pré-cadastrada). Sem cofre aberto o app pede para criar ou

@@ -19,6 +19,7 @@ export const DEFAULT_EXCLUDES = [
   // Barrels puros de `reexport`: os módulos que eles reexportam são medidos
   // (`drive/backup.ts`, `vault/vault.ts`).
   /^src\/main\/(drive|vault)\/index\.ts$/,
+  /^src\/main\/drive\/providers\/(dropbox|google)\/index\.ts$/,
   // Entry point do renderer: monta o React em `#root` e nada mais. A suíte
   // renderiza `<App/>` diretamente, então este arquivo nunca é importado por um
   // teste, e a mutação dele mediria a montagem, que não tem decisão.

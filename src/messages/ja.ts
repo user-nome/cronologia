@@ -68,13 +68,19 @@ export const ja: Messages = {
 
   settings: {
     title: '設定',
-    bannerTitle: 'Dropbox バックアップ。',
-    bannerBody:
+    bannerTitle: (label: string): string => `${label} バックアップ。`,
+    bannerBodyDropbox:
       'ライブラリはアプリ専用フォルダに保存されます（Dropbox の `/Apps/` 以下）。' +
       'API としてはこのアプリだけがそのフォルダを読み書きでき、他の領域は表示されません。' +
       'フォルダはあなたのアカウント内に見えるので、すべてのファイルは解読不能な名前と ' +
       '暗号化された内容でアップロードされます (AES-256-GCM)。最初のバックアップ前に ' +
       '以下の暗号化パスフレーズを設定してください。',
+    bannerBodyGoogle:
+      'このビルドはライブラリをアプリ専用の隠しフォルダ（Google Drive の ' +
+      '`appDataFolder`）に保存します。このフォルダは Google Drive の画面には現れず、' +
+      'このアプリだけが読み書きできます。要求するスコープはこのフォルダだけです。' +
+      'すべてのファイルは解読不能な名前と暗号化された内容 (AES-256-GCM) でアップロード' +
+      'されるため、最初のバックアップ前に以下の暗号化パスフレーズを設定してください。',
     languageLabel: '言語',
     providersLabel: 'バックアップ先',
     hiddenFolder: '非公開フォルダ',
@@ -82,44 +88,49 @@ export const ja: Messages = {
     notOperational: '未対応',
     backupIn: (target: string): string => `${target} にバックアップ`,
     passphraseLabel: 'バックアップ暗号化パスフレーズ',
-    passphrasePlaceholder: 'Dropbox バックアップの暗号化に使用',
+    passphrasePlaceholder: (label: string): string => `${label} バックアップの暗号化に使用`,
     connected: '接続済み',
     disconnected: '切断',
-    accountFallback: 'Dropbox アカウント',
+    accountFallback: (label: string): string => `${label} アカウント`,
     lastBackup: '最終バックアップ',
-    inDropboxBackup: 'Dropbox バックアップ内',
+    inBackup: (label: string): string => `${label} バックアップ内`,
     translationNotice: {
       title: '翻訳のお知らせ',
       text: 'これらの言語の中でポルトガル語以外は話せません。すべての翻訳はAIによって行われています。世の中のすべてと同じように、間違いがあるかもしれません。少しの寛容をお願いいたします。',
       translationNotice2:
         '翻訳の改善にご協力いただける場合は、プロジェクトのリポジトリで Issue を作成してください。',
     },
+    providerSwitched: (label: string): string => `バックアップ先は ${label} になりました。`,
+    providerSwitchFailed: 'バックアップ先を変更できませんでした。',
     worksInBackup: (works: number): string => `${works} 件`,
-    syncingBanner: 'Dropbox と同期中…',
-    disconnectTitle: 'このアプリから Dropbox アカウントの接続を解除します',
+    syncingBanner: (label: string): string => `${label} と同期中…`,
+    disconnectTitle: (label: string): string =>
+      `このアプリから ${label} アカウントの接続を解除します`,
     disconnectAction: '切断',
     authorizing: '認証中…',
-    connectAction: 'Dropbox に接続',
-    restoreTitle: 'Dropbox のバックアップをダウンロードし、現在のライブラリを置き換えます',
+    connectAction: (label: string): string => `${label} に接続`,
+    restoreTitle: (label: string): string =>
+      `${label} のバックアップをダウンロードし、現在のライブラリを置き換えます`,
     restoreAction: '復元',
     restoring: '復元中…',
     backupAction: '今すぐバックアップ',
     sending: '送信中…',
     toastSaved: '設定を保存しました。',
     toastAuthFailed: '認証に失敗しました。',
-    toastConnected: 'Dropbox アカウントに接続しました。',
+    toastConnected: (label: string): string => `${label} アカウントに接続しました。`,
     toastBackupFailed: 'バックアップに失敗しました。',
-    toastBackupDone: 'Dropbox のアプリフォルダにバックアップを完了しました。',
+    toastBackupDone: (label: string): string =>
+      `${label} のアプリフォルダにバックアップを完了しました。`,
     toastRestoreFailed: '復元に失敗しました。',
     toastRestored: (works: number): string => `${works} 件の作品を復元しました。`,
-    toastDisconnected: 'Dropbox アカウントの接続を解除しました。',
+    toastDisconnected: (label: string): string => `${label} アカウントの接続を解除しました。`,
     toastPurgeFailed: 'クラウドからバックアップを削除できませんでした。',
   },
 
   restore: {
     title: 'バックアップパスフレーズ',
-    banner:
-      'Dropbox で**バックアップを作成**したときに使った暗号化パスフレーズを入力してください。' +
+    banner: (label: string): string =>
+      `${label} で**バックアップを作成**したときに使った暗号化パスフレーズを入力してください。` +
       'ダウンロードしたファイルを復元するには必須です。',
     passphraseLabel: '暗号化パスフレーズ',
     passphrasePlaceholder: 'バックアップ時に使用したパスフレーズ',
@@ -238,9 +249,10 @@ export const ja: Messages = {
   providers: {
     dropboxStorageTarget: '/Apps/Cronologia (アカウント内で見えるフォルダ)',
     googleStorageTarget: 'appDataFolder (非公開フォルダ。Google ドライブの UI には表示されません)',
-    googleUnavailable:
-      'Google ドライブはまだ利用できません。Google の要件 (アプリ検証、同意画面、' +
-      'スコープ審査) が整い次第有効化されます。それまでは Dropbox がバックアップ先です。',
+    googleNoCredentials:
+      'このビルドには Google Drive の資格情報が含まれていません。アプリは公開時に' +
+      'バイナリへ埋め込まれるキーの組で識別されます。それが公開されるまで、' +
+      'バックアップは Dropbox を使います。',
   },
 
   driveErrors: {
@@ -257,26 +269,31 @@ export const ja: Messages = {
     noBackupFound: (provider: string): string =>
       `${provider} のアプリフォルダにバックアップが見つかりません。`,
     invalidLibrary: 'バックアップが壊れています (library.json が不正)。',
-    invalidListResponse: 'Dropbox API の応答が不正です (ファイル一覧)。',
+    invalidListResponse: (provider: string): string =>
+      `${provider} API の応答が不正です (ファイル一覧)。`,
     tokenTimeout: '認証の待機がタイムアウトしました。',
     authCancelled: '認証がキャンセルされました。',
+    csrfRejected: '別オリジンからの認証コールバックだったため、接続を拒否しました。',
     tokenFailed: (status: number): string => `トークンの取得に失敗しました (${status})。`,
     invalidTokenResponse: (status: number): string => `トークン応答が不正です (${status})。`,
-    configureAppKey: '設定で Dropbox アプリキーを設定してください。',
-    sessionExpired: 'セッションが期限切れです。Dropbox アカウントを再接続してください。',
-    refreshFailed: 'Dropbox セッションを更新できませんでした。',
-    noAccount: 'Dropbox アカウントが接続されていません。',
-    permissionsUpdated: 'Dropbox の権限が更新されました。Dropbox アカウントを再接続してください。',
-    missingScopes:
-      'Dropbox アプリの権限が不足しています。App Console の Permissions で全スコープを有効にし、' +
-      '切断してから接続し直してください。',
-    missingScopesList: (missing: string): string =>
-      `Dropbox アプリの権限が不足しています (${missing})。` +
-      'App Console の Permissions で全スコープを有効にし、再接続してください。',
-    dropboxHttp: (status: number, response: string): string =>
+    configureAppKey:
+      'このビルドには DROPBOX_APP_KEY がありません。変数を設定して再ビルドしてください。',
+    sessionExpired: (provider: string): string =>
+      `セッションが期限切れです。${provider} アカウントを再接続してください。`,
+    refreshFailed: (provider: string): string => `${provider} セッションを更新できませんでした。`,
+    noAccount: (provider: string): string => `${provider} アカウントが接続されていません。`,
+    permissionsUpdated: (provider: string): string =>
+      `${provider} の権限が更新されました。${provider} アカウントを再接続してください。`,
+    missingScopes: (provider: string): string =>
+      `${provider} アプリの権限が不足しています。アプリの開発者コンソールで全スコープを` +
+      '有効にし、切断してから接続し直してください。',
+    missingScopesList: (provider: string, missing: string): string =>
+      `${provider} アプリの権限が不足しています (${missing})。アプリの開発者コンソールで` +
+      '全スコープを有効にし、再接続してください。',
+    providerHttp: (label: string, status: number, response: string): string =>
       response === ''
-        ? `Dropbox エラー (HTTP ${status})。`
-        : `Dropbox エラー (HTTP ${status})。応答: ${response}`,
+        ? `${label} エラー (HTTP ${status})。`
+        : `${label} エラー (HTTP ${status})。応答: ${response}`,
     restoreLocked: (seconds: number): string =>
       seconds < 60
         ? `パスフレーズ誤りの復元試行が多すぎます。${seconds} 秒後に再試行してください。`

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { RenderResult } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import App from '@zero/renderer/App';
@@ -307,6 +307,68 @@ describe('App: ações nas obras', () => {
     for (const call of mock.librarySave.mock.invocationCallOrder) {
       expect(call).toBeLessThan(ordem);
     }
+  });
+
+  it('o Salvar do modal cancela a gravação que o cartão ainda não fez', async () => {
+    // O mesmo par do teste de regressão, mas sem digitar nada no modal: com
+    // `fireEvent` os dois cliques acontecem dentro da janela de 450 ms, então o
+    // agendamento do cartão ainda está de pé quando o modal grava.
+    const { mock, view } = setup();
+    await screen.findByText(/4 obra\(s\)/);
+
+    fireEvent.click(within(cardOf('Solo Leveling')).getByTitle('Aumentar 1'));
+    fireEvent.click(screen.getByText('Solo Leveling'));
+    fireEvent.click(screen.getByRole('button', { name: /Salvar/ }));
+    await waitFor(() => expect(mock.librarySave).toHaveBeenCalledTimes(1));
+
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    // O rascunho do cartão foi descartado: o debounce não gravou nada depois.
+    expect(mock.librarySave).toHaveBeenCalledTimes(1);
+    view.unmount();
+  });
+
+  it('vários ajustes seguidos na mesma obra gravam só a última intenção', async () => {
+    const { mock, view } = setup();
+    await screen.findByText(/4 obra\(s\)/);
+    const card = cardOf('Solo Leveling');
+
+    fireEvent.click(within(card).getByTitle('Aumentar 1'));
+    fireEvent.click(within(card).getByTitle('Aumentar 1'));
+    expect(within(cardOf('Solo Leveling')).getByText('Cap. 22')).toBeInTheDocument();
+
+    await waitFor(() => expect(mock.librarySave).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    expect(mock.librarySave).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'w-lendo', progress: 22 }),
+    );
+    view.unmount();
+  });
+
+  it('descarta as gravações ainda agendadas quando a janela fecha', async () => {
+    const { mock, view } = setup();
+    await screen.findByText(/4 obra\(s\)/);
+
+    fireEvent.click(within(cardOf('Solo Leveling')).getByTitle('Aumentar 1'));
+    view.unmount();
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    // Sair com o debounce pendente não pode gravar meio rascunho: o usuário já
+    // não está mais na tela para ver o resultado.
+    expect(mock.librarySave).not.toHaveBeenCalled();
+  });
+
+  it('aumentar o progresso de obra concluída devolve o status para lendo', async () => {
+    const user = userEvent.setup();
+    const { mock } = setup();
+    await screen.findByText(/4 obra\(s\)/);
+
+    await user.click(within(cardOf('Tower of God')).getByTitle('Aumentar 1'));
+    await waitFor(() => expect(mock.librarySave).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    // Continuar a leitura devolve o status: concluído com progresso subindo
+    // seria um estado que o usuário não pode mais sair sozinho.
+    expect(mock.librarySave).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'w-feliz', status: 'lendo' }),
+    );
+    expect(within(cardOf('Tower of God')).getByText('Lendo')).toBeInTheDocument();
   });
 });
 

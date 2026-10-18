@@ -42,6 +42,7 @@ describe('preload (contextBridge)', () => {
     const settings: AppSettings = {
       driveClientId: 'id',
       drivePassphrase: 'frase',
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     };
     await api.pickCover();

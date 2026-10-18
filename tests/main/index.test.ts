@@ -2,8 +2,8 @@ import fs from 'fs';
 import http from 'http';
 import os from 'os';
 import path from 'path';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
-import type { AppSettings, LibraryReset, Work } from '@zero/types';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AppSettings, LibraryReset, PurgeResult, VaultResult, Work } from '@zero/types';
 import {
   configDir,
   coversDir,
@@ -12,10 +12,10 @@ import {
   saveLibrary,
   writeCoverFile,
 } from '@zero/main/library';
-import { setSecret, vaultSession } from '@zero/main/vault';
+import { currentMessages } from '@zero/main/i18n';
+import { IDLE_LOCK_MS, setSecret, vaultSession } from '@zero/main/vault';
 import { destroyVault } from '@zero/main/vault';
 import { VAULT_SECRET } from '@zero/main/vault/secrets';
-import { EMBEDDED_APP_KEY } from '@zero/main/drive/constants';
 import { makeDraft, makeWork } from '../helpers/fixtures.ts';
 import { sandboxPath } from '../helpers/sandbox.ts';
 import { openTestVault } from '../helpers/vault.ts';
@@ -49,6 +49,23 @@ function invokeAsync<T>(channel: string, ...args: unknown[]): Promise<T> {
   return invoke(channel, ...args) as Promise<T>;
 }
 
+async function negarOAuthDropbox(): Promise<URL> {
+  shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
+    const params = new URL(url).searchParams;
+    const redirect = params.get('redirect_uri');
+    if (redirect !== null) {
+      const request = http.get(
+        `${redirect}?error=access_denied&state=${params.get('state') ?? ''}`,
+      );
+      request.on('error', () => undefined);
+    }
+    return Promise.resolve();
+  });
+  const result = await invokeAsync<{ ok: boolean; error?: string }>('drive:auth');
+  expect(result).toEqual({ ok: false, error: 'access_denied' });
+  return new URL(shell.openExternal.mock.calls.at(-1)?.[0] ?? '');
+}
+
 function appListener(event: string): WindowEventHandler {
   const call = app.on.mock.calls.find((entry) => entry[0] === event);
   if (call === undefined) throw new Error(`Listener de app ausente: ${event}`);
@@ -73,6 +90,63 @@ function coverHandler(): (request: { url: string }) => Response {
   return call[1];
 }
 
+/** Senha-mestra de teste; o cofre é criado com o KDF barato de `tests/helpers`. */
+const PASSWORD = 'uva-preta-42-estrela';
+
+/** URL que o `electron-vite dev` injeta para o renderer. */
+const DEV_URL = 'http://localhost:5173';
+
+function errno(code: string): NodeJS.ErrnoException {
+  return Object.assign(new Error(code), { code });
+}
+
+/** Faz a próxima chamada do `fs` indicada falhar com `code`, como um disco cheio. */
+function falhaEm(alvo: 'mkdirSync' | 'lstatSync', code: string): void {
+  vi.spyOn(fs, alvo).mockImplementationOnce(() => {
+    throw errno(code);
+  });
+}
+
+/** Ajustes neutros para exercitar a gravação sem segredo de verdade. */
+const AJUSTES: AppSettings = {
+  driveClientId: '',
+  drivePassphrase: '',
+  backupProvider: 'dropbox',
+
+  language: 'pt-BR',
+};
+const AJUSTES_NOVOS: AppSettings = {
+  driveClientId: 'id',
+  drivePassphrase: 'frase',
+  backupProvider: 'dropbox',
+  language: 'en',
+};
+
+/** Evento de IPC cujo emissor está na URL dada (a guarda do main compara origem). */
+function frameDe(url: unknown): unknown {
+  return { senderFrame: { url } };
+}
+
+/** Janela já criada pelo app (índice 0 é a primeira); falha alto se não houver. */
+function janela(indice = 0): BrowserWindow {
+  const win = BrowserWindow.instances[indice];
+  if (win === undefined) throw new Error('Janela não criada.');
+  return win;
+}
+
+/**
+ * Janela viva para os avisos do main. Quando não há nenhuma (os testes de
+ * ciclo de vida fecharam as que existiam), recria pelo mesmo caminho do app:
+ * o `activate` do macOS, que é quem reabre a janela.
+ */
+function janelaViva(): BrowserWindow {
+  const antes = BrowserWindow.instances.length;
+  BrowserWindow.getAllWindows.mockReturnValueOnce([]);
+  appListener('activate')();
+  if (BrowserWindow.instances.length === antes) throw new Error('janela não recriada');
+  return janela(BrowserWindow.instances.length - 1);
+}
+
 const expectedChannels = [
   'library:get',
   'library:save',
@@ -83,6 +157,7 @@ const expectedChannels = [
   'settings:set',
   'drive:status',
   'drive:providers',
+  'drive:set-provider',
   'drive:auth',
   'drive:backup',
   'drive:restore',
@@ -108,6 +183,10 @@ beforeAll(async () => {
 
   await import('@zero/main/index');
   await vi.waitFor(() => expect(ipcMain.handle).toHaveBeenCalled());
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe('inicialização', () => {
@@ -148,9 +227,7 @@ describe('inicialização', () => {
 
   it('cria a janela com sandbox e context isolation', () => {
     expect(BrowserWindow.instances).toHaveLength(1);
-    const win = BrowserWindow.instances[0];
-    expect(win).toBeDefined();
-    const options = win?.options as {
+    const options = janela().options as {
       width: number;
       minWidth: number;
       minHeight: number;
@@ -170,9 +247,9 @@ describe('inicialização', () => {
     expect(options.webPreferences.devTools).toBe(true);
     expect(String(options.webPreferences.preload)).toContain(path.join('preload', 'index'));
     // Em produção o renderer é servido pelo scheme custom `cronologia://` (sem file://).
-    expect(win?.loadURL.mock.calls[0]?.[0]).toBe('cronologia://app/index.html');
+    expect(janela().loadURL.mock.calls[0]?.[0]).toBe('cronologia://app/index.html');
     // Sem dev URL, loadFile não é usado (scheme custom cobre a home).
-    expect(win?.loadFile).not.toHaveBeenCalled();
+    expect(janela().loadFile).not.toHaveBeenCalled();
   });
 
   it('trava o app em uma única instância', () => {
@@ -183,10 +260,9 @@ describe('inicialização', () => {
   it('remove o menu da aplicação (sem File/Edit/View) e sem menu de botão direito', () => {
     expect(Menu.setApplicationMenu).toHaveBeenCalledTimes(1);
     expect(Menu.setApplicationMenu).toHaveBeenCalledWith(null);
-    const win = BrowserWindow.instances[0];
     // O único listener de webContents é a guarda de navegação; nenhum
     // handler de context-menu (menu de botão direito).
-    const events = win?.webContents.on.mock.calls.map((call) => call[0]) ?? [];
+    const events = janela().webContents.on.mock.calls.map((call) => call[0]);
     expect(events).not.toContain('context-menu');
   });
 
@@ -206,18 +282,16 @@ describe('inicialização', () => {
   });
 
   it('define o ícone da janela a partir do ícone do pacote', () => {
-    const win = BrowserWindow.instances[0];
     expect(nativeImage.createFromPath).toHaveBeenCalledWith(
       expect.stringContaining(path.join('build', 'icon.png')),
     );
-    expect(win?.options.icon).toBeDefined();
+    expect(janela().options.icon).toBeDefined();
   });
 });
 
 describe('atalho F11 (tela cheia)', () => {
   it('registra o F11 ao focar e libera ao desfocar/encerrar', () => {
-    const win = BrowserWindow.instances[0];
-    if (win === undefined) throw new Error('Janela não criada.');
+    const win = janela();
     globalShortcut.register.mockClear();
     globalShortcut.unregister.mockClear();
     globalShortcut.unregisterAll.mockClear();
@@ -308,6 +382,7 @@ describe('handlers de configurações e Drive', () => {
     expect(settings).toEqual({
       driveClientId: '',
       drivePassphrase: '',
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     });
   });
@@ -318,76 +393,37 @@ describe('handlers de configurações e Drive', () => {
     expect(status.accountEmail).toBeNull();
   });
 
-  it('drive:providers devolve o catálogo com o Google Drive não operante', () => {
-    const providers = invoke('drive:providers') as {
-      id: string;
-      operational: boolean;
-      storageHidden: boolean;
-      unavailableReason: string | null;
-    }[];
-    expect(providers.map((provider) => provider.id)).toEqual(['dropbox', 'google-drive']);
-    expect(providers[0]).toMatchObject({ operational: true, storageHidden: false });
-    expect(providers[1]).toMatchObject({ operational: false, storageHidden: true });
-    expect(providers[1]?.unavailableReason ?? '').toContain('exigências do Google');
-  });
-
   it('drive:auth usa a chave das configurações e roda o OAuth do Dropbox', async () => {
+    vi.stubEnv('DROPBOX_APP_KEY', '');
     invoke('settings:set', {
       driveClientId: 'id-do-teste',
       drivePassphrase: '',
     });
-    shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
-      const redirect = new URL(url).searchParams.get('redirect_uri');
-      if (redirect !== null) {
-        const request = http.get(`${redirect}?error=access_denied`);
-        request.on('error', () => undefined);
-      }
-      return Promise.resolve();
-    });
-
-    const result = await invokeAsync<{ ok: boolean; error?: string }>('drive:auth');
-
-    expect(result).toEqual({ ok: false, error: 'access_denied' });
-    const opened = shell.openExternal.mock.calls.at(-1)?.[0] ?? '';
-    expect(opened).toContain('client_id=id-do-teste');
-    expect(opened).toMatch(/redirect_uri=http(%3A|:)(\/\/|%2F%2F)localhost(%3A|:)\d+/);
-    expect(opened).not.toContain('client_secret');
-    // O override do settings.json tem prioridade sobre a chave embutida.
-    expect(opened).not.toContain(`client_id=${EMBEDDED_APP_KEY}`);
+    const opened = await negarOAuthDropbox();
+    expect(opened.searchParams.get('client_id')).toBe('id-do-teste');
+    expect(opened.searchParams.get('redirect_uri')).toMatch(/^http:\/\/localhost:\d+\/callback$/u);
+    expect(opened.searchParams.has('client_secret')).toBe(false);
+    // O override do cofre tem prioridade sobre a chave do build.
   });
 
-  it('drive:auth usa a chave embutida quando o settings não tem override', async () => {
-    // `settings:set` preserva a chave do cofre quando a janela manda `''`
-    // (ela não tem campo): limpar é papel de quem gravou (aqui, o teste).
+  it('drive:auth usa a chave do build quando o settings não tem override', async () => {
+    vi.stubEnv('DROPBOX_APP_KEY', 'chave-do-build');
     setSecret(VAULT_SECRET.driveClientId, '');
     invoke('settings:set', {
       driveClientId: '',
       drivePassphrase: '',
     });
-    shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
-      const redirect = new URL(url).searchParams.get('redirect_uri');
-      if (redirect !== null) {
-        const request = http.get(`${redirect}?error=access_denied`);
-        request.on('error', () => undefined);
-      }
-      return Promise.resolve();
-    });
-
-    const result = await invokeAsync<{ ok: boolean; error?: string }>('drive:auth');
-
-    expect(result).toEqual({ ok: false, error: 'access_denied' });
-    expect(EMBEDDED_APP_KEY).not.toBe('');
-    const opened = shell.openExternal.mock.calls.at(-1)?.[0] ?? '';
-    expect(opened).toContain(`client_id=${EMBEDDED_APP_KEY}`);
+    const opened = await negarOAuthDropbox();
+    expect(opened.searchParams.get('client_id')).toBe('chave-do-build');
   });
 
   it('drive:disconnect limpa a sessão e avisa a janela', () => {
-    const win = BrowserWindow.instances[0];
-    win?.webContents.send.mockClear();
+    const win = janela();
+    win.webContents.send.mockClear();
     const status = invoke('drive:disconnect') as { connected: boolean; lastError: string | null };
     expect(status.connected).toBe(false);
     expect(status.lastError).toBeNull();
-    expect(win?.webContents.send).toHaveBeenCalledWith(
+    expect(win.webContents.send).toHaveBeenCalledWith(
       'drive:status-changed',
       expect.objectContaining({ connected: false }),
     );
@@ -410,18 +446,20 @@ describe('handlers de configurações e Drive', () => {
     const saved = invoke('settings:set', {
       driveClientId: '  novo-id  ',
       drivePassphrase: 'frase',
+      backupProvider: 'dropbox',
       language: 'en',
     }) as AppSettings;
     expect(saved).toEqual({
       driveClientId: 'novo-id',
       drivePassphrase: 'frase',
+      backupProvider: 'dropbox',
       language: 'en',
     });
-    // O disco guarda só o idioma; os segredos ficam no cofre.
+    // O disco guarda idioma e provedor; os segredos ficam no cofre.
     const onDisk: unknown = JSON.parse(
       fs.readFileSync(path.join(configDir(), 'settings.json'), 'utf-8'),
     );
-    expect(onDisk).toEqual({ language: 'en' });
+    expect(onDisk).toEqual({ language: 'en', backupProvider: 'dropbox' });
   });
 });
 
@@ -451,8 +489,7 @@ describe('handler cover:pick', () => {
   });
 
   it('abre o diálogo na janela de origem quando disponível', async () => {
-    const win = BrowserWindow.instances[0];
-    if (win === undefined) throw new Error('Janela não criada.');
+    const win = janela();
     BrowserWindow.fromWebContents.mockReturnValueOnce(win);
     dialog.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] });
     await invokeAsync<string | null>('cover:pick');
@@ -487,16 +524,14 @@ describe('protocolo cover://', () => {
 
 describe('ciclo de vida da janela', () => {
   it('mostra a janela quando pronta', () => {
-    const win = BrowserWindow.instances[0];
-    if (win === undefined) throw new Error('Janela não criada.');
+    const win = janela();
     win.show.mockClear();
     onceEvent(win, 'ready-to-show')();
     expect(win.show).toHaveBeenCalledTimes(1);
   });
 
   it('abre links externos no navegador e nega janelas novas', () => {
-    const win = BrowserWindow.instances[0];
-    if (win === undefined) throw new Error('Janela não criada.');
+    const win = janela();
     shell.openExternal.mockClear();
     const opener = win.webContents.setWindowOpenHandler.mock.calls[0]?.[0];
     if (opener === undefined) throw new Error('Window open handler ausente.');
@@ -506,8 +541,7 @@ describe('ciclo de vida da janela', () => {
   });
 
   it('não abre URLs externas fora de https', () => {
-    const win = BrowserWindow.instances[0];
-    if (win === undefined) throw new Error('Janela não criada.');
+    const win = janela();
     shell.openExternal.mockClear();
     const opener = win.webContents.setWindowOpenHandler.mock.calls[0]?.[0];
     if (opener === undefined) throw new Error('Window open handler ausente.');
@@ -518,8 +552,7 @@ describe('ciclo de vida da janela', () => {
   });
 
   it('prende a navegação à página do app (will-navigate)', () => {
-    const win = BrowserWindow.instances[0];
-    if (win === undefined) throw new Error('Janela não criada.');
+    const win = janela();
     const call = win.webContents.on.mock.calls.find((entry) => entry[0] === 'will-navigate');
     if (call === undefined) throw new Error('Listener will-navigate ausente.');
     const listener = call[1];
@@ -535,8 +568,7 @@ describe('ciclo de vida da janela', () => {
   });
 
   it('foca (e restaura) a janela na segunda instância', () => {
-    const win = BrowserWindow.instances[0];
-    if (win === undefined) throw new Error('Janela não criada.');
+    const win = janela();
     win.focus.mockClear();
     win.restore.mockClear();
     const listener = appListener('second-instance');
@@ -549,26 +581,47 @@ describe('ciclo de vida da janela', () => {
     listener();
     expect(win.restore).toHaveBeenCalledTimes(1);
     expect(win.focus).toHaveBeenCalledTimes(2);
+
+    // Sem janela viva o aviso some inteiro: não explode nem inventa janela.
+    windowEvent(win, 'closed')();
+    const antes = BrowserWindow.instances.length;
+    expect(() => listener()).not.toThrow();
+    expect(BrowserWindow.instances.length).toBe(antes);
   });
 
-  it('encerra o app quando todas as janelas fecham', () => {
+  it('encerra o app quando todas as janelas fecham (menos no macOS)', () => {
+    const plataforma = process.platform;
     app.quit.mockClear();
+
     appListener('window-all-closed')();
     expect(app.quit).toHaveBeenCalledTimes(1);
+
+    // No macOS quem reabre é o `activate`, então fechar não encerra nada.
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
+    try {
+      app.quit.mockClear();
+      appListener('window-all-closed')();
+      expect(app.quit).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(process, 'platform', { value: plataforma, configurable: true });
+    }
   });
 
-  it('recria a janela no activate quando não há janelas', () => {
-    const before = BrowserWindow.instances.length;
+  it('o activate só recria a janela quando não há nenhuma', () => {
+    const antes = BrowserWindow.instances.length;
+    BrowserWindow.getAllWindows.mockReturnValue([...BrowserWindow.instances]);
+    appListener('activate')();
+    expect(BrowserWindow.instances.length).toBe(antes);
+
     BrowserWindow.getAllWindows.mockReturnValueOnce([]);
     appListener('activate')();
-    expect(BrowserWindow.instances.length).toBe(before + 1);
+    expect(BrowserWindow.instances.length).toBe(antes + 1);
   });
 });
 
 describe('status do Drive para o renderer', () => {
   it('para de enviar status depois que a janela é fechada', () => {
-    const win = BrowserWindow.instances[0];
-    if (win === undefined) throw new Error('Janela não criada.');
+    const win = janela();
     windowEvent(win, 'closed')();
     win.webContents.send.mockClear();
 
@@ -579,8 +632,7 @@ describe('status do Drive para o renderer', () => {
 
 describe('F11 depois que a janela é fechada', () => {
   it('ignora o atalho sem janela viva', () => {
-    const win = BrowserWindow.instances[0];
-    if (win === undefined) throw new Error('Janela não criada.');
+    const win = janela();
     windowEvent(win, 'closed')();
     win.setFullScreen.mockClear();
 
@@ -593,6 +645,188 @@ describe('F11 depois que a janela é fechada', () => {
   });
 });
 
+/** Frames que não são a página do app e portanto não podem chamar handler nenhum. */
+const FORA_DA_PAGINA: unknown[] = [
+  {},
+  null,
+  { senderFrame: null },
+  { senderFrame: {} },
+  // URL que não é parseável não pode "dar branco" e liberar o handler.
+  { senderFrame: { url: ':::nao-e-url' } },
+  // `url` fora de string é tratado como ausente, nunca como confiado.
+  { senderFrame: { url: 42 } },
+  { senderFrame: { url: 'https://evil.example/pagina' } },
+  // Mesmo scheme, outra origem, ou nenhum origin.
+  { senderFrame: { url: 'cronologia://outro/index.html' } },
+  { senderFrame: { url: 'file:///etc/passwd' } },
+];
+
+describe('guarda de origem do IPC', () => {
+  it('recusa frame ausente, de URL inválida e de outra origem', () => {
+    for (const frame of FORA_DA_PAGINA) {
+      expect(() => handler('library:get')(frame)).toThrow('IPC bloqueado');
+      expect(() => handler('settings:set')(frame, AJUSTES)).toThrow('IPC bloqueado');
+    }
+  });
+
+  it('aceita a página do app e recusa a mesma origem com porta diferente', () => {
+    // Só o origin interessa: o reload com query de cache bust é a mesma página.
+    expect(handler('library:get')(FAKE_EVENT)).toBeInstanceOf(Array);
+    expect(handler('library:get')(frameDe('cronologia://app/index.html?v=2'))).toBeInstanceOf(
+      Array,
+    );
+    expect(() => handler('library:get')(frameDe('cronologia://app:1234/index.html'))).toThrow(
+      'IPC bloqueado',
+    );
+  });
+});
+
+describe('o aviso de cofre fechado chega na janela', () => {
+  beforeEach(async () => {
+    await openTestVault();
+  });
+
+  it('o bloqueio pedido pelo usuário avisa a tela e marca como não automático', () => {
+    const win = janelaViva();
+    win.webContents.send.mockClear();
+    win.isDestroyed.mockReturnValue(false);
+
+    const status = invoke('vault:lock') as { unlocked: boolean };
+
+    expect(status.unlocked).toBe(false);
+    // Sem este aviso a grade ficava com as obras descifradas e o disco sem chave.
+    expect(win.webContents.send).toHaveBeenCalledWith('vault:locked', false);
+  });
+
+  it('sem janela viva o aviso é descartado, não vira exceção', () => {
+    const win = janelaViva();
+    windowEvent(win, 'closed')();
+
+    expect(invoke('vault:lock')).toMatchObject({ unlocked: false });
+  });
+
+  it('janela já destruída também não leva o aviso', () => {
+    const win = janelaViva();
+    win.isDestroyed.mockReturnValue(true);
+    win.webContents.send.mockClear();
+
+    invoke('vault:lock');
+
+    expect(win.webContents.send).not.toHaveBeenCalled();
+    win.isDestroyed.mockReturnValue(false);
+  });
+
+  it('o auto-lock por ociosidade avisa a tela e relê o estado do drive', () => {
+    const win = janelaViva();
+    win.webContents.send.mockClear();
+
+    vi.useFakeTimers();
+    try {
+      vaultSession.adopt(Buffer.alloc(32, 7));
+      vi.advanceTimersByTime(IDLE_LOCK_MS);
+      expect(vaultSession.isUnlocked()).toBe(false);
+      expect(win.webContents.send).toHaveBeenCalledWith('vault:locked', true);
+      // Com a sessão caída não há conta Dropbox em memória: o status recua.
+      expect(invoke('drive:status')).toMatchObject({ connected: false });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('atividade da interface alimenta a janela de ociosidade', () => {
+  it('vault:touch repassa o sinal para a sessão, e também guarda a origem', async () => {
+    await openTestVault();
+    const tocar = vi.spyOn(vaultSession, 'touch');
+
+    expect(invoke('vault:touch')).toBeUndefined();
+    expect(tocar).toHaveBeenCalledTimes(1);
+    expect(vaultSession.isUnlocked()).toBe(true);
+    expect(() => handler('vault:touch')(frameDe('https://evil.example/pagina'))).toThrow(
+      'IPC bloqueado',
+    );
+  });
+});
+
+describe('canais do cofre pela ponte', () => {
+  it('vault:status começa sem cofre e acompanha o ciclo', async () => {
+    await openTestVault();
+    destroyVault();
+    expect(invoke('vault:status')).toEqual({
+      exists: false,
+      unlocked: false,
+      attempts: 0,
+      lockUntil: 0,
+    });
+
+    const criado = await invokeAsync<VaultResult>('vault:create', PASSWORD);
+    expect(criado).toEqual({
+      ok: true,
+      status: { exists: true, unlocked: true, attempts: 0, lockUntil: 0 },
+    });
+    expect(invoke('vault:status')).toMatchObject({ exists: true, unlocked: true });
+    expect(invoke('vault:lock')).toMatchObject({ exists: true, unlocked: false });
+  });
+
+  it('vault:create recusa senha previsível antes de qualquer escrita', async () => {
+    await openTestVault();
+    destroyVault();
+
+    const fraco = await invokeAsync<VaultResult>('vault:create', 'curta12');
+
+    expect(fraco).toEqual({ ok: false, code: 'vaultWeakPassword', retryInMs: 0 });
+    expect(invoke('vault:status')).toMatchObject({ exists: false });
+  });
+
+  it('vault:unlock conta a tentativa errada e depois reabre com a senha certa', async () => {
+    await openTestVault();
+
+    const errado = await invokeAsync<VaultResult>('vault:unlock', 'senha-errada-xyz');
+    expect(errado).toEqual({ ok: false, code: 'vaultWrongPassword', retryInMs: 10_000 });
+    // A tentativa falhada é registrada no disco, mas derrubar uma sessão já
+    // aberta seria jogar fora o acesso de quem digitou certo.
+    expect(invoke('vault:status')).toMatchObject({ attempts: 1, unlocked: true });
+    // E durante a espera nem o Argon2id roda.
+    expect(await invokeAsync<VaultResult>('vault:unlock', PASSWORD)).toMatchObject({
+      ok: false,
+      code: 'vaultLockedOut',
+    });
+
+    await openTestVault();
+    expect(await invokeAsync<VaultResult>('vault:unlock', PASSWORD)).toEqual({
+      ok: true,
+      status: { exists: true, unlocked: true, attempts: 0, lockUntil: 0 },
+    });
+  });
+});
+
+describe('modo desenvolvimento (ELECTRON_RENDERER_URL)', () => {
+  it('a janela nasce no dev server e a navegação fica presa a ele', () => {
+    vi.stubEnv('ELECTRON_RENDERER_URL', DEV_URL);
+    try {
+      const win = janelaViva();
+      const call = win.webContents.on.mock.calls.find((entry) => entry[0] === 'will-navigate');
+      if (call === undefined) throw new Error('Listener will-navigate ausente.');
+      const evento = { preventDefault: vi.fn() };
+
+      expect(win.loadURL).toHaveBeenCalledWith(DEV_URL);
+      call[1](evento, DEV_URL);
+      expect(evento.preventDefault).not.toHaveBeenCalled();
+      call[1](evento, 'https://exemplo.com/fora');
+      expect(evento.preventDefault).toHaveBeenCalledTimes(1);
+
+      // Em desenvolvimento quem manda na origem é o Vite, não `cronologia://`.
+      expect(() => handler('drive:providers')(frameDe(`${DEV_URL}/index.html`))).not.toThrow();
+      expect(() => handler('drive:providers')(FAKE_EVENT)).toThrow('IPC bloqueado');
+      expect(() =>
+        handler('drive:providers')(frameDe('http://outro.local:5173/index.html')),
+      ).toThrow('IPC bloqueado');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
 describe('encerramento', () => {
   it('zera a chave do cofre no before-quit', () => {
     vaultSession.adopt(Buffer.alloc(32, 7));
@@ -602,5 +836,83 @@ describe('encerramento', () => {
 
     expect(vaultSession.isUnlocked()).toBe(false);
     expect(vaultSession.key()).toBeNull();
+  });
+});
+
+describe('falha real de disco vira resposta, não crash', () => {
+  beforeEach(async () => {
+    await openTestVault();
+  });
+
+  it('library:reset conta a falha em vez de anunciar limpeza', () => {
+    invoke('library:reset');
+    saveLibrary([makeWork()]);
+    // O shred não conseguiu abrir o arquivo: sobrou resíduo no disco.
+    falhaEm('lstatSync', 'EACCES');
+
+    expect(invoke('library:reset')).toEqual({ ok: false, shredded: 0, failed: 1 });
+  });
+
+  it('library:reset propaga erro que não é do cofre, em vez de virar contagem', () => {
+    falhaEm('mkdirSync', 'ENOSPC');
+
+    expect(() => invoke('library:reset')).toThrow('ENOSPC');
+  });
+
+  it('settings:set com o cofre fechado recusa com a mensagem localizada', () => {
+    destroyVault();
+
+    expect(() => invoke('settings:set', AJUSTES_NOVOS)).toThrow(
+      currentMessages().vault.errors.vaultLocked,
+    );
+  });
+
+  it('settings:set propaga erro que não é do cofre', () => {
+    falhaEm('mkdirSync', 'ENOSPC');
+    expect(() => invoke('settings:set', AJUSTES_NOVOS)).toThrow('ENOSPC');
+  });
+
+  it('drive:purge sem conta conectada recusa com contagem zerada, sem tocar na nuvem', async () => {
+    invoke('drive:disconnect');
+
+    const resultado = await invokeAsync<PurgeResult>('drive:purge');
+
+    expect(resultado).toEqual({
+      ok: false,
+      deleted: 0,
+      failed: 0,
+      error: currentMessages().driveErrors.connectFirst('Dropbox'),
+    });
+  });
+
+  it('falha inesperada ao criar o cofre vira vaultTampered e vai para o log', async () => {
+    destroyVault();
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    falhaEm('mkdirSync', 'ENOSPC');
+
+    const resultado = await invokeAsync<VaultResult>('vault:create', PASSWORD);
+
+    expect(resultado).toEqual({ ok: false, code: 'vaultTampered', retryInMs: 0 });
+    expect(erro).toHaveBeenCalled();
+  });
+
+  it('vault:destroy apaga cofre e capas, e o acervo restante fica ilegível', () => {
+    saveLibrary([makeWork()]);
+    writeCoverFile('capa.png', Buffer.from('capa', 'utf-8'));
+
+    const resultado = invoke('vault:destroy') as VaultResult;
+
+    expect(resultado).toEqual({
+      ok: true,
+      status: { exists: false, unlocked: false, attempts: 0, lockUntil: 0 },
+    });
+    expect(fs.existsSync(path.join(coversDir(), 'capa.png.enc'))).toBe(false);
+    // O acervo local continua no disco, mas sem chave ficou ilegível: some da
+    // tela por falta de chave, não por `[]` fingido.
+    expect(fs.existsSync(path.join(dataDir(), 'library.enc'))).toBe(true);
+    expect(() => invoke('library:get')).toThrow();
+    // Destruir o cofre local não é o mesmo que apagar o backup na nuvem:
+    // quem apaga o backup é `drive:purge`, operação separada e explícita.
+    expect(invoke('vault:status')).toMatchObject({ exists: false, unlocked: false });
   });
 });

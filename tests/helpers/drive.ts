@@ -267,12 +267,15 @@ export async function connect(passphrase = PASSPHRASE): Promise<void> {
     driveClientId: APP_KEY,
     drivePassphrase: passphrase,
     language: 'pt-BR',
+    backupProvider: 'dropbox',
   });
   shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
     const params = new URL(url).searchParams;
     const redirect = params.get('redirect_uri');
     if (redirect !== null) {
-      const request = http.get(`${redirect}?code=codigo-valido`);
+      // O `state` volta na query: é o que liga o callback ao pedido que o app
+      // fez, e o servidor recusa um callback que não traga o valor certo.
+      const request = http.get(`${redirect}?code=codigo-valido&state=${params.get('state') ?? ''}`);
       request.on('error', () => undefined);
     }
     return Promise.resolve();

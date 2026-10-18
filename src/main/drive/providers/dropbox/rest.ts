@@ -1,14 +1,11 @@
-import { API_ENDPOINT, CONTENT_ENDPOINT } from '@zero/main/drive/constants';
-import { accessToken, refreshAccessToken } from '@zero/main/drive/oauth';
+import type { RemoteFile } from '@zero/types';
+import {
+  DROPBOX_API_ENDPOINT,
+  DROPBOX_CONTENT_ENDPOINT,
+} from '@zero/main/drive/providers/dropbox/constants';
+import { accessToken, refreshAccessToken } from '@zero/main/drive/providers/dropbox/session';
 import { parseJson } from '@zero/main/drive/json';
 import { currentMessages } from '@zero/main/i18n';
-
-export interface RemoteFile {
-  id: string;
-  name: string;
-  modifiedTime: string;
-  size?: number | undefined;
-}
 
 interface DropboxEntry {
   '.tag'?: string | undefined;
@@ -49,7 +46,7 @@ function isListFolderResponse(value: unknown): value is ListFolderResponse {
 async function listFolderPage(res: Response): Promise<ListFolderResponse> {
   const data: unknown = await parseJson(res);
   if (!isListFolderResponse(data)) {
-    throw new Error(currentMessages().driveErrors.invalidListResponse);
+    throw new Error(currentMessages().driveErrors.invalidListResponse('Dropbox'));
   }
   return data;
 }
@@ -75,7 +72,7 @@ function toRemoteFile(entry: DropboxEntry): RemoteFile | null {
 async function apiFetch(path: string, body: unknown): Promise<Response> {
   const token = await accessToken();
   const run = async (bearer: string): Promise<Response> =>
-    fetch(`${API_ENDPOINT}${path}`, {
+    fetch(`${DROPBOX_API_ENDPOINT}${path}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -108,10 +105,10 @@ async function toDropboxError(res: Response): Promise<Error> {
   // Escopo faltando (permissão não marcada no App Console, ou sessão concedida
   // antes dela): traduz para ação concreta em vez de vazar o inglês da API.
   if (/missing_scope|required scope/i.test(`${detail} ${raw}`)) {
-    throw new Error(currentMessages().driveErrors.missingScopes);
+    throw new Error(currentMessages().driveErrors.missingScopes('Dropbox'));
   }
   throw new Error(
-    detail !== '' ? detail : currentMessages().driveErrors.dropboxHttp(res.status, raw),
+    detail !== '' ? detail : currentMessages().driveErrors.providerHttp('Dropbox', res.status, raw),
   );
 }
 
@@ -155,7 +152,7 @@ async function contentFetch(
 ): Promise<Response> {
   const token = await accessToken();
   const run = async (bearer: string): Promise<Response> =>
-    fetch(`${CONTENT_ENDPOINT}/files/${endpoint}`, {
+    fetch(`${DROPBOX_CONTENT_ENDPOINT}/files/${endpoint}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${bearer}`,

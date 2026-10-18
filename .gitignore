@@ -1,6 +1,12 @@
 node_modules
 out
 release
+# Credenciais do Google Drive injetadas no build. O `.env.example` (só os
+# nomes das variáveis) é versionado; o `.env` com os valores, não. No CI os
+# mesmos valores vêm dos GitHub Secrets (ver publish.yml).
+.env
+.env.local
+.env.*.local
 # cofre de desenvolvimento criado pelo `npm run dev` (CRONOLOGIA_VAULT_DIR)
 .dev-vault
 # workspace temporário do repo APT flat gerado no CI (publish.yml)

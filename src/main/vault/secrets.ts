@@ -8,9 +8,18 @@ import { deleteSecret, getSecret, setSecret } from '@zero/main/vault/vault';
 export const VAULT_SECRET = {
   /** Tokens OAuth do Dropbox (`drive/state.ts`), JSON da forma `Tokens`. */
   dropboxTokens: 'dropbox.tokens',
+  /**
+   * Tokens OAuth do Google Drive (`drive/state.ts`), **mesma** forma `Tokens`.
+   *
+   * Uma entrada por provedor, e não uma só: trocar de destino no app não pode
+   * derrubar a sessão do outro. A sessão do provedor escolhido é a que fica em
+   * memória; as outras continuam guardadas aqui e voltam quando o usuário
+   * volta para aquele destino.
+   */
+  googleDriveTokens: 'googleDrive.tokens',
   /** Senha de criptografia do backup (`settings.drivePassphrase`). */
   drivePassphrase: 'settings.drivePassphrase',
-  /** App key alternativa (`settings.driveClientId`). */
+  /** App key alternativa do Dropbox (`settings.driveClientId`). */
   driveClientId: 'settings.driveClientId',
 } as const;
 

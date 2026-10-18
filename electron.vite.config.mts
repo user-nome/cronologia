@@ -1,5 +1,6 @@
 import { defineConfig } from 'electron-vite';
 import react from '@vitejs/plugin-react';
+import { loadEnv } from 'vite';
 import { resolve } from 'path';
 
 const root = import.meta.dirname;
@@ -10,7 +11,24 @@ const sharedAliases = {
   '@zero/messages': resolve(root, 'src/messages'),
 } as const;
 
-export default defineConfig({
+/**
+ * Identificadores OAuth que o build do `main` carrega dentro do binário.
+ *
+ * `loadEnv(mode, root, '')` lê o `.env` local **e** o `process.env` do CI, com o
+ * segundo vencendo sobre o primeiro. Os valores não aparecem no código-fonte;
+ * o Dropbox e o client_id do Google são públicos em clientes desktop, e o
+ * client_secret do Google não é uma barreira de segurança.
+ */
+function oauthCredentials(mode: string): Record<string, string> {
+  const env = loadEnv(mode, root, '');
+  return {
+    'process.env.DROPBOX_APP_KEY': JSON.stringify(env.DROPBOX_APP_KEY ?? ''),
+    'process.env.GOOGLE_CLIENT_ID': JSON.stringify(env.GOOGLE_CLIENT_ID ?? ''),
+    'process.env.GOOGLE_CLIENT_SECRET': JSON.stringify(env.GOOGLE_CLIENT_SECRET ?? ''),
+  };
+}
+
+export default defineConfig(({ mode }) => ({
   main: {
     resolve: {
       alias: {
@@ -18,6 +36,7 @@ export default defineConfig({
         '@zero/main': resolve(root, 'src/main'),
       },
     },
+    define: oauthCredentials(mode),
     build: {
       rollupOptions: {
         input: resolve(root, 'src/main/index.ts'),
@@ -66,4 +85,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

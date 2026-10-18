@@ -9,7 +9,8 @@ flowchart TB
     Main --> Lib[(library.enc + covers/*.enc<br/>cifrados com a chave do cofre)]
     Main --> Cfg[(settings.json + tokens)]
     Main --> Drive[drive/: BackupProvider + OAuth PKCE]
-    Drive --> Cloud[(Dropbox: pasta do app)]
+    Drive --> Dropbox[(Dropbox: /Apps/Cronologia)]
+    Drive --> Google[(Google Drive: appDataFolder)]
     UI -. usa .-> Msgs[src/messages: pt-BR canônico + en/ko/zh-CN/ja]
     Main -. usa .-> Msgs
 ```
@@ -34,29 +35,31 @@ entrypoints que o Electron exige) e arquivo no teto de ~500 linhas é quebrado.
 
 ### Módulos do processo main
 
-| Arquivo                 | Papel                                                                                            |
-| ----------------------- | ------------------------------------------------------------------------------------------------ |
-| `index.ts`              | Entrypoint: janela, política da sessão, canais IPC, push de status e ciclo de vida               |
-| `protocols.ts`          | Schemes `cover://` (capas) e `cronologia://` (SPA em produção), registrados na importação        |
-| `library.ts`            | acervo cifrado (`library.enc`, `covers/*.enc`) e reset destrutivo                                |
-| `store-crypto.ts`       | formato `CLIB1` (AES-256-GCM) e derivação da chave do acervo por HKDF                            |
-| `shred.ts`              | sobrescrita segura antes de apagar                                                               |
-| `cleanup.ts`            | legados em claro e `.tmp` órfãos no boot                                                         |
-| `settings.ts`           | `settings.json`: App key, senha de backup e idioma                                               |
-| `jsonfile.ts`           | Escrita atômica (`writeJsonAtomic`) com modo de permissão                                        |
-| `paths.ts`              | Diretórios XDG de dados, configuração e cache do app                                             |
-| `i18n.ts`               | `currentMessages()`: bundle do idioma corrente no main                                           |
-| `external.ts`           | `openExternalSafe`: `shell.openExternal` só para `https:`                                        |
-| `drive/index.ts`        | Barrel da API pública do backup (authorize, backupNow, restoreNow…)                              |
-| `drive/provider.ts`     | Contrato `BackupProvider`, catálogo e `currentProvider()`                                        |
-| `drive/providers/`      | Adaptadores: `dropbox.ts` (operante), `google-drive.ts` (não operante)                           |
-| `drive/oauth.ts`        | Autorização PKCE + loopback + refresh                                                            |
-| `drive/rest.ts`         | Chamadas REST do Dropbox (pasta do app)                                                          |
-| `drive/crypto.ts`       | AES-256-GCM do backup e nomes opacos (HMAC)                                                      |
-| `drive/backup.ts`       | Orquestração de backup/restauração/desconexão                                                    |
-| `drive/state.ts`        | Sessão em memória + persistência dos tokens no cofre                                             |
-| `drive/restore-lock.ts` | Trava contra restauração concorrente                                                             |
-| `vault/`                | Cofre (`/var/lib`): `crypto`, `container`, `lockout`, `session`, `vault`, `secrets`, `privilege` |
+| Arquivo                   | Papel                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `index.ts`                | Entrypoint: janela, política da sessão, canais IPC, push de status e ciclo de vida               |
+| `protocols.ts`            | Schemes `cover://` (capas) e `cronologia://` (SPA em produção), registrados na importação        |
+| `library.ts`              | acervo cifrado (`library.enc`, `covers/*.enc`) e reset destrutivo                                |
+| `store-crypto.ts`         | formato `CLIB1` (AES-256-GCM) e derivação da chave do acervo por HKDF                            |
+| `shred.ts`                | sobrescrita segura antes de apagar                                                               |
+| `cleanup.ts`              | legados em claro e `.tmp` órfãos no boot                                                         |
+| `settings.ts`             | `settings.json`: App key, senha de backup e idioma                                               |
+| `jsonfile.ts`             | Escrita atômica (`writeJsonAtomic`) com modo de permissão                                        |
+| `paths.ts`                | Diretórios XDG de dados, configuração e cache do app                                             |
+| `i18n.ts`                 | `currentMessages()`: bundle do idioma corrente no main                                           |
+| `external.ts`             | `openExternalSafe`: `shell.openExternal` só para `https:`                                        |
+| `drive/index.ts`          | Barrel da API pública do backup (authorize, backupNow, restoreNow…)                              |
+| `drive/provider.ts`       | Contrato `BackupProvider`, catálogo e `currentProvider()`                                        |
+| `drive/providers/`        | Adaptadores de Dropbox e Google Drive (quando há credencial no build)                            |
+| `drive/oauth-flow.ts`     | Autorização OAuth com PKCE + loopback compartilhada                                              |
+| `drive/oauth.ts`          | Sessão OAuth do Dropbox                                                                          |
+| `drive/rest.ts`           | Chamadas REST do Dropbox (pasta do app)                                                          |
+| `drive/providers/google/` | Credenciais, sessão OAuth e REST do Google Drive (`appDataFolder`)                               |
+| `drive/crypto.ts`         | AES-256-GCM do backup e nomes opacos (HMAC)                                                      |
+| `drive/backup.ts`         | Orquestração de backup/restauração/desconexão                                                    |
+| `drive/state.ts`          | Sessão em memória + persistência dos tokens no cofre                                             |
+| `drive/restore-lock.ts`   | Trava contra restauração concorrente                                                             |
+| `vault/`                  | Cofre (`/var/lib`): `crypto`, `container`, `lockout`, `session`, `vault`, `secrets`, `privilege` |
 
 ## Aliases `@zero/*`
 

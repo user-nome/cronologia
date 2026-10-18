@@ -1,17 +1,49 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { currentProvider, getProvider, listProviders } from '@zero/main/drive/provider';
+import {
+  googleClientId,
+  googleClientSecret,
+  hasGoogleCredentials,
+} from '@zero/main/drive/providers/google';
+import { dropboxAppKey } from '@zero/main/drive/providers/dropbox/credentials';
+import { state } from '@zero/main/drive/state';
 import { messages } from '@zero/messages';
+import { resetSandbox } from '../helpers/sandbox.ts';
 
 const m = messages('pt-BR');
 
+/**
+ * O catálogo é o que a interface mostra, então ele responde por uma pergunta
+ * que a credencial decide: **este build tem o que conectar o Google Drive?**
+ *
+ * Nos testes o `process.env` está vazio (o `define` do Vite só roda no build),
+ * o que é o mesmo estado de um `npm ci` limpo: o Google Drive aparece como não
+ * operante, com o motivo real. Os casos com credencial usam `vi.stubEnv`, que
+ * escreve no mesmo lugar que `credentials.ts` lê.
+ */
+const CHAVE = '123.apps.googleusercontent.com';
+const SEGREDO = 'GOCSPX-segredo-de-teste';
+const DROPBOX_KEY = 'dropbox-app-key';
+
+beforeEach(() => {
+  resetSandbox();
+  vi.stubEnv('DROPBOX_APP_KEY', '');
+  state.provider = 'dropbox';
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  state.provider = 'dropbox';
+});
+
 describe('catálogo de provedores de backup', () => {
-  it('lista o Dropbox operante e o Google Drive como não operante', () => {
+  it('marca ambos os provedores como indisponíveis sem credenciais de build', () => {
     const [dropbox, google] = listProviders();
     expect(dropbox).toEqual({
       id: 'dropbox',
       label: 'Dropbox',
-      operational: true,
-      unavailableReason: null,
+      operational: false,
+      unavailableReason: m.driveErrors.configureAppKey,
       storageTarget: m.providers.dropboxStorageTarget,
       storageHidden: false,
     });
@@ -19,18 +51,54 @@ describe('catálogo de provedores de backup', () => {
       id: 'google-drive',
       label: 'Google Drive',
       operational: false,
-      unavailableReason: m.providers.googleUnavailable,
+      unavailableReason: m.providers.googleNoCredentials,
       storageTarget: m.providers.googleStorageTarget,
       storageHidden: true,
     });
   });
 
-  it('explica ao usuário por que o Google Drive ainda não está operante', () => {
+  it('lê a App key do Dropbox injetada pelo build, aparando espaços', () => {
+    vi.stubEnv('DROPBOX_APP_KEY', `  ${DROPBOX_KEY}\n`);
+
+    expect(dropboxAppKey()).toBe(DROPBOX_KEY);
+    expect(getProvider('dropbox').describe(m)).toMatchObject({
+      operational: true,
+      unavailableReason: null,
+    });
+  });
+
+  it('diz ao usuário que a falta é de credencial do build, não do Google', () => {
     const info = getProvider('google-drive').describe(m);
     expect(info.operational).toBe(false);
-    expect(info.unavailableReason ?? '').toContain('não está operante');
-    expect(info.unavailableReason ?? '').toContain('exigências do Google');
+    // A mensagem precisa dizer o que fazer (o par entra na publicação) e para
+    // onde o backup vai enquanto isso, senão o usuário acha que perdeu o Drive.
+    expect(info.unavailableReason ?? '').toContain('build');
     expect(info.unavailableReason ?? '').toContain('backup usa o Dropbox');
+  });
+
+  it('marca o Google Drive como operante quando o build traz a credencial', () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
+    const info = getProvider('google-drive').describe(m);
+    expect(info.operational).toBe(true);
+    // Operante não leva motivo de recusa: sobrar um texto de "indisponível" ao
+    // lado de um provedor conectável seria o app se contradizendo.
+    expect(info.unavailableReason).toBeNull();
+    expect(hasGoogleCredentials()).toBe(true);
+  });
+
+  it('lê o par de chaves injetado, aparando o espaço das variaveis de ambiente', () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', `  ${CHAVE}\n`);
+    vi.stubEnv('GOOGLE_CLIENT_SECRET', ` ${SEGREDO} `);
+    expect(googleClientId()).toBe(CHAVE);
+    expect(googleClientSecret()).toBe(SEGREDO);
+  });
+
+  it('trata ambiente vazio como sem credencial, sem exceção', () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', '');
+    vi.stubEnv('GOOGLE_CLIENT_SECRET', '');
+    expect(googleClientId()).toBe('');
+    expect(googleClientSecret()).toBe('');
+    expect(hasGoogleCredentials()).toBe(false);
   });
 
   it('grava o backup do Google Drive em pasta oculta (appDataFolder)', () => {
@@ -42,24 +110,24 @@ describe('catálogo de provedores de backup', () => {
     expect(getProvider('dropbox').describe(m).storageHidden).toBe(false);
   });
 
-  it('recusa toda operação do Google Drive com o mesmo motivo da interface', async () => {
-    const provider = getProvider('google-drive');
-    await expect(provider.authorize()).resolves.toEqual({
+  it('recusa autorizar sem credencial, com o mesmo motivo da interface', async () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', '');
+    // A interface diz "não traz credencial"; a autorização precisa recusar com a
+    // mesma frase, senão o usuário recebe um erro de OAuth para um build que nem
+    // tenta sair no navegador.
+    await expect(getProvider('google-drive').authorize()).resolves.toEqual({
       ok: false,
-      error: m.providers.googleUnavailable,
+      error: m.providers.googleNoCredentials,
     });
-    await expect(provider.listAppFiles()).rejects.toThrow(m.providers.googleUnavailable);
-    await expect(provider.uploadFile('nome', Buffer.alloc(0))).rejects.toThrow(
-      m.providers.googleUnavailable,
-    );
-    await expect(provider.downloadFile('id')).rejects.toThrow(m.providers.googleUnavailable);
-    await expect(provider.deleteFile('id')).rejects.toThrow(m.providers.googleUnavailable);
   });
 
-  it('usa o Dropbox como provedor atual das operações', () => {
+  it('segue o provedor escolhido, não o Dropbox fixo', () => {
+    expect(currentProvider().id).toBe('dropbox');
+    state.provider = 'google-drive';
+    expect(currentProvider().id).toBe('google-drive');
+    // O catálogo descreve o mesmo objeto que as operações usam.
     const provider = currentProvider();
-    expect(provider.id).toBe('dropbox');
-    expect(provider.operational).toBe(true);
-    expect(getProvider(provider.id).describe(m)).toEqual(provider.describe(m));
+    expect(getProvider(provider.id)).toBe(provider);
+    expect(provider.describe(m)).toEqual(getProvider('google-drive').describe(m));
   });
 });

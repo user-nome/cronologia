@@ -5,11 +5,14 @@ import { richText, useMessages } from '@zero/renderer/i18n';
 interface RestorePasswordModalProps {
   onConfirm: (passphrase: string) => void;
   onCancel: () => void;
+  /** Nome do provedor de onde vem o backup ("Dropbox", "Google Drive"). */
+  provider: string;
 }
 
 export default function RestorePasswordModal({
   onConfirm,
   onCancel,
+  provider,
 }: RestorePasswordModalProps): JSX.Element {
   const m = useMessages();
   const [passphrase, setPassphrase] = useState('');
@@ -37,7 +40,7 @@ export default function RestorePasswordModal({
         </div>
 
         <div className="modal-body">
-          <div className="banner info">{richText(m.restore.banner)}</div>
+          <div className="banner info">{richText(m.restore.banner(provider))}</div>
 
           <div className="field">
             <label>{m.restore.passphraseLabel}</label>

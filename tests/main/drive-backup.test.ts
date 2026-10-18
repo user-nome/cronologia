@@ -1,15 +1,25 @@
 import fs from 'fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { backupInfo, backupNow, getStatus, restoreNow } from '@zero/main/drive';
+import {
+  backupInfo,
+  backupNow,
+  disconnect,
+  getStatus,
+  initDrive,
+  restoreNow,
+} from '@zero/main/drive';
 import {
   MANIFEST_FILE,
   buildManifest,
+  decryptWith,
   encryptWith,
   manifestKeyFor,
   nameKeyFor,
+  parseManifest,
   remoteName,
 } from '@zero/main/drive/crypto';
 import { loadLibrary, readCoverBuffer, saveLibrary } from '@zero/main/library';
+import { lockVault, unlockVault } from '@zero/main/vault';
 import { makeWork } from '../helpers/fixtures.ts';
 import {
   FakeDropbox,
@@ -25,9 +35,16 @@ import {
   resetDrive,
   stubFetch,
 } from '../helpers/drive.ts';
+import { PASSWORD } from '../helpers/vault.ts';
 
 function uploadedNames(drive: FakeDropbox): string[] {
   return [...drive.files.values()].map((file) => file.name);
+}
+
+function remoteIdFor(drive: FakeDropbox, remoteNameHash: string): string {
+  const found = drive.findByName(remoteNameHash);
+  if (found === undefined) throw new Error(`Arquivo remoto ausente no teste: ${remoteNameHash}`);
+  return found.id;
 }
 
 describe('backupNow', { timeout: 60_000 }, () => {
@@ -200,8 +217,8 @@ describe('backupNow', { timeout: 60_000 }, () => {
     expect(result).toEqual({
       ok: false,
       error:
-        'Faltam permissões no app Dropbox. Marque todos os escopos na aba Permissions ' +
-        'do App Console, desconecte e conecte de novo.',
+        'Faltam permissões no app Dropbox. Confira todos os escopos no painel do ' +
+        'aplicativo, desconecte e conecte de novo.',
     });
   });
 
@@ -224,6 +241,50 @@ describe('backupNow', { timeout: 60_000 }, () => {
       ok: false,
       error: 'Erro do Dropbox (HTTP 500). Resposta: erro interno',
     });
+  });
+
+  it('recusa com o cofre fechado, antes de tocar na nuvem', async () => {
+    await connect();
+    const drive = new FakeDropbox();
+    stubFetch((call) => drive.handle(call));
+    lockVault();
+
+    // Sem cofre aberto não há senha de criptografia nem onde gravar o horário:
+    // o backup para aqui em vez de subir alguma coisa sem registro.
+    expect(await backupNow()).toEqual({ ok: false, error: 'O cofre está fechado.' });
+    expect(drive.files.size).toBe(0);
+    expect(getStatus().syncing).toBe(false);
+  });
+
+  it('manifesto ilegível com a senha atual inicia uma cadeia nova de nomes', async () => {
+    await connect();
+    saveLibrary([makeWork({ id: 'obra-cadeia-nova' })]);
+    const drive = new FakeDropbox();
+    const saltAntigo = Buffer.alloc(16, 7);
+    const libraryAntigo = remoteName('library.json', nameKeyFor(PASSPHRASE, saltAntigo));
+    drive.seed(libraryAntigo, Buffer.from('[]'));
+    // O arquivo do manifesto está onde a senha atual procura, mas foi cifrado
+    // com outra: não há como reaproveitar o salt, e adivinhar seria pior.
+    drive.seed(
+      remoteName(MANIFEST_FILE, manifestKeyFor(PASSPHRASE)),
+      encryptWith(buildManifest({ [libraryAntigo]: 'library.json' }, saltAntigo), 'outra-senha'),
+    );
+    stubFetch((call) => drive.handle(call));
+
+    const result = await backupNow();
+
+    expect(result.ok).toBe(true);
+    expect(drive.findByName(libraryAntigo)).toBeUndefined();
+    expect(result.summary?.id).toBe('novo');
+
+    // O manifesto novo descreve outro nome remoto para o mesmo arquivo local:
+    // a cadeia recomeçou em vez de reaproveitar o salt que ninguém consegue ler.
+    const manifestId = remoteIdFor(drive, remoteName(MANIFEST_FILE, manifestKeyFor(PASSPHRASE)));
+    const manifest = drive.files.get(manifestId);
+    if (manifest === undefined) throw new Error('Manifesto ausente no teste.');
+    const mapping = parseManifest(decryptWith(manifest.content, PASSPHRASE)).files;
+    expect(Object.values(mapping)).toContain('library.json');
+    expect(Object.keys(mapping)).not.toContain(libraryAntigo);
   });
 });
 
@@ -320,5 +381,96 @@ describe('restoreNow', { timeout: 60_000 }, () => {
     const result = await restoreNow(PASSPHRASE);
     expect(result).toEqual({ ok: false, error: 'no_permission' });
     expect(getStatus().lastError).toBe('no_permission');
+  });
+
+  it('recusa com o cofre fechado, porque não há onde gravar o acervo', async () => {
+    await connect();
+    lockVault();
+
+    expect(await restoreNow(PASSPHRASE)).toEqual({
+      ok: false,
+      error: 'O cofre está fechado.',
+    });
+    expect(getStatus().syncing).toBe(false);
+  });
+
+  it('recusa execução paralela enquanto sincroniza', async () => {
+    await connect();
+    saveLibrary([makeWork({ id: 'obra-paralela' })]);
+    const gate = defer();
+    stubFetch((call) => {
+      if (call.url === LIST_FOLDER_ENDPOINT) return gate.promise;
+      return json({});
+    });
+    const primeiro = backupNow();
+    await vi.waitFor(() => expect(getStatus().syncing).toBe(true));
+
+    expect(await restoreNow(PASSPHRASE)).toEqual({
+      ok: false,
+      error: 'Sincronização já em andamento.',
+    });
+
+    gate.resolve(json({ error_summary: 'cancelado' }, 500));
+    expect(await primeiro).toEqual({ ok: false, error: 'cancelado' });
+  });
+
+  it('recusa lista de obras com entrada que não é registro', async () => {
+    await connect();
+    const drive = new FakeDropbox();
+    drive.seed('library.json', Buffer.from(JSON.stringify([null, 42, 'obra'])));
+    stubFetch((call) => drive.handle(call));
+
+    expect(await restoreNow(PASSPHRASE)).toEqual({
+      ok: false,
+      error: 'Backup inválido (library.json corrompido).',
+    });
+  });
+
+  it('resolve os nomes locais pelo manifesto do backup', async () => {
+    await connect();
+    const drive = new FakeDropbox();
+    const nameSalt = Buffer.alloc(16, 11);
+    const libraryRemote = remoteName('library.json', nameKeyFor(PASSPHRASE, nameSalt));
+    drive.seed(libraryRemote, Buffer.from(JSON.stringify([makeWork({ id: 'opaca' })])));
+    // Manifesto em claro: o que está em teste é a resolução dos nomes pelo
+    // manifesto, não a cifra (que tem suíte própria).
+    drive.seed(
+      remoteName(MANIFEST_FILE, manifestKeyFor(PASSPHRASE)),
+      Buffer.from(JSON.stringify({ [libraryRemote]: 'library.json' }), 'utf-8'),
+    );
+    stubFetch((call) => drive.handle(call));
+
+    expect(await restoreNow(PASSPHRASE)).toEqual({ ok: true, works: 1 });
+    expect(loadLibrary().map((work) => work.id)).toEqual(['opaca']);
+  });
+});
+
+describe('disconnect', { timeout: 60_000 }, () => {
+  beforeEach(async () => {
+    await resetDrive();
+  });
+
+  it('com o cofre fechado mantém a sessão e explica o motivo', async () => {
+    await connect();
+    lockVault();
+
+    const status = disconnect();
+
+    // Sem chave não dá para apagar o token de dentro do cofre: fingir que
+    // desconectou só faria a sessão voltar na próxima abertura.
+    expect(status.connected).toBe(true);
+    expect(status.lastError).toBe('O cofre está fechado.');
+  });
+
+  it('com o cofre aberto apaga mesmo os tokens gravados', async () => {
+    await connect();
+
+    const status = disconnect();
+    expect(status.connected).toBe(false);
+    expect(status.lastError).toBeNull();
+
+    await unlockVault(PASSWORD);
+    initDrive();
+    expect(getStatus().connected).toBe(false);
   });
 });

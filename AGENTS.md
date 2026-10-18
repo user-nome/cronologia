@@ -39,8 +39,11 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
   (Argon2id + AES-256-GCM; sem cofre aberto não há segredo nem backup, ver
   `docs/cofre.md`/`docs/credenciais.md`). Não existe caminho legado
   (`enc:`/keyring, `dropbox-tokens.json`, migração de marca). A nuvem
-  passa pelo contrato `BackupProvider` (`docs/backup-providers.md`), com o
-  Dropbox como único provedor operante (App folder, sem credencial embutida).
+  passa pelo contrato `BackupProvider` (`docs/backup-providers.md`): Dropbox
+  usa a App folder e Google Drive usa `appDataFolder` quando `GOOGLE_CLIENT_ID`
+  está configurado no build. As chaves OAuth públicas são injetadas no bundle
+  main por `DROPBOX_APP_KEY`/`GOOGLE_CLIENT_ID`, nunca mantidas como literais no
+  código-fonte.
 - IPC via `ipcRenderer.invoke` e `ipcMain.handle`; canal novo só com tipo em
   `src/types/` e entrada em `docs/api.md`.
 
@@ -99,7 +102,8 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
 - `npm run check`: typecheck + lint + format + auditoria OSV. Obrigatório
   antes de concluir qualquer mudança.
 - `npm test` (ou `test:coverage`): Vitest em `tests/**`; cobertura mínima de
-  50% por métrica. Comportamento novo vem com teste.
+  **95% por arquivo** nas quatro métricas (`perFile: true`). Comportamento novo
+  vem com teste.
 - `npm run test:e2e` / `test:e2e:bundled` / `test:e2e:packaged`: Playwright
   sobre o app compilado (`out/`) e o payload do `.deb`. Exige `npm run build` e
   `npm run dist:dir` antes. Entra no typecheck (`e2e/tsconfig.json`) e no lint,
@@ -152,9 +156,10 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
 
 - `npm run security:audit` limpo antes de concluir; vulnerabilidade sem fix
   upstream só com justificativa e `ignoreUntil` em `.osv-scanner.toml`.
-- Nada de credencial no repositório: tokens Dropbox saem do device do
-  usuário (OAuth PKCE, sem secret) e os secrets do CI (`GPG_PRIVATE_KEY`,
-  `GPG_PASSPHRASE`) vivem só no GitHub.
+- Nada de token OAuth no repositório: tokens Dropbox/Google saem do dispositivo
+  do usuário (OAuth PKCE). As App keys OAuth são identificadores públicos,
+  injetados no build por `.env` local ou secrets do CI; os secrets do CI
+  (`GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`) vivem só no GitHub.
 - Renderer com CSP (schemes `cover:` e `cronologia:`) e preload sandboxed (por
   isso ele é CommonJS); não enfraquecer `contextIsolation` nem inserir HTML
   dinâmico. Na produção a SPA é servida por `cronologia://` via

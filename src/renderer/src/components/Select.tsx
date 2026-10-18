@@ -14,6 +14,14 @@ interface SelectProps<T extends string> {
   onChange: (value: T) => void;
   placeholder?: string;
   searchable?: boolean;
+  /**
+   * Trava o controle enquanto outra ação do dono está em andamento.
+   *
+   * É o `disabled` de um `<button>`: some com a interação e com o foco por
+   * teclado, sem desabilitar o botão de verdade, porque o menu é um `div` e o
+   * navegador não aplicaria o atributo a ele.
+   */
+  disabled?: boolean;
 }
 
 /** Normaliza para o filtro: sem acento e em minúsculas. */
@@ -30,6 +38,7 @@ export default function Select<T extends string>({
   onChange,
   placeholder,
   searchable = false,
+  disabled = false,
 }: SelectProps<T>): JSX.Element {
   const m = useMessages();
   const [open, setOpen] = useState(false);
@@ -87,9 +96,22 @@ export default function Select<T extends string>({
     closeMenu();
   };
 
+  /** `Enter`/`Espaço`/clique no gatilho não reabrem nem escolhem travado. */
+  const toggle = (): void => {
+    if (disabled) return;
+    if (open) closeMenu();
+    else openMenu(selectedIndex >= 0 ? selectedIndex : 0);
+  };
+
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     const target = event.target as HTMLElement;
     const typing = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+
+    if (disabled) {
+      // Nem abrir nem navegar: um `Tab` que chega aqui não pode acionar nada.
+      if (event.key === 'Escape' && open) closeMenu();
+      return;
+    }
 
     if (!open) {
       if (!typing && event.key === 'ArrowDown') {
@@ -153,7 +175,9 @@ export default function Select<T extends string>({
         className="select-trigger"
         aria-haspopup="listbox"
         aria-expanded={open}
-        onClick={() => (open ? closeMenu() : openMenu(selectedIndex >= 0 ? selectedIndex : 0))}
+        disabled={disabled}
+        aria-disabled={disabled}
+        onClick={toggle}
       >
         {selected !== undefined ? (
           <span className="select-value">

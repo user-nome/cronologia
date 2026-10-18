@@ -69,13 +69,19 @@ export const en: Messages = {
 
   settings: {
     title: 'Settings',
-    bannerTitle: 'Dropbox backup.',
-    bannerBody:
+    bannerTitle: (label: string): string => `${label} backup.`,
+    bannerBodyDropbox:
       'Your library is written to the app’s reserved folder (inside `/Apps/` in your ' +
       'account): through the API, only this application can see that folder, and the rest ' +
       'of your Dropbox is not even visible to it. Since the folder is visible to you, every ' +
       'file is uploaded with an unreadable name and encrypted content (AES-256-GCM), so set ' +
       'the encryption password below before the first backup.',
+    bannerBodyGoogle:
+      'This build keeps your library in the hidden folder that belongs to the app (the ' +
+      'Google Drive `appDataFolder`), which does not show up in the Google Drive ' +
+      'interface and which this app sees on its own: the only scope requested is that ' +
+      'folder. Every file is uploaded with an unreadable name and encrypted content ' +
+      '(AES-256-GCM), so set the encryption password below before the first backup.',
     languageLabel: 'Language',
     providersLabel: 'Backup providers',
     hiddenFolder: 'Hidden folder',
@@ -83,32 +89,36 @@ export const en: Messages = {
     notOperational: 'Not operational',
     backupIn: (target: string): string => `Backup in ${target}`,
     passphraseLabel: 'Backup encryption password',
-    passphrasePlaceholder: 'Used to encrypt the backup on Dropbox',
+    passphrasePlaceholder: (label: string): string => `Used to encrypt the backup on ${label}`,
     connected: 'Connected',
     disconnected: 'Disconnected',
-    accountFallback: 'Dropbox account',
+    accountFallback: (label: string): string => `${label} account`,
     lastBackup: 'Last backup',
-    inDropboxBackup: 'In the Dropbox backup',
+    inBackup: (label: string): string => `In the ${label} backup`,
     worksInBackup: (works: number): string => `${works} work(s)`,
-    syncingBanner: 'Syncing with Dropbox…',
-    disconnectTitle: 'Disconnects the Dropbox account from this application',
+    syncingBanner: (label: string): string => `Syncing with ${label}…`,
+    disconnectTitle: (label: string): string =>
+      `Disconnects the ${label} account from this application`,
     disconnectAction: 'Disconnect',
     authorizing: 'Authorizing…',
-    connectAction: 'Connect to Dropbox',
-    restoreTitle: 'Downloads the Dropbox backup and replaces the current library',
+    connectAction: (label: string): string => `Connect to ${label}`,
+    restoreTitle: (label: string): string =>
+      `Downloads the ${label} backup and replaces the current library`,
     restoreAction: 'Restore',
     restoring: 'Restoring…',
     backupAction: 'Back up now',
     sending: 'Uploading…',
     toastSaved: 'Settings saved.',
     toastAuthFailed: 'Authorization failed.',
-    toastConnected: 'Dropbox account connected successfully.',
+    toastConnected: (label: string): string => `${label} account connected successfully.`,
     toastBackupFailed: 'Backup failed.',
-    toastBackupDone: 'Backup finished in the app folder on Dropbox.',
+    toastBackupDone: (label: string): string => `Backup finished in the app folder on ${label}.`,
     toastRestoreFailed: 'Restore failed.',
     toastRestored: (works: number): string => `Backup restored: ${works} work(s).`,
-    toastDisconnected: 'Dropbox account disconnected.',
+    toastDisconnected: (label: string): string => `${label} account disconnected.`,
     toastPurgeFailed: 'Could not delete the backup from the cloud.',
+    providerSwitched: (label: string): string => `Backup now goes to ${label}.`,
+    providerSwitchFailed: 'Could not switch the backup provider.',
     translationNotice: {
       title: 'Translation notice',
       text: "I don't speak any of these languages except Portuguese, and all translations are done by AI. Like everything in this world, there may be errors, so please have a little patience.",
@@ -119,8 +129,8 @@ export const en: Messages = {
 
   restore: {
     title: 'Backup password',
-    banner:
-      'Enter the encryption password used when you **backed up** to Dropbox. ' +
+    banner: (label: string): string =>
+      `Enter the encryption password used when you **backed up** to ${label}. ` +
       'It is required to decrypt the downloaded files.',
     passphraseLabel: 'Encryption password',
     passphrasePlaceholder: 'Password used in the backup',
@@ -238,10 +248,10 @@ export const en: Messages = {
     dropboxStorageTarget: '/Apps/Cronologia (folder visible in your account)',
     googleStorageTarget:
       'appDataFolder (hidden folder, does not appear in the Google Drive interface)',
-    googleUnavailable:
-      'Google Drive is not operational yet: the integration will only be enabled once ' +
-      'Cronologia meets Google’s requirements (app verification, consent screen and scope ' +
-      'review). In the meantime, backups use Dropbox.',
+    googleNoCredentials:
+      'This build carries no Google Drive credential: the app is identified by a key ' +
+      'pair that goes into the binary at release time. Until that pair is published, ' +
+      'the backup uses Dropbox.',
   },
 
   driveErrors: {
@@ -257,26 +267,30 @@ export const en: Messages = {
     noBackupFound: (provider: string): string =>
       `No backup found in the app folder on ${provider}.`,
     invalidLibrary: 'Invalid backup (library.json corrupted).',
-    invalidListResponse: 'Invalid Dropbox API response (file listing).',
+    invalidListResponse: (provider: string): string =>
+      `Invalid ${provider} API response (file listing).`,
     tokenTimeout: 'Timed out waiting for authorization.',
     authCancelled: 'Authorization cancelled.',
+    csrfRejected: 'Authorization callback from another origin; the connection was refused.',
     tokenFailed: (status: number): string => `Failed to obtain tokens (${status}).`,
     invalidTokenResponse: (status: number): string => `Invalid token response (${status}).`,
-    configureAppKey: 'Configure the Dropbox app key in Settings.',
-    sessionExpired: 'Session expired. Connect the Dropbox account again.',
-    refreshFailed: 'Could not refresh the Dropbox session.',
-    noAccount: 'No Dropbox account connected.',
-    permissionsUpdated: 'Dropbox permissions updated. Reconnect the Dropbox account.',
-    missingScopes:
-      'Permissions missing in the Dropbox app. Check every scope in the Permissions tab ' +
-      'of the App Console, then disconnect and reconnect.',
-    missingScopesList: (missing: string): string =>
-      `Permissions missing in the Dropbox app (${missing}). ` +
-      'Check every scope in the Permissions tab of the App Console, then disconnect and reconnect.',
-    dropboxHttp: (status: number, response: string): string =>
+    configureAppKey: 'This build has no DROPBOX_APP_KEY. Set the variable and rebuild.',
+    sessionExpired: (provider: string): string =>
+      `Session expired. Connect the ${provider} account again.`,
+    refreshFailed: (provider: string): string => `Could not refresh the ${provider} session.`,
+    noAccount: (provider: string): string => `No ${provider} account connected.`,
+    permissionsUpdated: (provider: string): string =>
+      `${provider} permissions updated. Reconnect the ${provider} account.`,
+    missingScopes: (provider: string): string =>
+      `Permissions are missing in the ${provider} app. Check every scope in the app ` +
+      'developer panel, then disconnect and reconnect.',
+    missingScopesList: (provider: string, missing: string): string =>
+      `Permissions are missing in the ${provider} app (${missing}). Check every scope in ` +
+      'the app developer panel and reconnect.',
+    providerHttp: (label: string, status: number, response: string): string =>
       response === ''
-        ? `Dropbox error (HTTP ${status}).`
-        : `Dropbox error (HTTP ${status}). Response: ${response}`,
+        ? `${label} error (HTTP ${status}).`
+        : `${label} error (HTTP ${status}). Response: ${response}`,
     restoreLocked: (seconds: number): string =>
       seconds < 60
         ? `Too many failed restore attempts with the wrong password. Try again in ${seconds} seconds.`

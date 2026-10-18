@@ -74,13 +74,19 @@ export const ptBR = {
 
   settings: {
     title: 'Configurações',
-    bannerTitle: 'Backup no Dropbox.',
-    bannerBody:
+    bannerTitle: (label: string): string => `Backup no ${label}.`,
+    bannerBodyDropbox:
       'Sua biblioteca é gravada na pasta reservada do app (dentro de `/Apps/` na sua conta): ' +
       'pela API, só este aplicativo enxerga essa pasta, e o resto do seu Dropbox nem aparece ' +
       'para ele. Como a pasta é visível para você, todo arquivo sobe com nome ilegível e ' +
       'conteúdo criptografado (AES-256-GCM), então defina a senha de criptografia abaixo ' +
       'antes do primeiro backup.',
+    bannerBodyGoogle:
+      'Este build guarda sua biblioteca na pasta oculta do app (o `appDataFolder` do ' +
+      'Google Drive), que **não aparece** na interface do Google Drive e que este app ' +
+      'enxerga sozinho: o único escopo pedido é o dessa pasta. Todo arquivo sobe com ' +
+      'nome ilegível e conteúdo criptografado (AES-256-GCM), então defina a senha de ' +
+      'criptografia abaixo antes do primeiro backup.',
     languageLabel: 'Idioma',
     providersLabel: 'Provedores de backup',
     hiddenFolder: 'Pasta oculta',
@@ -88,32 +94,36 @@ export const ptBR = {
     notOperational: 'Não operante',
     backupIn: (target: string): string => `Backup em ${target}`,
     passphraseLabel: 'Senha de criptografia do backup',
-    passphrasePlaceholder: 'Usada para criptografar o backup no Dropbox',
+    passphrasePlaceholder: (label: string): string =>
+      `Usada para criptografar o backup no ${label}`,
     connected: 'Conectado',
     disconnected: 'Desconectado',
-    accountFallback: 'Conta Dropbox',
+    accountFallback: (label: string): string => `Conta ${label}`,
     lastBackup: 'Último backup',
-    inDropboxBackup: 'No backup do Dropbox',
+    inBackup: (label: string): string => `No backup do ${label}`,
     worksInBackup: (works: number): string => `${works} obra(s)`,
-    syncingBanner: 'Sincronizando com o Dropbox…',
-    disconnectTitle: 'Desconecta a conta Dropbox deste aplicativo',
+    syncingBanner: (label: string): string => `Sincronizando com o ${label}…`,
+    disconnectTitle: (label: string): string => `Desconecta a conta ${label} deste aplicativo`,
     disconnectAction: 'Desconectar',
     authorizing: 'Autorizando…',
-    connectAction: 'Conectar ao Dropbox',
-    restoreTitle: 'Baixa o backup do Dropbox e substitui a biblioteca atual',
+    connectAction: (label: string): string => `Conectar ao ${label}`,
+    restoreTitle: (label: string): string =>
+      `Baixa o backup do ${label} e substitui a biblioteca atual`,
     restoreAction: 'Restaurar',
     restoring: 'Restaurando…',
     backupAction: 'Fazer backup agora',
     sending: 'Enviando…',
     toastSaved: 'Configurações salvas.',
     toastAuthFailed: 'Falha na autorização.',
-    toastConnected: 'Conta Dropbox conectada com sucesso.',
+    toastConnected: (label: string): string => `Conta ${label} conectada com sucesso.`,
     toastBackupFailed: 'Falha no backup.',
-    toastBackupDone: 'Backup concluído na pasta do app no Dropbox.',
+    toastBackupDone: (label: string): string => `Backup concluído na pasta do app no ${label}.`,
     toastRestoreFailed: 'Falha ao restaurar.',
     toastRestored: (works: number): string => `Backup restaurado com ${works} obra(s).`,
-    toastDisconnected: 'Conta Dropbox desconectada.',
+    toastDisconnected: (label: string): string => `Conta ${label} desconectada.`,
     toastPurgeFailed: 'Não foi possível apagar o backup na nuvem.',
+    providerSwitched: (label: string): string => `Backup agora vai para o ${label}.`,
+    providerSwitchFailed: 'Não foi possível trocar o provedor de backup.',
     translationNotice: {
       title: 'Aviso sobre traduções',
       text: 'Eu não falo nenhum desses idiomas com exceção do português, e toda a tradução é feita por IA. Como tudo nesse mundo, pode haver falhas, então peço um pouco de paciência.',
@@ -124,8 +134,8 @@ export const ptBR = {
 
   restore: {
     title: 'Senha do backup',
-    banner:
-      'Informe a senha de criptografia usada ao **fazer o backup** no Dropbox. ' +
+    banner: (label: string): string =>
+      `Informe a senha de criptografia usada ao **fazer o backup** no ${label}. ` +
       'Ela é obrigatória para decifrar os arquivos baixados.',
     passphraseLabel: 'Senha de criptografia',
     passphrasePlaceholder: 'Senha usada no backup',
@@ -244,10 +254,10 @@ export const ptBR = {
   providers: {
     dropboxStorageTarget: '/Apps/Cronologia (pasta visível na sua conta)',
     googleStorageTarget: 'appDataFolder (pasta oculta, não aparece na interface do Google Drive)',
-    googleUnavailable:
-      'O Google Drive ainda não está operante: a integração só será ativada quando o ' +
-      'Cronologia atende às exigências do Google (verificação do app, tela de ' +
-      'consentimento e revisão dos escopos). Enquanto isso, o backup usa o Dropbox.',
+    googleNoCredentials:
+      'Este build não traz credencial do Google Drive: o app é identificado por um par ' +
+      'de chaves que entra no binário na publicação. Enquanto esse par não for ' +
+      'publicado, o backup usa o Dropbox.',
   },
 
   driveErrors: {
@@ -263,26 +273,31 @@ export const ptBR = {
     noBackupFound: (provider: string): string =>
       `Nenhum backup encontrado na pasta do app no ${provider}.`,
     invalidLibrary: 'Backup inválido (library.json corrompido).',
-    invalidListResponse: 'Resposta inválida da API do Dropbox (listagem de arquivos).',
+    invalidListResponse: (provider: string): string =>
+      `Resposta inválida da API do ${provider} (listagem de arquivos).`,
     tokenTimeout: 'Tempo esgotado aguardando autorização.',
     authCancelled: 'Autorização cancelada.',
+    csrfRejected: 'Callback de autorização vindo de outra origem; a conexão foi recusada.',
     tokenFailed: (status: number): string => `Falha ao obter tokens (${status}).`,
     invalidTokenResponse: (status: number): string => `Resposta de tokens inválida (${status}).`,
-    configureAppKey: 'Configure a chave do aplicativo Dropbox nas Configurações.',
-    sessionExpired: 'Sessão expirada. Conecte a conta Dropbox novamente.',
-    refreshFailed: 'Não foi possível renovar a sessão do Dropbox.',
-    noAccount: 'Nenhuma conta Dropbox conectada.',
-    permissionsUpdated: 'Permissões do Dropbox atualizadas. Reconecte a conta Dropbox.',
-    missingScopes:
-      'Faltam permissões no app Dropbox. Marque todos os escopos na aba Permissions ' +
-      'do App Console, desconecte e conecte de novo.',
-    missingScopesList: (missing: string): string =>
-      `Faltam permissões no app Dropbox (${missing}). ` +
-      'Marque todos os escopos na aba Permissions do App Console, desconecte e conecte de novo.',
-    dropboxHttp: (status: number, response: string): string =>
+    configureAppKey: 'Este build não tem DROPBOX_APP_KEY. Configure a variável e recompile.',
+    sessionExpired: (provider: string): string =>
+      `Sessão expirada. Conecte a conta ${provider} novamente.`,
+    refreshFailed: (provider: string): string =>
+      `Não foi possível renovar a sessão do ${provider}.`,
+    noAccount: (provider: string): string => `Nenhuma conta ${provider} conectada.`,
+    permissionsUpdated: (provider: string): string =>
+      `Permissões do ${provider} atualizadas. Reconecte a conta ${provider}.`,
+    missingScopes: (provider: string): string =>
+      `Faltam permissões no app ${provider}. Confira todos os escopos no painel do ` +
+      'aplicativo, desconecte e conecte de novo.',
+    missingScopesList: (provider: string, missing: string): string =>
+      `Faltam permissões no app ${provider} (${missing}). Confira todos os escopos no ` +
+      'painel do aplicativo e conecte de novo.',
+    providerHttp: (label: string, status: number, response: string): string =>
       response === ''
-        ? `Erro do Dropbox (HTTP ${status}).`
-        : `Erro do Dropbox (HTTP ${status}). Resposta: ${response}`,
+        ? `Erro do ${label} (HTTP ${status}).`
+        : `Erro do ${label} (HTTP ${status}). Resposta: ${response}`,
     restoreLocked: (seconds: number): string =>
       seconds < 60
         ? `Muitas tentativas de restauração com senha errada. Tente novamente em ${seconds} segundos.`

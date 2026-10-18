@@ -1,9 +1,10 @@
 import type { BackupProviderId, BackupProviderInfo } from '@zero/types';
 import type { Messages } from '@zero/messages';
+import type { RemoteFile } from '@zero/types';
 import { currentMessages } from '@zero/main/i18n';
 import { dropboxProvider } from '@zero/main/drive/providers/dropbox';
-import { googleDriveProvider } from '@zero/main/drive/providers/google-drive';
-import type { RemoteFile } from '@zero/main/drive/rest';
+import { googleDriveProvider } from '@zero/main/drive/providers/google';
+import { state } from '@zero/main/drive/state';
 
 export type { RemoteFile };
 
@@ -13,16 +14,15 @@ export type { RemoteFile };
  * O núcleo do backup (`backup.ts`), a criptografia (`crypto.ts`) e a orquestração
  * são genéricos: eles conversam com a nuvem só por este contrato. Cada provedor
  * implementa as 4 operações de arquivo mais a autorização; OAuth, REST e forma
- * dos tokens vivem em `src/main/drive/providers/<provedor>/` (hoje em módulos
- * irmãos, já que só o Dropbox tem implementação).
+ * dos tokens vivem em `src/main/drive/providers/<provedor>/`.
  *
  * Textos da UI ficam em `describe(messages)` (idioma corrente em cada chamada);
  * `label` é o nome da marca, que não se traduz. O catálogo (`listProviders`)
  * formata tudo de uma vez no idioma vigente.
  *
- * Estado ainda é único (sem provedor por sessão): `state.tokens` descreve a
- * sessão do provedor atual. Isso muda quando um segundo provedor ficar operante
- * (ver `docs/backup-providers.md`).
+ * Estado por provedor: `state.tokens` é sempre a sessão do provedor escolhido
+ * (`state.provider`), e o cofre guarda uma entrada por destino, para que trocar
+ * de provedor não desconecte o outro.
  */
 export interface BackupProvider {
   readonly id: BackupProviderId;
@@ -56,13 +56,13 @@ export function getProvider(id: BackupProviderId): BackupProvider {
 }
 
 /**
- * Provedor usado nas operações de backup.
+ * Provedor usado nas operações de backup: o que o usuário escolheu.
  *
- * Hoje só o Dropbox é operante (`operational` no catálogo), então ele é a
- * escolha fixa. A seleção entre provedores passa a existir quando um segundo
- * ficar operante, momento em que a escolha do usuário também deve valer para
- * `state.tokens`.
+ * O valor vem de `state.provider`, que é carregado do `settings.json` no boot e
+ * trocado por `switchProvider` (chamado pelo IPC `drive:setProvider`). Todo
+ * caminho que fala com a nuvem passa por aqui, então `state.tokens` e o provedor
+ * em uso não têm como divergir.
  */
 export function currentProvider(): BackupProvider {
-  return REGISTRY.dropbox;
+  return REGISTRY[state.provider];
 }

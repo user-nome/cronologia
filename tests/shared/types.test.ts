@@ -1,6 +1,7 @@
 import { describe, expectTypeOf, it } from 'vitest';
 import type {
   AppSettings,
+  BackupProviderId,
   BackupSummary,
   DriveStatus,
   ElectronApi,
@@ -46,6 +47,7 @@ describe('tipos compartilhados', () => {
       driveClientId: string;
       drivePassphrase: string;
       language: Language;
+      backupProvider: BackupProviderId;
     }>();
     expectTypeOf<DriveStatus['connected']>().toEqualTypeOf<boolean>();
     expectTypeOf<DriveStatus['lastSync']>().toEqualTypeOf<string | null>();

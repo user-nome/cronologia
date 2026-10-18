@@ -1,4 +1,4 @@
-import { createVault, destroyVault } from '@zero/main/vault';
+import { createVault, destroyVault, lockVault } from '@zero/main/vault';
 
 /** Perfil barato para a suíte: o cofre de produção usa `KDF_DEFAULTS`. */
 export const FAST_KDF = { memoryKiB: 16_384, iterations: 1, parallelism: 1 };
@@ -12,4 +12,16 @@ export const PASSWORD = 'uva-preta-42-estrela';
 export async function openTestVault(): Promise<void> {
   destroyVault();
   await createVault(PASSWORD, FAST_KDF);
+}
+
+/**
+ * Tranca o cofre sem apagá-lo.
+ *
+ * Serve para o caminho "existe mas está fechado", que é diferente do "não
+ * existe": o primeiro derruba o token em memória, o segundo nem chega a ler o
+ * cofre. `openTestVault` recria em cima, então os testes que usam este não
+ * precisam de outra limpeza.
+ */
+export function closeTestVault(): void {
+  lockVault();
 }

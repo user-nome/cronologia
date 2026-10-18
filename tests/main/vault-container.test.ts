@@ -85,4 +85,36 @@ describe('vault/container: formato do vault.zkv', () => {
     lying.writeUInt32BE(buffer.length, 45 + 16 + 16 + 16);
     expect(decodeContainer(lying)).toBeNull();
   });
+
+  it('devolve null quando o salt do wrap cabe mas o IV seguinte não', () => {
+    const buffer = encodeContainer(fixture());
+    // Cabeçalho (45) + salt (16) = 61 bytes: o wrap ainda não tem IV, tag nem
+    // comprimento. A leitura precisa recusar no passo seguinte, sem ler fora do
+    // buffer nem devolver bloco pela metade.
+    const semIv = buffer.subarray(0, 45 + 16);
+    expect(semIv.length).toBe(61);
+    expect(decodeContainer(semIv)).toBeNull();
+  });
+
+  it('devolve null para instante e trava fora do inteiro seguro', () => {
+    const buffer = encodeContainer(fixture());
+    const grande = BigInt(Number.MAX_SAFE_INTEGER);
+
+    const createdAtGrande = Buffer.from(buffer);
+    createdAtGrande.writeBigUInt64BE(grande + 1n, 12);
+    expect(decodeContainer(createdAtGrande)).toBeNull();
+
+    const lockUntilGrande = Buffer.from(buffer);
+    lockUntilGrande.writeBigUInt64BE(grande + 1n, 36);
+    expect(decodeContainer(lockUntilGrande)).toBeNull();
+
+    // O limite exato continua valendo: o corte é "> máximo seguro", não ">=".
+    const limite = Buffer.from(buffer);
+    limite.writeBigUInt64BE(grande, 12);
+    limite.writeBigUInt64BE(grande, 36);
+    expect(decodeContainer(limite)).toMatchObject({
+      createdAt: Number.MAX_SAFE_INTEGER,
+      lockUntil: Number.MAX_SAFE_INTEGER,
+    });
+  });
 });

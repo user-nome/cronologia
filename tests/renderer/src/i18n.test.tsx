@@ -44,6 +44,30 @@ describe('richText', () => {
     expect(container.textContent).toBe('sem marcação');
     expect(container.querySelector('strong')).toBeNull();
   });
+
+  it('aceita marcador no começo da mensagem, sem texto antes dele', () => {
+    // O primeiro marcador colado no início não tem o que recortar antes: sem
+    // esse caso, o trecho vazio viraria um nó de texto solto na tela.
+    const { container } = render(<div>{richText('**a biblioteca inteira** é sua.')}</div>);
+    expect(container.querySelector('strong')?.textContent).toBe('a biblioteca inteira');
+    expect(container.textContent).toBe('a biblioteca inteira é sua.');
+  });
+
+  it('aceita marcador no fim da mensagem, sem texto depois dele', () => {
+    const { container } = render(<div>{richText('veja `package.json`')}</div>);
+    expect(container.querySelector('code')?.textContent).toBe('package.json');
+    expect(container.textContent).toBe('veja package.json');
+  });
+
+  it('intercala vários marcadores sem perder o texto entre eles', () => {
+    const { container } = render(<div>{richText('**a** e `b` e **c**.')}</div>);
+    expect([...container.querySelectorAll('strong')].map((node) => node.textContent)).toEqual([
+      'a',
+      'c',
+    ]);
+    expect(container.querySelector('code')?.textContent).toBe('b');
+    expect(container.textContent).toBe('a e b e c.');
+  });
 });
 
 describe('contexto de idioma', () => {

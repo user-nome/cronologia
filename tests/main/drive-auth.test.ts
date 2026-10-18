@@ -4,24 +4,20 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DriveStatus } from '@zero/types';
 import { authorize, disconnect, getStatus, initDrive, onStatus } from '@zero/main/drive';
-import { SCOPE_VERSION } from '@zero/main/drive/constants';
+import { DROPBOX_SCOPE_VERSION } from '@zero/main/drive/providers/dropbox/constants';
+import { currentMessages } from '@zero/main/i18n';
+import { setError, toMessage } from '@zero/main/drive/state';
 import { saveSettings } from '@zero/main/settings';
 import { lockVault, setSecret, unlockVault } from '@zero/main/vault';
+import { VaultError } from '@zero/main/vault/errors';
 import { VAULT_SECRET } from '@zero/main/vault/secrets';
 import { shell } from '../mocks/electron.ts';
 import { APP_KEY, connect, json, resetDrive, stubFetch, tokensPath } from '../helpers/drive.ts';
 import { PASSWORD } from '../helpers/vault.ts';
 
-// Este arquivo também cobre o caminho "sem chave nenhuma" (build sem chave
-// embutida e sem override no settings.json), então a chave embutida é anulada
-// aqui; os demais testes sempre apontam `driveClientId` para APP_KEY.
-vi.mock('@zero/main/drive/constants', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@zero/main/drive/constants')>();
-  return { ...actual, EMBEDDED_APP_KEY: '' };
-});
-
 describe('estado do Dropbox', { timeout: 60_000 }, () => {
   beforeEach(async () => {
+    vi.stubEnv('DROPBOX_APP_KEY', '');
     await resetDrive();
   });
 
@@ -79,7 +75,7 @@ describe('estado do Dropbox', { timeout: 60_000 }, () => {
         expiresAt: Date.now() + 3_600_000,
         accountEmail: 'outra@x.com',
         lastSync: '2026-01-05T00:00:00.000Z',
-        scopeVersion: SCOPE_VERSION,
+        scopeVersion: DROPBOX_SCOPE_VERSION,
       }),
       'utf-8',
     );
@@ -94,15 +90,17 @@ describe('authorize', { timeout: 60_000 }, () => {
   });
 
   it('recusa sem abrir o navegador quando não há chave do aplicativo', async () => {
+    vi.stubEnv('DROPBOX_APP_KEY', '');
     saveSettings({
       driveClientId: '',
       drivePassphrase: 'frase',
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     });
     const result = await authorize();
     expect(result.ok).toBe(false);
-    expect(result.error).toContain('chave do aplicativo Dropbox');
-    expect(getStatus().lastError).toContain('chave do aplicativo Dropbox');
+    expect(result.error).toBe(currentMessages().driveErrors.configureAppKey);
+    expect(getStatus().lastError).toBe(currentMessages().driveErrors.configureAppKey);
     expect(shell.openExternal).not.toHaveBeenCalled();
   });
 
@@ -110,12 +108,16 @@ describe('authorize', { timeout: 60_000 }, () => {
     saveSettings({
       driveClientId: APP_KEY,
       drivePassphrase: 'frase',
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     });
     shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
-      const redirect = new URL(url).searchParams.get('redirect_uri');
+      const params = new URL(url).searchParams;
+      const redirect = params.get('redirect_uri');
       if (redirect !== null) {
-        const request = http.get(`${redirect}?error=access_denied`);
+        const request = http.get(
+          `${redirect}?error=access_denied&state=${params.get('state') ?? ''}`,
+        );
         request.on('error', () => undefined);
       }
       return Promise.resolve();
@@ -151,12 +153,16 @@ describe('authorize', { timeout: 60_000 }, () => {
     saveSettings({
       driveClientId: APP_KEY,
       drivePassphrase: '',
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     });
     shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
-      const redirect = new URL(url).searchParams.get('redirect_uri');
+      const params = new URL(url).searchParams;
+      const redirect = params.get('redirect_uri');
       if (redirect !== null) {
-        const request = http.get(`${redirect}?error=access_denied`);
+        const request = http.get(
+          `${redirect}?error=access_denied&state=${params.get('state') ?? ''}`,
+        );
         request.on('error', () => undefined);
       }
       return Promise.resolve();
@@ -171,12 +177,16 @@ describe('authorize', { timeout: 60_000 }, () => {
     saveSettings({
       driveClientId: APP_KEY,
       drivePassphrase: '',
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     });
     shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
-      const redirect = new URL(url).searchParams.get('redirect_uri');
+      const params = new URL(url).searchParams;
+      const redirect = params.get('redirect_uri');
       if (redirect !== null) {
-        const request = http.get(`${redirect}?code=codigo-valido`);
+        const request = http.get(
+          `${redirect}?code=codigo-valido&state=${params.get('state') ?? ''}`,
+        );
         request.on('error', () => undefined);
       }
       return Promise.resolve();
@@ -203,12 +213,16 @@ describe('authorize', { timeout: 60_000 }, () => {
     saveSettings({
       driveClientId: APP_KEY,
       drivePassphrase: '',
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     });
     shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
-      const redirect = new URL(url).searchParams.get('redirect_uri');
+      const params = new URL(url).searchParams;
+      const redirect = params.get('redirect_uri');
       if (redirect !== null) {
-        const request = http.get(`${redirect}?code=codigo-valido`);
+        const request = http.get(
+          `${redirect}?code=codigo-valido&state=${params.get('state') ?? ''}`,
+        );
         request.on('error', () => undefined);
       }
       return Promise.resolve();
@@ -218,6 +232,58 @@ describe('authorize', { timeout: 60_000 }, () => {
     expect(result.ok).toBe(false);
     expect(result.error).toBe('Falha ao obter tokens (400).');
     expect(getStatus().lastError).toBe('Falha ao obter tokens (400).');
+  });
+});
+
+// A sessão persistida é a única fonte do estado do Dropbox, então o que está
+// gravado no cofre passa por uma validação de forma antes de virar "conectado".
+describe('tokens persistidos no cofre', () => {
+  beforeEach(async () => {
+    await resetDrive();
+    setError(null);
+  });
+
+  it('sessão com versão de escopo antiga exige reconexão em vez de valer', () => {
+    setSecret(
+      VAULT_SECRET.dropboxTokens,
+      JSON.stringify({
+        accessToken: 'token-antigo',
+        expiresAt: Date.now() + 3_600_000,
+        accountEmail: 'leitor@example.com',
+        lastSync: null,
+        scopeVersion: DROPBOX_SCOPE_VERSION - 1,
+      }),
+    );
+
+    initDrive();
+
+    const status = getStatus();
+    expect(status.connected).toBe(false);
+    expect(status.lastError).toBe('Permissões do Dropbox atualizadas. Reconecte a conta Dropbox.');
+  });
+
+  it('ignora token gravado que não é objeto', () => {
+    setSecret(VAULT_SECRET.dropboxTokens, '"apenas um texto"');
+
+    initDrive();
+
+    expect(getStatus().connected).toBe(false);
+    expect(getStatus().lastError).toBeNull();
+  });
+
+  it('ignora token gravado sem accessToken ou sem scopeVersion', () => {
+    setSecret(VAULT_SECRET.dropboxTokens, JSON.stringify({ expiresAt: 1, lastSync: null }));
+
+    initDrive();
+
+    expect(getStatus().connected).toBe(false);
+    expect(getStatus().lastError).toBeNull();
+  });
+
+  it('toMessage traduz o código do cofre e serializa o que não é Error', () => {
+    expect(toMessage(new VaultError('vaultLocked'))).toBe('O cofre está fechado.');
+    expect(toMessage('falha avulsa')).toBe('falha avulsa');
+    expect(toMessage(new Error('erro comum'))).toBe('erro comum');
   });
 });
 

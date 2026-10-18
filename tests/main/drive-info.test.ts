@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { backupInfo, backupNow, getStatus, initDrive } from '@zero/main/drive';
-import { SCOPE_VERSION } from '@zero/main/drive/constants';
+import { DROPBOX_SCOPE_VERSION } from '@zero/main/drive/providers/dropbox/constants';
+import { currentMessages } from '@zero/main/i18n';
 import { saveLibrary } from '@zero/main/library';
 import { saveSettings } from '@zero/main/settings';
 import { setSecret } from '@zero/main/vault';
@@ -19,16 +20,9 @@ import {
   stubFetch,
 } from '../helpers/drive.ts';
 
-// Este arquivo também cobre o caminho "sem chave nenhuma" (build sem chave
-// embutida e sem override no settings.json), então a chave embutida é anulada
-// aqui; os demais testes sempre apontam `driveClientId` para APP_KEY.
-vi.mock('@zero/main/drive/constants', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@zero/main/drive/constants')>();
-  return { ...actual, EMBEDDED_APP_KEY: '' };
-});
-
 describe('backupInfo', { timeout: 60_000 }, () => {
   beforeEach(async () => {
+    vi.stubEnv('DROPBOX_APP_KEY', '');
     await resetDrive();
   });
 
@@ -116,12 +110,13 @@ describe('renovação de sessão', { timeout: 60_000 }, () => {
         expiresAt: Date.now() - 1000,
         accountEmail: 'leitor@example.com',
         lastSync: null,
-        scopeVersion: SCOPE_VERSION,
+        scopeVersion: DROPBOX_SCOPE_VERSION,
       }),
     );
     saveSettings({
       driveClientId: APP_KEY,
       drivePassphrase: PASSPHRASE,
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     });
     initDrive();
@@ -164,6 +159,7 @@ describe('renovação de sessão', { timeout: 60_000 }, () => {
     saveSettings({
       driveClientId: '',
       drivePassphrase: PASSPHRASE,
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     });
     saveLibrary([makeWork({ id: 'obra-9' })]);
@@ -173,7 +169,7 @@ describe('renovação de sessão', { timeout: 60_000 }, () => {
 
     const result = await backupNow();
     expect(result.ok).toBe(false);
-    expect(result.error).toContain('chave do aplicativo Dropbox');
+    expect(result.error).toBe(currentMessages().driveErrors.configureAppKey);
   });
 
   it('reporta falha quando a renovação é recusada', async () => {

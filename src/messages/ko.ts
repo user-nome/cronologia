@@ -69,12 +69,18 @@ export const ko: Messages = {
 
   settings: {
     title: '설정',
-    bannerTitle: 'Dropbox 백업.',
-    bannerBody:
+    bannerTitle: (label: string): string => `${label} 백업.`,
+    bannerBodyDropbox:
       '라이브러리는 앱 전용 폴더에 저장됩니다(계정의 `/Apps/` 안): API를 통해 이 ' +
       '앱만 그 폴더를 볼 수 있으며, 나머지 Dropbox는 이 앱에 보이지도 않습니다. 폴더는 ' +
       '계정에서 보이므로, 모든 파일은 알아볼 수 없는 이름과 암호화된 내용(AES-256-GCM)으로 ' +
       '업로드됩니다. 첫 백업 전에 아래에서 암호화 비밀번호를 설정하세요.',
+    bannerBodyGoogle:
+      '이 빌드는 라이브러리를 앱 전용 숨김 폴더(Google Drive의 `appDataFolder`)에 ' +
+      '저장합니다. 이 폴더는 Google Drive 화면에 나타나지 않으며 이 앱만 볼 수 ' +
+      '있습니다. 요청한 범위는 이 폴더 하나뿐입니다. 모든 파일은 알아볼 수 없는 이름과 ' +
+      '암호화된 내용(AES-256-GCM)으로 업로드되므로 첫 백업 전에 아래에서 암호화 ' +
+      '비밀번호를 설정하세요.',
     languageLabel: '언어',
     providersLabel: '백업 제공업체',
     hiddenFolder: '숨김 폴더',
@@ -82,32 +88,34 @@ export const ko: Messages = {
     notOperational: '사용 불가',
     backupIn: (target: string): string => `${target}에 백업`,
     passphraseLabel: '백업 암호화 비밀번호',
-    passphrasePlaceholder: 'Dropbox 백업 암호화에 사용',
+    passphrasePlaceholder: (label: string): string => `${label} 백업 암호화에 사용`,
     connected: '연결됨',
     disconnected: '연결 해제됨',
-    accountFallback: 'Dropbox 계정',
+    accountFallback: (label: string): string => `${label} 계정`,
     lastBackup: '마지막 백업',
-    inDropboxBackup: 'Dropbox 백업 내',
+    inBackup: (label: string): string => `${label} 백업 내`,
     worksInBackup: (works: number): string => `${works}개 작품`,
-    syncingBanner: 'Dropbox와 동기화하는 중…',
-    disconnectTitle: '이 앱에서 Dropbox 계정 연결 해제',
+    syncingBanner: (label: string): string => `${label}와 동기화하는 중…`,
+    disconnectTitle: (label: string): string => `이 앱에서 ${label} 계정 연결 해제`,
     disconnectAction: '연결 해제',
     authorizing: '인증 중…',
-    connectAction: 'Dropbox에 연결',
-    restoreTitle: 'Dropbox 백업을 내려받아 현재 라이브러리를 교체',
+    connectAction: (label: string): string => `${label}에 연결`,
+    restoreTitle: (label: string): string => `${label} 백업을 내려받아 현재 라이브러리를 교체`,
     restoreAction: '복원',
     restoring: '복원 중…',
     backupAction: '지금 백업하기',
     sending: '업로드 중…',
     toastSaved: '설정이 저장되었습니다.',
     toastAuthFailed: '인증에 실패했습니다.',
-    toastConnected: 'Dropbox 계정이 연결되었습니다.',
+    toastConnected: (label: string): string => `${label} 계정이 연결되었습니다.`,
     toastBackupFailed: '백업에 실패했습니다.',
-    toastBackupDone: 'Dropbox 앱 폴더에 백업이 완료되었습니다.',
+    toastBackupDone: (label: string): string => `${label} 앱 폴더에 백업이 완료되었습니다.`,
     toastRestoreFailed: '복원에 실패했습니다.',
     toastRestored: (works: number): string => `백업에서 ${works}개 작품을 복원했습니다.`,
-    toastDisconnected: 'Dropbox 계정 연결이 해제되었습니다.',
+    toastDisconnected: (label: string): string => `${label} 계정 연결이 해제되었습니다.`,
     toastPurgeFailed: '클라우드에서 백업을 삭제하지 못했습니다.',
+    providerSwitched: (label: string): string => `이제 백업은 ${label}(으)로 갑니다.`,
+    providerSwitchFailed: '백업 제공업체를 변경하지 못했습니다.',
     translationNotice: {
       title: '번역 안내',
       text: '이 언어들 중에서 포르투갈어를 제외하고는 할 줄 모릅니다. 모든 번역은 AI가 했습니다. 세상의 모든 것과 마찬가지로 오류가 있을 수 있으니 너그러운 양해 부탁드립니다.',
@@ -117,8 +125,8 @@ export const ko: Messages = {
 
   restore: {
     title: '백업 비밀번호',
-    banner:
-      'Dropbox에 **백업할 때** 사용한 암호화 비밀번호를 입력하세요. ' +
+    banner: (label: string): string =>
+      `${label}에 **백업할 때** 사용한 암호화 비밀번호를 입력하세요. ` +
       '내려받은 파일의 암호를 푸는 데 필요합니다.',
     passphraseLabel: '암호화 비밀번호',
     passphrasePlaceholder: '백업에 사용한 비밀번호',
@@ -233,10 +241,9 @@ export const ko: Messages = {
   providers: {
     dropboxStorageTarget: '/Apps/Cronologia (계정에 보이는 폴더)',
     googleStorageTarget: 'appDataFolder (숨김 폴더, Google Drive 화면에 나타나지 않음)',
-    googleUnavailable:
-      'Google Drive는 아직 사용할 수 없습니다: Cronologia가 Google 요구사항(앱 확인, 동의 ' +
-      '화면, 범위 심사)을 충족해야 통합이 활성화됩니다. 그때까지 백업은 Dropbox를 ' +
-      '사용합니다.',
+    googleNoCredentials:
+      '이 빌드에는 Google Drive 자격 증명이 없습니다. 앱은 배포 시 바이너리에 들어가는 ' +
+      '키 쌍으로 식별됩니다. 그 키 쌍이 공개되기 전까지 백업은 Dropbox를 사용합니다.',
   },
 
   driveErrors: {
@@ -252,26 +259,30 @@ export const ko: Messages = {
     noBackupFound: (provider: string): string =>
       `${provider}의 앱 폴더에서 백업을 찾을 수 없습니다.`,
     invalidLibrary: '백업이 유효하지 않습니다(library.json 손상).',
-    invalidListResponse: 'Dropbox API 응답이 유효하지 않습니다(파일 목록).',
+    invalidListResponse: (provider: string): string =>
+      `${provider} API 응답이 유효하지 않습니다(파일 목록).`,
     tokenTimeout: '인증 대기 시간이 초과되었습니다.',
     authCancelled: '인증이 취소되었습니다.',
+    csrfRejected: '다른 출처의 인증 콜백이었습니다. 연결을 거부했습니다.',
     tokenFailed: (status: number): string => `토큰을 가져오지 못했습니다(${status}).`,
     invalidTokenResponse: (status: number): string => `토큰 응답이 유효하지 않습니다(${status}).`,
-    configureAppKey: '설정에서 Dropbox 앱 키를 설정하세요.',
-    sessionExpired: '세션이 만료되었습니다. Dropbox 계정을 다시 연결하세요.',
-    refreshFailed: 'Dropbox 세션을 새로고침할 수 없습니다.',
-    noAccount: '연결된 Dropbox 계정이 없습니다.',
-    permissionsUpdated: 'Dropbox 권한이 업데이트되었습니다. Dropbox 계정을 다시 연결하세요.',
-    missingScopes:
-      'Dropbox 앱에 권한이 부족합니다. App Console의 Permissions 탭에서 모든 범위를 ' +
+    configureAppKey: '이 빌드에 DROPBOX_APP_KEY가 없습니다. 변수를 설정하고 다시 빌드하세요.',
+    sessionExpired: (provider: string): string =>
+      `세션이 만료되었습니다. ${provider} 계정을 다시 연결하세요.`,
+    refreshFailed: (provider: string): string => `${provider} 세션을 새로고침할 수 없습니다.`,
+    noAccount: (provider: string): string => `연결된 ${provider} 계정이 없습니다.`,
+    permissionsUpdated: (provider: string): string =>
+      `${provider} 권한이 업데이트되었습니다. ${provider} 계정을 다시 연결하세요.`,
+    missingScopes: (provider: string): string =>
+      `${provider} 앱에 권한이 부족합니다. 앱 개발자 콘솔에서 모든 범위를 ` +
       '선택한 뒤 연결 해제 후 다시 연결하세요.',
-    missingScopesList: (missing: string): string =>
-      `Dropbox 앱에 권한이 부족합니다(${missing}). ` +
-      'App Console의 Permissions 탭에서 모든 범위를 선택한 뒤 다시 연결하세요.',
-    dropboxHttp: (status: number, response: string): string =>
+    missingScopesList: (provider: string, missing: string): string =>
+      `${provider} 앱에 권한이 부족합니다(${missing}). 앱 개발자 콘솔에서 모든 범위를 ` +
+      '선택한 뒤 다시 연결하세요.',
+    providerHttp: (label: string, status: number, response: string): string =>
       response === ''
-        ? `Dropbox 오류(HTTP ${status}).`
-        : `Dropbox 오류(HTTP ${status}). 응답: ${response}`,
+        ? `${label} 오류(HTTP ${status}).`
+        : `${label} 오류(HTTP ${status}). 응답: ${response}`,
     restoreLocked: (seconds: number): string =>
       seconds < 60
         ? `잘못된 암호로 복원 시도가 너무 많습니다. ${seconds}초 후 다시 시도하세요.`

@@ -38,6 +38,7 @@ describe('settings', () => {
     expect(loadSettings()).toEqual({
       driveClientId: '',
       drivePassphrase: '',
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     });
   });
@@ -48,15 +49,17 @@ describe('settings', () => {
     expect(loadSettings()).toEqual({
       driveClientId: '',
       drivePassphrase: '',
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     });
   });
 
-  it('lê só o idioma do disco (segredos moram no cofre)', () => {
+  it('lê idioma e provedor do disco (segredos moram no cofre)', () => {
     writeSettingsJson({ language: 'ko' });
     expect(loadSettings()).toEqual({
       driveClientId: '',
       drivePassphrase: '',
+      backupProvider: 'dropbox',
       language: 'ko',
     });
   });
@@ -64,6 +67,7 @@ describe('settings', () => {
   it('ignora o settings.json antigo (enc:/keyring e campos de outro provedor)', () => {
     writeSettingsJson({
       language: 'ja',
+      backupProvider: 'dropbox',
       drivePassphrase: 'enc:abc123',
       driveClientId: 'id-antigo',
       driveClientSecret: 'segredo-antigo',
@@ -71,26 +75,34 @@ describe('settings', () => {
     expect(loadSettings()).toEqual({
       driveClientId: '',
       drivePassphrase: '',
+      backupProvider: 'dropbox',
       language: 'ja',
     });
 
     // O primeiro salvamento regrava o arquivo só com o idioma.
-    saveSettings({ driveClientId: 'nova-key', drivePassphrase: 'frase', language: 'pt-BR' });
+    saveSettings({
+      driveClientId: 'nova-key',
+      drivePassphrase: 'frase',
+      backupProvider: 'dropbox',
+      language: 'pt-BR',
+    });
     const raw = fs.readFileSync(settingsFile(), 'utf-8');
     expect(raw).not.toContain('enc:');
     expect(raw).not.toContain('segredo-antigo');
-    expect(JSON.parse(raw)).toEqual({ language: 'pt-BR' });
+    expect(JSON.parse(raw)).toEqual({ language: 'pt-BR', backupProvider: 'dropbox' });
   });
 
-  it('saveSettings grava segredos no cofre e idioma no disco', () => {
+  it('saveSettings grava segredos no cofre e idioma e provedor no disco', () => {
     const saved = saveSettings({
       driveClientId: '  minha-app-key-123  ',
       drivePassphrase: '  segredo de backup  ',
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     });
     expect(saved).toEqual({
       driveClientId: 'minha-app-key-123',
       drivePassphrase: '  segredo de backup  ',
+      backupProvider: 'dropbox',
       language: 'pt-BR',
     });
     expect(loadSettings()).toEqual(saved);
@@ -99,22 +111,37 @@ describe('settings', () => {
     const raw = fs.readFileSync(settingsFile(), 'utf-8');
     expect(raw).not.toContain('minha-app-key-123');
     expect(raw).not.toContain('segredo de backup');
-    expect(JSON.parse(raw)).toEqual({ language: 'pt-BR' });
+    expect(JSON.parse(raw)).toEqual({ language: 'pt-BR', backupProvider: 'dropbox' });
   });
 
   it('persiste o idioma e normaliza valores fora do catálogo', () => {
-    expect(saveSettings({ driveClientId: '', drivePassphrase: '', language: 'en' }).language).toBe(
-      'en',
-    );
+    expect(
+      saveSettings({
+        driveClientId: '',
+        drivePassphrase: '',
+        backupProvider: 'dropbox',
+        language: 'en',
+      }).language,
+    ).toBe('en');
     expect(loadSettings().language).toBe('en');
 
-    expect(saveSettings({ driveClientId: '', drivePassphrase: '', language: 'ko' }).language).toBe(
-      'ko',
-    );
+    expect(
+      saveSettings({
+        driveClientId: '',
+        drivePassphrase: '',
+        backupProvider: 'dropbox',
+        language: 'ko',
+      }).language,
+    ).toBe('ko');
     expect(loadSettings().language).toBe('ko');
 
     expect(
-      saveSettings({ driveClientId: '', drivePassphrase: '', language: 'zh-CN' }).language,
+      saveSettings({
+        driveClientId: '',
+        drivePassphrase: '',
+        backupProvider: 'dropbox',
+        language: 'zh-CN',
+      }).language,
     ).toBe('zh-CN');
     expect(loadSettings().language).toBe('zh-CN');
 
@@ -123,13 +150,23 @@ describe('settings', () => {
   });
 
   it('grava settings.json com permissão 0600', () => {
-    saveSettings({ driveClientId: 'id', drivePassphrase: 'frase', language: 'pt-BR' });
+    saveSettings({
+      driveClientId: 'id',
+      drivePassphrase: 'frase',
+      backupProvider: 'dropbox',
+      language: 'pt-BR',
+    });
     const mode = fs.statSync(settingsFile()).mode & 0o777;
     expect(mode).toBe(0o600);
   });
 
   it('segredos não sobrevivem ao cofre fechado (falha fechada)', () => {
-    saveSettings({ driveClientId: 'id', drivePassphrase: 'frase-secreta', language: 'pt-BR' });
+    saveSettings({
+      driveClientId: 'id',
+      drivePassphrase: 'frase-secreta',
+      backupProvider: 'dropbox',
+      language: 'pt-BR',
+    });
     lockVault();
     expect(loadSettings().drivePassphrase).toBe('');
     expect(loadSettings().driveClientId).toBe('');
@@ -138,11 +175,21 @@ describe('settings', () => {
   });
 
   it('saveSettings recusa gravar com o cofre fechado', async () => {
-    saveSettings({ driveClientId: 'id', drivePassphrase: 'frase-secreta', language: 'en' });
+    saveSettings({
+      driveClientId: 'id',
+      drivePassphrase: 'frase-secreta',
+      backupProvider: 'dropbox',
+      language: 'en',
+    });
     const antes = fs.readFileSync(settingsFile(), 'utf-8');
     lockVault();
     const error = await catchError(() =>
-      saveSettings({ driveClientId: 'id', drivePassphrase: 'frase', language: 'pt-BR' }),
+      saveSettings({
+        driveClientId: 'id',
+        drivePassphrase: 'frase',
+        backupProvider: 'dropbox',
+        language: 'pt-BR',
+      }),
     );
     expect(error.code).toBe('vaultLocked');
     // Nada foi gravado: nem o idioma novo entrou no disco.

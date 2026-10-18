@@ -161,7 +161,18 @@ jobs:
       - name: Gerar .deb (compila e empacota; o upload é no step seguinte)
         # --publish never: sem isso, o electron-builder tenta publicar
         # sozinho por causa da tag ("Implicit publishing") e falha sem token.
-        run: npm run build && npx electron-builder --linux deb --publish never
+        env:
+          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DROPBOX_APP_KEY" ]; then
+            echo "::error::Secret DROPBOX_APP_KEY ausente em Settings → Secrets → Actions (repo cronologia)."
+            exit 1
+          fi
+          npm run build
+          npx electron-builder --linux deb --publish never
 
       - name: Criar tag da Release (se ainda não existir)
         env:

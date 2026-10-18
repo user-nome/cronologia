@@ -37,6 +37,16 @@ describe('trava exponencial da restauração', () => {
     }
   });
 
+  /*
+   * A rampa é um `switch` (`penaltySeconds` em `restore-lock.ts`) e não um
+   * índice numa tabela, por um motivo que a própria cobertura mediu: com
+   * `noUncheckedIndexedAccess`, `TABELA[indice]` com `indice: number` continua
+   * sendo `number | undefined`, e o `??` que isso exige é um branch que nenhum
+   * valor de `attempts` alcança (o `Math.min` já prendia o índice ao intervalo).
+   * A escala acima fixa a rampa inteira, inclusive o teto de 15 min, então o
+   * `default` do `switch` tem verificação de verdade.
+   */
+
   it('libera sozinha assim que a espera acabar', () => {
     registerRestoreFailure();
     registerRestoreFailure();
@@ -47,6 +57,26 @@ describe('trava exponencial da restauração', () => {
     expect(restoreLockRemainingSec()).toBe(1);
     now += 1_000;
     expect(restoreLockRemainingSec()).toBe(0);
+  });
+
+  it('a rampa conta tentativas, não tempo: esperar não devolve o degrau', () => {
+    registerRestoreFailure();
+    registerRestoreFailure();
+    registerRestoreFailure();
+    expect(restoreLockRemainingSec()).toBe(10);
+
+    // A espera acaba, a contagem continua: quem insiste na tentativa cai no
+    // degrau seguinte, porque só o sucesso (ou o reinício do app) zera a rampa.
+    now += 10_000;
+    expect(restoreLockRemainingSec()).toBe(0);
+
+    registerRestoreFailure();
+    expect(restoreLockRemainingSec()).toBe(30);
+
+    now += 30_000;
+    expect(restoreLockRemainingSec()).toBe(0);
+    registerRestoreFailure();
+    expect(restoreLockRemainingSec()).toBe(60);
   });
 
   it('reset zera tentativas e trava', () => {

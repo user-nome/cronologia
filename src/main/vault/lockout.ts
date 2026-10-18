@@ -5,9 +5,16 @@
  */
 
 /** Espera em ms por tentativa errada: 10 s, 30 s, 1 min, 1 h e depois 24 h. */
-export const LOCKOUT_DELAYS_MS: readonly number[] = [10_000, 30_000, 60_000, 3_600_000, 86_400_000];
+export const LOCKOUT_DELAYS_MS = [
+  10_000, 30_000, 60_000, 3_600_000, 86_400_000,
+] as const satisfies readonly [number, number, number, number, number];
 
-export const LAST_DELAY_MS = LOCKOUT_DELAYS_MS[LOCKOUT_DELAYS_MS.length - 1] ?? 86_400_000;
+/**
+ * Teto da rampa (24 h). O índice é literal e a tabela é um tuple, então o tipo
+ * já entrega `86400000`: não há `??` para o `noUncheckedIndexedAccess`
+ * reclamar, e o valor continua escrito em um lugar só.
+ */
+export const LAST_DELAY_MS: (typeof LOCKOUT_DELAYS_MS)[4] = LOCKOUT_DELAYS_MS[4];
 
 export interface LockoutState {
   locked: boolean;

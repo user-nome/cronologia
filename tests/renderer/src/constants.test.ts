@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CATEGORIES,
   FILTER_OPTIONS,
@@ -68,6 +68,20 @@ describe('formatDate', () => {
     const en = formatDate('2026-03-04T15:30:00.000Z', 'en');
     expect(en).not.toBe('-');
     expect(en).not.toBe(pt);
+  });
+
+  it('cai no hífen quando o motor não sabe formatar a data', () => {
+    // Nenhum valor de `Language` é uma tag inválida, então o `catch` de
+    // `formatDate` só dispara quando o próprio motor levanta: build do Chromium
+    // sem os dados de locale da tag salva em Configurações, por exemplo. O
+    // stub reproduz esse motor; o que o teste fixa é que a exceção **não** vaza
+    // para a renderização do card, que cairia no hífen como uma data vazia.
+    vi.spyOn(Date.prototype, 'toLocaleString').mockImplementation(() => {
+      throw new RangeError('Incorrect locale information provided');
+    });
+
+    expect(formatDate('2026-03-04T15:30:00.000Z', 'pt-BR')).toBe('-');
+    expect(formatDate('2026-03-04T15:30:00.000Z', 'ja')).toBe('-');
   });
 });
 

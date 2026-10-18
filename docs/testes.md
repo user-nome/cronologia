@@ -12,7 +12,7 @@ Três camadas, com três SIGNais diferentes. Esta doc é da primeira:
 
 Suíte em Vitest com ambiente `jsdom` único (`vitest.config.mts`): o renderer e
 também o processo main rodam em `jsdom`, com o `electron` trocado pelo stub de
-`tests/mocks/electron.ts`. São **38 arquivos** e **463 testes**; a duração gira
+`tests/mocks/electron.ts`. São **52 arquivos** e **780 testes**; a duração gira
 em torno de 2 minutos porque os testes de backup cifram de verdade com scrypt
 `N=2^17` (~128 MiB por derivação), enquanto o Argon2id do cofre roda com o KDF
 barato dos testes (16 MiB).
@@ -22,7 +22,7 @@ barato dos testes (16 MiB).
 ```bash
 npm test               # execução única (o que o CI espera)
 npm run test:watch     # modo watch
-npm run test:coverage  # cobertura em coverage/ (limiar de 50%)
+npm run test:coverage  # cobertura em coverage/ (95% por arquivo)
 ```
 
 O `npm run check` **não** roda os testes: ele cobre typecheck, lint, formato e
@@ -36,50 +36,66 @@ São sob demanda (ver os guias linkados no topo).
 
 ### Processo main
 
-| Arquivo                                             | O que cobre                                                                                                                                                |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/main/index.test.ts`                          | Boot (instância única, protocolos, IPC), handlers, `cover://`, ciclo da janela, F11, diretórios XDG                                                        |
-| `tests/main/index.dev.test.ts`                      | Modo desenvolvimento (Vite dev server, ausência em produção)                                                                                               |
-| `tests/main/index-startup.test.ts`                  | Arranque resiliente: falha de disco em `initDrive` não impede a janela nem o registro de IPC                                                               |
-| `tests/main/index-vault.test.ts`                    | Canais `vault:*` (criar/desbloquear/trava), guarda `assertAppFrame` e auto-lock (`vault:locked`)                                                           |
-| `tests/main/shred.test.ts`                          | sobrescrita segura: sumiu, bytes intermediários não são o original, symlink não é seguido, pasta vazia                                                     |
-| `tests/main/destroy.test.ts`                        | destruição do cofre/acervo, guarda de não ressuscitar, legados em claro, `.tmp` órfãos                                                                     |
-| `tests/main/drive-purge.test.ts`                    | `purgeRemote`: apaga tudo, conta falha parcial, não age sem cofre aberto                                                                                   |
-| `tests/renderer/src/components/DangerZone.test.tsx` | confirmação em duas etapas das ações destrutivas                                                                                                           |
-| `tests/main/jsonfile.test.ts`                       | `writeJsonAtomic`: escrita atômica, `mode` aplicado mesmo com `.tmp` pré-existente                                                                         |
-| `tests/main/library.test.ts`                        | acervo cifrado: XDG, `clampProgress`, roundtrip, capa, restauração, mime, cofre fechado, arquivo corrompido                                                |
-| `tests/main/settings.test.ts`                       | `settings.json`: idioma no disco, segredos no cofre, normalização e recusa com cofre fechado                                                               |
-| `tests/main/vault-crypto.test.ts`                   | Argon2id, AES-256-GCM, HKDF, faixa do KDF e regra de força da senha mestra                                                                                 |
-| `tests/main/vault-container.test.ts`                | Formato do `vault.zkv`: roundtrip, offsets, lixo, truncamento, faixa e fail-closed                                                                         |
-| `tests/main/vault-lockout.test.ts`                  | Escala da trava (10 s até 24 h) e estado por tentativa                                                                                                     |
-| `tests/main/vault-session.test.ts`                  | Singleton da sessão: `adopt`/`wipe`, zeragem de bytes e repasse do auto-lock                                                                               |
-| `tests/main/vault.test.ts`                          | Ciclo de vida: criar, senha fraca, desbloquear, senha errada, trava, segredos, adulteração                                                                 |
-| `tests/main/vault-secrets.test.ts`                  | Cofre é a única fonte: sem/aberto/fechado/adulterado (falha fechada), sem migração do legado                                                               |
-| `tests/main/vault-privilege.test.ts`                | `setupVaultDirectory`: override bloqueia pkexec; exit 0/126/127/throw → ok/cancelled/failed; `isVaultDirUnavailable` e `createVault` sem pkexec no sandbox |
-| `tests/main/drive-auth.test.ts`                     | Estado do Dropbox, `authorize` (loopback/PKCE), desconexão e refresh                                                                                       |
-| `tests/main/drive-backup.test.ts`                   | `backupNow`/`restoreNow` ponta a ponta (rede simulada, cifra real)                                                                                         |
-| `tests/main/drive-crypto.test.ts`                   | Formato `WTENC3`: cifra, nomes opacos, falha com senha errada                                                                                              |
-| `tests/main/drive-info.test.ts`                     | `backupInfo`, renovação de sessão e retry após 401                                                                                                         |
-| `tests/main/drive-provider.test.ts`                 | Catálogo de provedores (Dropbox operante, Google Drive oculto)                                                                                             |
-| `tests/main/drive-remote-names.test.ts`             | Nomes remotos opacos (HMAC-SHA256) e manifesto de cadeia                                                                                                   |
-| `tests/main/drive-restore-lock.test.ts`             | Trava exponencial da restauração (só `PassphraseError` conta)                                                                                              |
+| Arquivo                                    | O que cobre                                                                                                                                                |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/main/index.test.ts`                 | Boot (instância única, protocolos, IPC), handlers, `cover://`, ciclo da janela, F11, diretórios XDG, guarda de origem de frame                             |
+| `tests/main/index.dev.test.ts`             | Modo desenvolvimento (Vite dev server, ausência em produção)                                                                                               |
+| `tests/main/index-startup.test.ts`         | Arranque resiliente: falha de disco em `initDrive` não impede a janela nem o registro de IPC                                                               |
+| `tests/main/index-vault.test.ts`           | Canais `vault:*` (criar/desbloquear/trava/destruir), guarda `assertAppFrame` e auto-lock (`vault:locked`)                                                  |
+| `tests/main/protocols.test.ts`             | Scheme `cronologia://`: tabela de MIME por extensão, 403 em traversal percent-encoded, 404 e 500                                                           |
+| `tests/main/node-loader.test.ts`           | Loader de aliases `@zero/*` rodando o Node de verdade em processo filho                                                                                    |
+| `tests/main/external.test.ts`              | `openExternalSafe`: só `https`, esquema em qualquer caixa, URL malformada e recusa do shell                                                                |
+| `tests/main/cleanup.test.ts`               | Varredura de legado no boot: o que é sobrescrito, o que é contado como falha e o log sem caminho do home                                                   |
+| `tests/main/store-crypto.test.ts`          | Formato `CLIB1`: roundtrip, assinatura, tamanho, separação de domínio e recusa sem cofre aberto                                                            |
+| `tests/main/shred.test.ts`                 | sobrescrita segura: sumiu, bytes intermediários não são o original, symlink não é seguido, pasta vazia                                                     |
+| `tests/main/destroy.test.ts`               | destruição do cofre/acervo, guarda de não ressuscitar, legados em claro, `.tmp` órfãos                                                                     |
+| `tests/main/drive-purge.test.ts`           | `purgeRemote`: apaga tudo, conta falha parcial, não age sem cofre aberto                                                                                   |
+| `tests/main/drive-rest.test.ts`            | Chamadas REST do Dropbox: paginação, validação fail-closed do corpo, renovação e repetição após 401, erro traduzido                                        |
+| `tests/main/drive-oauth.test.ts`           | PKCE sem secret, loopback (porta fixa e porta livre quando a fixa está ocupada), troca e renovação de token, escopo parcial                                |
+| `tests/main/drive-crypto.test.ts`          | Formato `WTENC3`: cifra, manifesto v1/v2, nomes opacos, falha com senha errada                                                                             |
+| `tests/main/jsonfile.test.ts`              | `writeJsonAtomic`: escrita atômica, `mode` aplicado mesmo com `.tmp` pré-existente                                                                         |
+| `tests/main/library.test.ts`               | acervo cifrado: XDG, `clampProgress`, roundtrip, capa, restauração, mime, cofre fechado, arquivo corrompido                                                |
+| `tests/main/settings.test.ts`              | `settings.json`: idioma no disco, segredos no cofre, normalização e recusa com cofre fechado                                                               |
+| `tests/main/vault-crypto.test.ts`          | Argon2id, AES-256-GCM, HKDF, faixa do KDF e regra de força da senha mestra                                                                                 |
+| `tests/main/vault-container.test.ts`       | Formato do `vault.zkv`: roundtrip, offsets, lixo, truncamento, faixa e fail-closed                                                                         |
+| `tests/main/vault-lockout.test.ts`         | Escala da trava (10 s até 24 h), contagem ilegível no teto e invariante de nunca destravar                                                                 |
+| `tests/main/vault-session.test.ts`         | Singleton da sessão: `adopt`/`wipe`, zeragem de bytes e repasse do auto-lock                                                                               |
+| `tests/main/vault.test.ts`                 | Ciclo de vida: criar, senha fraca, desbloquear, senha errada, trava, segredos, adulteração, pasta sem permissão, Container destruído                       |
+| `tests/main/vault-secrets.test.ts`         | Cofre é a única fonte: sem/aberto/fechado/adulterado (falha fechada), JSON de forma errada e sessão ligada à chave em memória                              |
+| `tests/main/vault-privilege.test.ts`       | `setupVaultDirectory`: override bloqueia pkexec; exit 0/126/127/throw → ok/cancelled/failed; `isVaultDirUnavailable` e `createVault` sem pkexec no sandbox |
+| `tests/main/drive-auth.test.ts`            | Estado do Dropbox, tokens no cofre, escopo divergente e refresh                                                                                            |
+| `tests/main/drive-backup.test.ts`          | `backupNow`/`restoreNow` ponta a ponta (rede simulada, cifra real), recusa sem cofre e execução paralela                                                   |
+| `tests/main/drive-info.test.ts`            | `backupInfo`, renovação de sessão e retry após 401                                                                                                         |
+| `tests/main/drive-provider.test.ts`        | Catálogo e disponibilidade dos provedores (Google Drive condicionado à credencial)                                                                         |
+| `tests/main/google-drive.test.ts`          | OAuth e REST Google Drive: paginação, appDataFolder, upload multipart/PATCH, retry 401 e renovação                                                         |
+| `tests/main/drive-switch-provider.test.ts` | Troca de destino e preservação de sessões independentes no cofre                                                                                           |
+| `tests/main/drive-remote-names.test.ts`    | Nomes remotos opacos (HMAC-SHA256) e manifesto de cadeia                                                                                                   |
+| `tests/main/drive-restore-lock.test.ts`    | Trava exponencial da restauração (só `PassphraseError` conta) e a rampa até saturar em 15 min                                                              |
 
-### Preload, tipos e renderer
+### Mensagens, preload, tipos e renderer
 
-| Arquivo                                                    | O que cobre                                                                                 |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `tests/preload/index.test.ts`                              | Fachada `window.api`: canais por grupo (`library`/`settings`/`drive`/`vault`) e assinaturas |
-| `tests/shared/types.test.ts`                               | Uniões fechadas e guards dos contratos compartilhados                                       |
-| `tests/renderer/src/App.test.tsx`                          | Telas: carga, estatísticas, busca/filtros, ações nas obras, modais, status Drive            |
-| `tests/renderer/src/components/WorkCard.test.tsx`          | Card: badges, progresso, ações de status                                                    |
-| `tests/renderer/src/components/WorkModal.test.tsx`         | Criar/editar obra, validação e exclusão com confirmação                                     |
-| `tests/renderer/src/components/SettingsModal.test.tsx`     | Configurações: carga, provedores, senha de backup, ações do Drive, cofre                    |
-| `tests/renderer/src/components/VaultModal.test.tsx`        | Cofre: medidor de força, confirmação, erro do backend e sucesso                             |
-| `tests/renderer/src/components/Select.test.tsx`            | Select acessível (teclado, `aria`, busca)                                                   |
-| `tests/renderer/src/components/AttributionsModal.test.tsx` | Página de Atribuições                                                                       |
-| `tests/renderer/src/components/DonateModal.test.tsx`       | Página de Doações                                                                           |
-| `tests/renderer/src/constants.test.ts`                     | Opções de filtro, cores, `coverUrl`, `formatDate`, `clampProgress`                          |
-| `tests/renderer/src/i18n.test.tsx`                         | `richText()`, contexto de idioma e catálogo de 5 idiomas                                    |
+| Arquivo                                                       | O que cobre                                                                                                     |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `tests/messages/bundles.test.ts`                              | Varredura das 5 traduções: folha vazia, marcador de negrito/código sem par, reticência e mensagem com parâmetro |
+| `tests/messages/branch-coverage.test.ts`                      | Ramos das mensagens que dependem de argumento (corpo de erro vazio, escala de segundos × minutos)               |
+| `tests/preload/index.test.ts`                                 | Fachada `window.api`: lista **completa** de canais por grupo, assinaturas e o aviso de bloqueio com a sua causa |
+| `tests/shared/types.test.ts`                                  | Uniões fechadas e guards dos contratos compartilhados                                                           |
+| `tests/renderer/src/App.test.tsx`                             | Telas: carga, estatísticas, busca/filtros, ações nas obras, status Drive e fila de gravação                     |
+| `tests/renderer/src/App.modais.test.tsx`                      | Modais a partir do App: configurações, atribuições, doações, zona de risco e o portão do cofre                  |
+| `tests/renderer/src/main.test.tsx`                            | Entry do renderer: monta o `App` em `#root` e não quebra quando o elemento não existe                           |
+| `tests/renderer/src/components/WorkCard.test.tsx`             | Card: badges, progresso, ações de status                                                                        |
+| `tests/renderer/src/components/WorkModal.test.tsx`            | Criar/editar obra, validação e exclusão com confirmação                                                         |
+| `tests/renderer/src/components/SettingsModal.test.tsx`        | Configurações: carga, provedores, senha de backup e indicador de ocupado                                        |
+| `tests/renderer/src/components/SettingsModal.drive.test.tsx`  | Ações do Drive: rótulos de ocupado, fallbacks de erro e limpeza do prefixo de IPC                               |
+| `tests/renderer/src/components/SettingsModal.vault.test.tsx`  | Cofre nas configurações: badge, prompt, ação adiada e fechamento com Escape                                     |
+| `tests/renderer/src/components/VaultModal.test.tsx`           | Cofre: medidor de força, confirmação, erro do backend, recontagem da trava e modo barreira                      |
+| `tests/renderer/src/components/DangerZone.test.tsx`           | Confirmação em duas etapas das ações destrutivas e os três caminhos de falha                                    |
+| `tests/renderer/src/components/RestorePasswordModal.test.tsx` | Senha de restauração: foco, tipo do campo, atalhos e cancelamento                                               |
+| `tests/renderer/src/components/Select.test.tsx`               | Select acessível (teclado, `aria`, busca, menu vazio)                                                           |
+| `tests/renderer/src/components/AttributionsModal.test.tsx`    | Página de Atribuições: rolagem em pausa e as duas faces do clique no overlay                                    |
+| `tests/renderer/src/components/DonateModal.test.tsx`          | Página de Doações: cópia do link, sem clipboard e falha de escrita                                              |
+| `tests/renderer/src/constants.test.ts`                        | Opções de filtro, cores, `coverUrl`, `formatDate`, `clampProgress`                                              |
+| `tests/renderer/src/i18n.test.tsx`                            | `richText()` (marcadores no meio, no começo e no fim), contexto de idioma e catálogo de 5 idiomas               |
 
 ### Apoios
 
@@ -139,30 +155,57 @@ de DOM em `tests/setup.ts`: `setupFiles` roda para ele também.
 ## Cobertura
 
 `vitest.config.mts` mede `src/**/*.{ts,tsx}` com o provedor v8 (relatórios em
-texto e HTML em `coverage/`) e exige **50%** de linhas, instruções, funções e
-ramos. Estado atual na 1.9.2 (463 testes em 38 arquivos):
+texto e HTML em `coverage/`) e exige **95% por arquivo** (`perFile: true`) de
+linhas, instruções, funções e ramos. Estado atual na 1.9.2 (780 testes em 52
+arquivos):
 
-| Métrica    | Global | `src/main/vault/*` |
-| ---------- | ------ | ------------------ |
-| Statements | 86,9%  | 93,2%              |
-| Branches   | 81,0%  | 85,1%              |
-| Functions  | 83,0%  | 100%               |
-| Lines      | 89,0%  | 98,4%              |
+| Métrica    | Global | Pior arquivo |
+| ---------- | ------ | ------------ |
+| Statements | 99,5%  | 96,3%        |
+| Branches   | 99,5%  | 95,4%        |
+| Functions  | 98,8%  | 95,2%        |
+| Lines      | 99,7%  | 97,8%        |
 
-Os módulos de destruição ficaram altos: `store-crypto.ts` e os containers em
-100% de linhas, `shred.ts` acima de 95%, `library.ts` acima de 95%. O limiar do
-projeto é 50% nas quatro métricas. O `src/renderer/src/main.tsx` aparece com 0%
-porque é o entry que monta o React em `#root`: a suíte renderiza `<App/>`
-diretamente, então ele fica de fora do denominador (ver `scope.ts` da
-[mutação](mutation.md), que tem o mesmo motivo).
+Nenhum arquivo fica abaixo de 95% em nenhuma métrica. O piso subiu de 50%
+agregado para 95% por arquivo depois da varredura de baixo para cima: o piso
+agregado perdoa o arquivo esquecido, e era isso que acontecia, com o entry do
+renderer em 0%, os bundles de idioma em 10% e o scheme da SPA em 35%.
+
+Os módulos de destruição ficaram em 100% nas quatro métricas (`shred.ts`,
+`store-crypto.ts`, `vault/container.ts`, `vault/vault.ts`, `drive/rest.ts`,
+`drive/state.ts`, `drive/backup.ts`). O `src/renderer/src/main.tsx` (entry que
+monta o React em `#root`) tem teste próprio: `tests/renderer/src/main.test.tsx`.
 
 Rodar cobertura: `npm run test:coverage`. Um `npm run test -- coverage` **não**
 funciona: sem os dois hífens, o Vitest lê `coverage` como filtro de nome de
 arquivo e sai com "No test files found".
 
-Os `*.ts` de tipo puro e o `index.html` ficam de fora (`global.d.ts`,
-`src/renderer/index.html`); os bundles de idioma não traduzidos contam pouco
-porque a paridade é garantida por teste estrutural, não por execução.
+Ficam de fora do denominador, cada um com o motivo no `exclude` da config:
+`global.d.ts` e o `index.html` do renderer, `src/types/**` e
+`src/messages/index.ts` (declarações de tipo e barrel de reexport, que com
+`verbatimModuleSyntax` não emitem nada) e `src/node.loader.ts` (hook que só roda
+em processo filho; é verificado por `tests/main/node-loader.test.ts`, que roda o
+Node de verdade, mas o V8 não mede cobertura entre processos).
+
+### Duas decisões que a cobertura por arquivo mudou no código
+
+Subir para 95% por arquivo expôs dois ramos que nenhum teste alcança porque o
+`noUncheckedIndexedAccess` os exige, e as duas correções foram no `src/`, não na
+medição:
+
+- **`src/main/drive/restore-lock.ts`**: a rampa da trava de restauração era um
+  índice numa tabela com `Math.min` de clamp e um `?? 10` defensivo. Com índice
+  de tipo `number`, o TypeScript não acompanha o clamp, e o `??` era um branch
+  inalcançável (75% de ramos no arquivo). Virou um `switch` total, com o
+  `default` sendo o teto de 15 min: sem índice, sem `??`, e com todos os ramos
+  alcançáveis por teste.
+- **`src/renderer/src/i18n.tsx`**: `richText` fazia `match[2] ?? ''` ao montar o
+  nó `<code>`. O `??` só existe para o tipo, porque o regex garante o grupo, e o
+  React já renderiza `undefined` como nada. Foi removido.
+
+O padrão é o mesmo: quando um ramo é inalcançável **por construção** (o código
+provou que o caminho não existe), corrigir o código é melhor do que pedir
+cobertura artificial. Cobertura é medida de execução: um ramo que o código torna impossível não é um buraco de teste, é um resto de tipagem.
 
 ## Depuração
 

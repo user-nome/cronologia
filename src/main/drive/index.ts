@@ -7,6 +7,6 @@ export {
   purgeRemote,
   restoreNow,
 } from '@zero/main/drive/backup';
-export { authorize } from '@zero/main/drive/oauth';
+export { authorize } from '@zero/main/drive/providers/dropbox';
 export { listProviders } from '@zero/main/drive/provider';
-export { emit, getStatus, loadState, onStatus } from '@zero/main/drive/state';
+export { emit, getStatus, loadState, onStatus, switchProvider } from '@zero/main/drive/state';

@@ -1,90 +1,85 @@
 # Provedores de backup
 
-Como o Cronologia fala com a nuvem: um contrato único
-(`BackupProvider`), um catálogo de provedores e o status de cada um. O guia do
-Dropbox (OAuth, App folder, troubleshooting) continua em
-[`dropbox.md`](dropbox.md).
+O app fala com serviços de nuvem por um contrato único (`BackupProvider`). A
+orquestração e a criptografia do backup são compartilhadas; OAuth, REST e
+armazenamento remoto ficam em adaptadores separados. O guia específico do
+Dropbox está em [`dropbox.md`](dropbox.md).
 
-## Situação hoje
+## Estado dos provedores
 
-| Provedor         | Situação                    | Destino do backup                                                            |
-| ---------------- | --------------------------- | ---------------------------------------------------------------------------- |
-| **Dropbox**      | **Operante** (único em uso) | `/Apps/Cronologia` (pasta visível na sua conta)                              |
-| **Google Drive** | **Não operante**            | `appDataFolder` (**pasta oculta**, não aparece na interface do Google Drive) |
+| Provedor         | Disponibilidade                                                             | Destino                            |
+| ---------------- | --------------------------------------------------------------------------- | ---------------------------------- |
+| **Dropbox**      | Operante                                                                    | `/Apps/Cronologia` (pasta visível) |
+| **Google Drive** | Operante em builds com `GOOGLE_CLIENT_ID`; caso contrário fica desabilitado | `appDataFolder` (pasta oculta)     |
 
-Em Configurações → **Provedores de backup** os dois aparecem: o Google Drive
-com o selo _Não operante_ e o motivo logo abaixo, para o usuário nunca
-achar que a integração já funciona.
+Em Configurações, o catálogo explica quando o Google Drive não está disponível
+neste build. Só provedores operantes aparecem no seletor. A escolha do usuário
+é persistida em `settings.json`; os tokens de cada serviço ficam em entradas
+separadas do cofre (`dropbox.tokens` e `google-drive.tokens`). Trocar de destino
+não desconecta o outro.
 
-### Por que o Google Drive ainda não está operante
+## Google Drive
 
-1. **Exigências do Google ainda não atendidas**: a integração só pode ser
-   publicada depois que o app passar pela verificação (tela de consentimento
-   OAuth, revisão dos escopos e publicação no console do Google).
-2. **A implementação não existe mais no código**: o OAuth/REST do Google Drive
-   foi substituído pelo Dropbox na v1.1.0 (ver `CHANGELOG.md`).
+O adaptador usa Drive API v3 exclusivamente com o escopo `drive.appdata`, além
+de `userinfo.email` para mostrar a conta conectada. Todos os arquivos são
+criados na pasta oculta `appDataFolder`; o app não lista nem acessa o Drive
+visível do usuário. O conteúdo continua cifrado com AES-256-GCM e os nomes
+remotos continuam opacos, como no Dropbox.
 
-Enquanto os dois pontos não forem resolvidos, o provedor fica com
-`operational: false` e **toda operação é recusada** com o mesmo motivo que a
-interface exibe (mensagem única em `src/messages/`, chave `providers.googleUnavailable`,
-no idioma corrente). Não há como “conectar” o Google Drive por engano.
+### Credenciais e build
 
-### Pasta oculta no Google Drive (decisão de design)
+O `client_id` identifica o app OAuth Desktop e é necessário para habilitar o
+provedor. Para desenvolvimento, copie `.env.example` para `.env` e informe
+`GOOGLE_CLIENT_ID`; `GOOGLE_CLIENT_SECRET` é opcional para o cliente Desktop.
+Se fornecido, o valor também é embutido no bundle main. Um segredo de cliente
+incluído em um aplicativo desktop distribuído **não é confidencial** e não deve
+ser tratado como barreira de segurança; a proteção do fluxo é PKCE.
 
-Quando o Google Drive for ativado, o backup **grava na pasta oculta
-`appDataFolder`** e não em pasta visível:
+No GitHub Actions, configure o secret `GOOGLE_CLIENT_ID` para incluir a
+integração nas Releases; `GOOGLE_CLIENT_SECRET` é opcional. O workflow de
+publicação injeta os valores no build, nunca no código-fonte. Sem o ID, o
+Dropbox continua operante e o Google Drive aparece no catálogo como
+indisponível. O consentimento, os escopos e o estado de publicação do app OAuth
+também precisam estar configurados no Google Cloud Console conforme as regras
+vigentes do Google.
 
-- `appDataFolder` só existe pela API (escopo `drive.appdata`) e **não aparece
-  na interface do Google Drive**: ninguém vê a pasta na conta, e o app nem
-  enxerga o resto do Drive do usuário.
-- É o mesmo espaço oculto que a integração original já usava (o Dropbox não
-  oferece nada equivalente: a pasta do app fica visível em `/Apps/`).
-- A decisão já está no catálogo: `storageTarget` descreve o destino e
-  `storageHidden: true` gera o selo _Pasta oculta_ na interface.
+### Fluxos e detalhes da API
+
+- OAuth Authorization Code com PKCE S256, servidor loopback em porta efêmera,
+  `access_type=offline` e `prompt=consent`.
+- Tokens armazenados apenas no cofre, separados por provedor; o access token é
+  renovado perto da expiração e após um 401, com uma única repetição da chamada.
+- Listagem percorre `nextPageToken` até o fim e valida a resposta fail-closed.
+- Criação usa upload multipart com metadados `name` e parent `appDataFolder`.
+  Atualizações usam `PATCH` media no arquivo existente para não apagar o backup
+  anterior antes de confirmar o conteúdo novo. Duplicatas são removidas só após
+  o upload bem-sucedido.
+- Download usa `alt=media`; remoção aceita 404 como já removido.
 
 ## Arquitetura
 
 ```mermaid
 flowchart TD
-    UI["SettingsModal: Provedores de backup"] -->|"window.api.drive.providers()"| IPC["drive:providers"]
-    IPC --> CAT["provider.ts: listProviders()"]
-    CAT --> DBX["providers/dropbox.ts (operante)"]
-    CAT --> GDR["providers/google-drive.ts (não operante)"]
-    DBX --> OAUTH["oauth.ts: PKCE + loopback"]
-    DBX --> REST["rest.ts: fetch da pasta do app"]
-    GDR --> STUB["recusa com o motivo da UI"]
-    BACKUP["backup.ts (genérico)"] -->|"currentProvider()"| CAT
+    UI["SettingsModal: provedores de backup"] -->|"window.api.drive.providers()"| IPC["drive:providers"]
+    IPC --> CAT["provider.ts: catálogo"]
+    CAT --> DBX["providers/dropbox.ts"]
+    CAT --> GDR["providers/google/: provider + OAuth + REST"]
+    DBX --> OAUTH["oauth-flow.ts: PKCE + loopback"]
+    GDR --> OAUTH
+    DBX --> RESTDB["REST da pasta /Apps/Cronologia"]
+    GDR --> RESTG["Drive API v3: appDataFolder"]
+    BACKUP["backup.ts: orquestração + cifra"] --> CAT
 ```
 
-| Arquivo                                    | Papel                                                                               |
-| ------------------------------------------ | ----------------------------------------------------------------------------------- |
-| `src/main/drive/provider.ts`               | Contrato `BackupProvider`, registro e `currentProvider()`                           |
-| `src/main/drive/providers/dropbox.ts`      | Adapter do OAuth/REST do Dropbox para o contrato                                    |
-| `src/main/drive/providers/google-drive.ts` | Stub **não operante**: motivo + destino oculto documentados                         |
-| `src/main/drive/backup.ts`                 | Orquestração genérica (não cita provedor algum)                                     |
-| `src/main/drive/crypto.ts`                 | Criptografia genérica (AES-256-GCM + nomes opacos)                                  |
-| `src/main/drive/state.ts`                  | Sessão em memória + tokens no cofre (`dropbox.tokens`) (ainda única: só um conecta) |
+| Arquivo                               | Papel                                                |
+| ------------------------------------- | ---------------------------------------------------- |
+| `src/main/drive/provider.ts`          | Contrato, catálogo e provedor ativo                  |
+| `src/main/drive/providers/dropbox.ts` | Adapter do OAuth/REST do Dropbox                     |
+| `src/main/drive/providers/google/`    | Credenciais, OAuth, sessão, REST e adapter do Google |
+| `src/main/drive/oauth-flow.ts`        | Fluxo OAuth/PKCE e loopback compartilhado            |
+| `src/main/drive/backup.ts`            | Orquestração genérica de backup/restauração          |
+| `src/main/drive/crypto.ts`            | Criptografia e nomes remotos opacos                  |
+| `src/main/drive/state.ts`             | Provedor selecionado e sessões guardadas no cofre    |
 
-O contrato é pequeno de propósito: `authorize()` + as 4 operações de arquivo
-(`listAppFiles`, `uploadFile`, `downloadFile`, `deleteFile`). Criptografia,
-manifesto e orquestração ficam fora, compartilhados por todos. Os textos da UI
-do catálogo (`label`, `unavailableReason`, `storageTarget`) são montados por
-`describe(messages)` no idioma corrente; ver [`messages.md`](messages.md).
-
-## Como ativar o Google Drive (ou um terceiro provedor)
-
-1. Implementar OAuth (PKCE + loopback, mesmo desenho do Dropbox) e o REST do
-   Drive em `src/main/drive/providers/`, **gravando em `appDataFolder`**,
-   com a pasta oculta.
-2. Marcar `operational: true` e zerar `unavailableReason` no catálogo.
-3. Generalizar o estado: hoje `state.tokens` é único e `currentProvider()` é
-   fixo no Dropbox; com dois provedores operantes, a sessão passa a ser por
-   provedor e a escolha do usuário vale aqui.
-4. Adicionar o seletor de provedor na UI (hoje não existe: só há um
-   operante) e trocar o rótulo fixo “Dropbox” da pílula do cabeçalho por
-   `DriveStatus`.
-5. Testes: espelhar o `FakeDropbox` (`tests/helpers/drive.ts`) para o novo
-   provedor e cobrir o caminho de backup/restauração ponta a ponta.
-
-Enquanto só um provedor estiver operante, nada disso é necessário: o catálogo
-já deixa o terreno pronto e o motivo visível para o usuário.
+Os textos do catálogo (`label`, disponibilidade e destino) são montados por
+`describe(messages)` no idioma corrente; mensagens ficam em `src/messages/`.

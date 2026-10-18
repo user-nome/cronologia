@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
   AppSettings,
+  BackupProviderId,
   DriveStatus,
   ElectronApi,
   LibraryReset,
@@ -25,6 +26,7 @@ const api: ElectronApi = {
   drive: {
     status: () => ipcRenderer.invoke('drive:status'),
     providers: () => ipcRenderer.invoke('drive:providers'),
+    setProvider: (id: BackupProviderId) => ipcRenderer.invoke('drive:set-provider', id),
     auth: () => ipcRenderer.invoke('drive:auth'),
     backup: () => ipcRenderer.invoke('drive:backup'),
     restore: (passphrase: string) => ipcRenderer.invoke('drive:restore', passphrase),
