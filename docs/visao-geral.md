@@ -68,8 +68,8 @@ desenvolvimento e também não entra no pacote.
 3. Backup opcional: crie o **cofre de segredos** e defina a senha de
    criptografia em Configurações, conecte um provedor (OAuth + PKCE) e faça
    backup; restaurar pede a senha. Tokens e senha de backup moram no cofre e
-   todo fluxo pede a senha mestra quando ele estiver fechado (sem cofre
-   aberto não há backup).
+   todo fluxo pede o PIN quando ele estiver fechado (sem cofre aberto não há
+   backup).
 4. Distribuição: push na `main` publica o `.deb` e o repositório APT assinado
    na GitHub Release; `sudo apt upgrade` atualiza o app
    (`docs/distribuicao-apt.md`).
@@ -93,10 +93,13 @@ desenvolvimento e também não entra no pacote.
 - **Tokens do Dropbox**: `access_token` curto + `refresh_token` duradouro
   devolvidos pela autorização, guardados só como segredo `dropbox.tokens` do
   cofre (nunca em arquivo em claro).
-- **Cofre de segredos**: arquivo cifrado sob uma senha mestra (Argon2id +
-  AES-256-GCM) em `/var/lib/.cronologia/.vault` que guarda os segredos
-  do app (tokens do Dropbox, senha de backup, App key alternativa); abre por
-  sessão e sofre auto-lock após 5 minutos (`docs/cofre.md`).
+- **Cofre de segredos**: arquivo cifrado (Argon2id + AES-256-GCM) em
+  `/var/lib/.cronologia/.vault` que guarda os segredos do app (tokens do
+  Dropbox, senha de backup, App key alternativa) e é aberto por **três**
+  credenciais: senha mestra de 24 caracteres, PIN de 8 dígitos do dia a dia e
+  frase de recuperação de 12+ palavras (que não abre o cofre: só redefine o
+  PIN). Abre por sessão e sofre auto-lock após 5 minutos
+  (`docs/cofre.md`).
 - **Provedor de backup**: implementação do contrato `BackupProvider`
   (`authorize` + 4 operações de arquivo); Dropbox operante e Google Drive
   disponível nos builds que incluem `GOOGLE_CLIENT_ID`

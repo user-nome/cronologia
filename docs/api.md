@@ -24,31 +24,34 @@ Cada método chama `ipcRenderer.invoke(canal, ...args)`, atendido por um
 `ipcMain.handle(canal, ...)` no processo main. A tabela abaixo cruza os três
 níveis (método → canal → origem dos dados):
 
-| `window.api`           | Canal IPC           | Origem dos dados                              |
-| ---------------------- | ------------------- | --------------------------------------------- |
-| `library.get()`        | `library:get`       | `library.enc` decifrado                       |
-| `library.save(obra)`   | `library:save`      | cria/atualiza obra + regrava `library.enc`    |
-| `library.remove(id)`   | `library:delete`    | remove obra + shred da capa órfã              |
-| `library.reset()`      | `library:reset`     | **destrutivo**: apaga todo o acervo           |
-| `pickCover()`          | `cover:pick`        | diálogo do SO → copia cifrada em `covers/`    |
-| `settings.get()`       | `settings:get`      | idioma do disco + segredos do cofre           |
-| `settings.set(cfg)`    | `settings:set`      | segredos no cofre e `settings.json` (0600)    |
-| `drive.status()`       | `drive:status`      | estado em memória (+ tokens no cofre)         |
-| `drive.providers()`    | `drive:providers`   | catálogo `BackupProvider` (Dropbox, Google)   |
-| `drive.auth()`         | `drive:auth`        | OAuth PKCE + loopback `localhost:17431`       |
-| `drive.backup()`       | `drive:backup`      | criptografa e envia à pasta do app            |
-| `drive.restore(senha)` | `drive:restore`     | baixa, decifra e substitui a biblioteca       |
-| `drive.backupInfo()`   | `drive:backup-info` | metadados do `library.json` remoto            |
-| `drive.disconnect()`   | `drive:disconnect`  | apaga a sessão e o segredo dos tokens         |
-| `drive.purge()`        | `drive:purge`       | **destrutivo**: apaga os blobs na nuvem       |
-| `drive.onStatus(cb)`   | evento (sem invoke) | assina `drive:status-changed`                 |
-| `vault.status()`       | `vault:status`      | container do cofre + sessão em memória        |
-| `vault.create(senha)`  | `vault:create`      | cria o cofre (Argon2id) e o deixa aberto      |
-| `vault.unlock(senha)`  | `vault:unlock`      | trava exponencial + Argon2id                  |
-| `vault.lock()`         | `vault:lock`        | zera a chave da sessão (auto-lock em 5 min)   |
-| `vault.touch()`        | `vault:touch`       | atividade da UI renova a janela de ociosidade |
-| `vault.destroy()`      | `vault:destroy`     | **destrutivo**: apaga cofre e acervo local    |
-| `vault.onLocked(cb)`   | evento (sem invoke) | assina `vault:locked` (auto-lock)             |
+| `window.api`                | Canal IPC             | Origem dos dados                              |
+| --------------------------- | --------------------- | --------------------------------------------- |
+| `library.get()`             | `library:get`         | `library.enc` decifrado                       |
+| `library.save(obra)`        | `library:save`        | cria/atualiza obra + regrava `library.enc`    |
+| `library.remove(id)`        | `library:delete`      | remove obra + shred da capa órfã              |
+| `library.reset()`           | `library:reset`       | **destrutivo**: apaga todo o acervo           |
+| `pickCover()`               | `cover:pick`          | diálogo do SO → copia cifrada em `covers/`    |
+| `settings.get()`            | `settings:get`        | idioma do disco + segredos do cofre           |
+| `settings.set(cfg)`         | `settings:set`        | segredos no cofre e `settings.json` (0600)    |
+| `drive.status()`            | `drive:status`        | estado em memória (+ tokens no cofre)         |
+| `drive.providers()`         | `drive:providers`     | catálogo `BackupProvider` (Dropbox, Google)   |
+| `drive.auth()`              | `drive:auth`          | OAuth PKCE + loopback `localhost:17431`       |
+| `drive.backup()`            | `drive:backup`        | criptografa e envia à pasta do app            |
+| `drive.restore(senha)`      | `drive:restore`       | baixa, decifra e substitui a biblioteca       |
+| `drive.backupInfo()`        | `drive:backup-info`   | metadados do `library.json` remoto            |
+| `drive.disconnect()`        | `drive:disconnect`    | apaga a sessão e o segredo dos tokens         |
+| `drive.purge()`             | `drive:purge`         | **destrutivo**: apaga os blobs na nuvem       |
+| `drive.onStatus(cb)`        | evento (sem invoke)   | assina `drive:status-changed`                 |
+| `vault.status()`            | `vault:status`        | container do cofre + sessão em memória        |
+| `vault.create(input)`       | `vault:create`        | cria o cofre (3 credenciais) e o deixa aberto |
+| `vault.unlock(input)`       | `vault:unlock`        | trava exponencial + Argon2id                  |
+| `vault.resetPin(input)`     | `vault:reset-pin`     | frase de recuperação → PIN novo               |
+| `vault.changeMaster(input)` | `vault:change-master` | reembrulha a chave (troca de senha)           |
+| `vault.changePin(input)`    | `vault:change-pin`    | reembrulha a chave (troca de PIN)             |
+| `vault.lock()`              | `vault:lock`          | zera a chave da sessão (auto-lock em 5 min)   |
+| `vault.touch()`             | `vault:touch`         | atividade da UI renova a janela de ociosidade |
+| `vault.destroy()`           | `vault:destroy`       | **destrutivo**: apaga cofre e acervo local    |
+| `vault.onLocked(cb)`        | evento (sem invoke)   | assina `vault:locked` (auto-lock)             |
 
 ---
 
@@ -337,8 +340,11 @@ ao desmontar o componente.
 
 ## 6. Cofre de segredos
 
-O cofre local, protegido por senha mestra, guarda os segredos do app:
-`dropbox.tokens`, `settings.drivePassphrase` e `settings.driveClientId`.
+O cofre local guarda os segredos do app (`dropbox.tokens`,
+`settings.drivePassphrase` e `settings.driveClientId`) e é aberto por **três**
+credenciais: senha mestra de 24 caracteres, PIN de 8 dígitos do dia a dia e
+frase de recuperação de 12+ palavras — que não abre o cofre, só redefine o PIN
+(detalhes em [`cofre.md`](cofre.md)).
 Consulte [`credenciais.md`](credenciais.md) e [`cofre.md`](cofre.md). O domínio
 fica em `src/main/vault/*`, e os canais são registrados em `src/main/index.ts`.
 Todo fluxo que consome um segredo (Conectar, Backup, Restaurar, Salvar
@@ -348,27 +354,59 @@ nenhum** (falha fechada), e o app nunca grava fora dele.
 
 ### `vault.status() → Promise<VaultStatus>`
 
-| Campo       | Tipo      | Notas                                         |
-| ----------- | --------- | --------------------------------------------- |
-| `exists`    | `boolean` | o arquivo do cofre existe (mesmo ilegível)    |
-| `unlocked`  | `boolean` | há chave na sessão (cofre aberto)             |
-| `attempts`  | `number`  | tentativas erradas consecutivas (0 = nenhuma) |
-| `lockUntil` | `number`  | epoch em ms da trava (0 = sem trava)          |
+| Campo             | Tipo      | Notas                                              |
+| ----------------- | --------- | -------------------------------------------------- |
+| `exists`          | `boolean` | o arquivo do cofre existe (mesmo ilegível)         |
+| `unlocked`        | `boolean` | há chave na sessão (cofre aberto)                  |
+| `attempts`        | `number`  | tentativas erradas consecutivas (0 = nenhuma)      |
+| `lockUntil`       | `number`  | epoch em ms da trava (0 = sem trava)               |
+| `lockRemainingMs` | `number`  | quanto falta da trava (0 = liberado)               |
+| `hasRecovery`     | `boolean` | há frase de recuperação (habilita "esqueci o PIN") |
 
-### `vault.create(password: string) → Promise<VaultResult>`
+### `vault.create(input: CreateVaultInput) → Promise<VaultResult>`
 
-Cria o cofre já aberto (Argon2id + AES-256-GCM) e re-lê o estado do drive.
+`input` = `{ masterPassword, pin, recoveryPhrase }`. As três credenciais entram
+juntas porque uma chave sem PIN obriga a digitar 24 caracteres todo dia, e uma
+frase sem valor é campo morto. Cria o cofre já aberto (três embrulhos Argon2id +
+AES-256-GCM sobre a mesma chave-mestra) e re-lê o estado do drive.
+
 Se a pasta em `/var/lib` não puder ser escrita, chama o helper do pacote via
 PolicyKit e tenta de novo (`vaultDirUnavailable`; diálogo dispensado =
-`vaultAuthCancelled`). Recusa senha previsível (`vaultWeakPassword`) e cofre
-já existente (`vaultExists`).
+`vaultAuthCancelled`). Formato e força de cada credencial são reconferidos no
+main (`vaultInvalidMaster`, `vaultWeakMaster`, `vaultInvalidPin`,
+`vaultWeakPin`, `vaultInvalidRecovery`, `vaultWeakRecovery`), porque o renderer
+é conveniência e não fronteira de segurança. Cofre já existente =
+`vaultExists`.
 
-### `vault.unlock(password: string) → Promise<VaultResult>`
+### `vault.unlock(input: UnlockInput) → Promise<VaultResult>`
 
-Abre o cofre existente. A trava exponencial é checada **antes** do Argon2id
-(`vaultLockedOut` com `retryInMs`); senha errada soma tentativa
-(`vaultWrongPassword`); container adulterado falha fechada (`vaultTampered`).
-Sucesso re-lê o estado do drive.
+`input` = `{ credential, kind }`, com `kind` em `master | pin`. A cadeia de
+desbloqueio decide na ordem em que o custo cresce: trava exponencial
+(`vaultLockedOut` com `retryInMs`), formato da credencial, Argon2id e integridade
+do payload. Credencial errada soma tentativa (`vaultWrongMaster` /
+`vaultWrongPin`); chave que abre o embrulho mas não o payload falha fechada com
+`vaultTampered`. Sucesso re-lê o estado do drive.
+
+O comprimento do valor já decide o método (24 caracteres só podem ser a senha
+mestra, 8 dígitos só podem ser o PIN), então a tela não oferece aba para escolher.
+
+### `vault.resetPin(input: ResetPinInput) → Promise<VaultResult>`
+
+`input` = `{ phrase, newPin }`. Prova de posse da frase de recuperação: reembrulha
+a chave com o PIN novo e devolve o cofre **já aberto**. A frase não é forma de
+login e nunca libera a sessão sozinha. Frase errada soma tentativa na mesma rampa
+(`vaultWrongRecovery`); sem frase gravada, `vaultMissing`.
+
+### `vault.changeMaster(input: ChangeMasterInput) → Promise<VaultResult>`
+
+`input` = `{ currentPassword, newPassword }`. Exige cofre aberto **e** a senha
+mestra atual: cofre aberto é estado do processo, não prova de posse. Só reescreve
+um embrulho — o acervo em disco não é tocado, então a UI não recarrega a
+biblioteca.
+
+### `vault.changePin(input: ChangePinInput) → Promise<VaultResult>`
+
+`input` = `{ currentPin, newPin }`. Mesmas condições da troca da senha mestra.
 
 ### `vault.lock() → Promise<VaultStatus>`
 
@@ -398,21 +436,26 @@ Assina o evento `vault:locked`, enviado quando o auto-lock fecha o cofre. A UI
 mostra o aviso `m.vault.autoLocked` e o próximo fluxo de segredo pede o
 desbloqueio de novo.
 
-### Códigos de erro (`VaultResult.ok === false`)
-
-| Código                | `retryInMs`     | Quando                                       |
-| --------------------- | --------------- | -------------------------------------------- |
-| `vaultWeakPassword`   | 0               | senha curta ou previsível na criação         |
-| `vaultExists`         | 0               | tentativa de criar um segundo cofre          |
-| `vaultMissing`        | 0               | desbloqueio sem cofre                        |
-| `vaultLocked`         | 0               | operação com a sessão fechada                |
-| `vaultWrongPassword`  | espera da volta | senha errada (soma tentativa)                |
-| `vaultLockedOut`      | espera restante | tentativa durante a trava exponencial        |
-| `vaultTampered`       | 0               | container ilegível/alterado (falha fechada)  |
-| `libraryTampered`     | 0               | `library.enc`/capa ilegível (falha fechada)  |
-| `vaultDestroyed`      | 0               | escrita depois da destruição do cofre        |
-| `vaultDirUnavailable` | 0               | pasta do cofre sem permissão de escrita      |
-| `vaultAuthCancelled`  | 0               | usuário dispensou o pedido de senha (pkexec) |
+| Código                 | `retryInMs`     | Quando                                       |
+| ---------------------- | --------------- | -------------------------------------------- |
+| `vaultInvalidMaster`   | 0               | senha mestra fora dos 24 caracteres          |
+| `vaultWeakMaster`      | 0               | senha mestra degenerada (criação ou troca)   |
+| `vaultInvalidPin`      | 0               | PIN fora dos 8 dígitos                       |
+| `vaultWeakPin`         | 0               | PIN degenerado (criação ou redefinição)      |
+| `vaultInvalidRecovery` | 0               | frase com menos de 12 palavras               |
+| `vaultWeakRecovery`    | 0               | frase com poucas palavras distintas          |
+| `vaultExists`          | 0               | tentativa de criar um segundo cofre          |
+| `vaultMissing`         | 0               | desbloqueio/redefinição sem cofre            |
+| `vaultLocked`          | 0               | operação com a sessão fechada                |
+| `vaultWrongMaster`     | espera da volta | senha mestra errada (soma tentativa)         |
+| `vaultWrongPin`        | espera da volta | PIN errado (soma tentativa)                  |
+| `vaultWrongRecovery`   | espera da volta | frase errada (soma tentativa)                |
+| `vaultLockedOut`       | espera restante | tentativa durante a trava exponencial        |
+| `vaultTampered`        | 0               | container ilegível/alterado (falha fechada)  |
+| `libraryTampered`      | 0               | `library.enc`/capa ilegível (falha fechada)  |
+| `vaultDestroyed`       | 0               | escrita depois da destruição do cofre        |
+| `vaultDirUnavailable`  | 0               | pasta do cofre sem permissão de escrita      |
+| `vaultAuthCancelled`   | 0               | usuário dispensou o pedido de senha (pkexec) |
 
 ---
 

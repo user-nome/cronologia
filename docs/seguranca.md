@@ -16,11 +16,16 @@ que ela protege.
 | Leitura do acervo falha fechada (`libraryTampered`, nunca `[]`)           | `src/main/store-crypto.ts` (`readStoreFile`)                                            |
 | Portão do acervo: sem cofre aberto, nada é lido nem gravado               | `src/main/library.ts` (`requireVault`)                                                  |
 | Sobrescrita segura antes de apagar (`fsync` antes do `unlink`)            | `src/main/shred.ts`                                                                     |
-| Destruição do cofre não ressuscita container                              | `src/main/vault/vault.ts` (marca `vaultDestroyed`)                                      |
-| Legado em claro e `.tmp` órfãos varridos no boot                          | `src/main/cleanup.ts`                                                                   |
+| Destruição do cofre não ressuscita container                              | `src/main/vault/store.ts` (marca de destruição), `src/main/vault/vault.ts`              |
+| `.tmp` órfão varrido no boot (sem legado: ninguém tem formato antigo)     | `src/main/cleanup.ts`                                                                   |
 | Apagar o backup na nuvem, com contagem de falha parcial                   | `src/main/drive/backup.ts` (`purgeRemote`)                                              |
-| Recusa de senha mestra previsível (antes do Argon2id)                     | `src/main/vault/crypto.ts` (`passwordProblem`)                                          |
-| Argon2id (128 MiB), AES-256-GCM e HKDF-SHA512                             | `src/main/vault/crypto.ts`                                                              |
+| Recusa de credencial degenerada (antes do Argon2id), mesma régua na tela  | `src/shared/strength.ts` (`blocked`), reconferido em `src/main/vault/vault.ts`          |
+| Custo por credencial: PIN com o perfil mais caro (10^8 candidatos)        | `src/main/vault/crypto.ts` (`KDF_PIN` vs `KDF_MASTER`)                                  |
+| Frase de recuperação não abre o cofre: só reembrulha o PIN                | `src/main/vault/vault.ts` (`resetPin`)                                                  |
+| Chave-mestra aleatória: trocar senha/PIN reembrulha, não recifra          | `src/main/vault/wrapping.ts`                                                            |
+| Cadeia na ordem do custo (trava → formato → KDF → integridade)            | `src/main/vault/unlock.ts`                                                              |
+| Troca de credencial exige a credencial atual (aberto não é posse)         | `src/main/vault/vault.ts` (`changeMasterPassword`, `changePin`)                         |
+| Argon2id (128 MiB / 256 MiB no PIN), AES-256-GCM e HKDF-SHA512            | `src/main/vault/crypto.ts`                                                              |
 | Container `vault.zkv` fail-closed e faixa do KDF na leitura               | `src/main/vault/container.ts`                                                           |
 | Trava exponencial (10 s → 24 h) antes de qualquer derivação               | `src/main/vault/lockout.ts`, `src/main/vault/vault.ts`                                  |
 | Chave-mestra só na sessão, auto-lock de 5 min e wipe no quit              | `src/main/vault/session.ts` (wipe chamado por `src/main/index.ts` no `before-quit`)     |
@@ -103,7 +108,8 @@ nunca conteúdo em claro.
 - `assertAppFrame` em todo canal IPC novo; sem ele o domínio do app fica
   acessível a frame de fora.
 - CSP do `index.html`, os 6 fuses e `contextIsolation`/`sandbox` do preload.
-- `passwordProblem` no main: o medidor do `VaultModal` é só feedback.
+- `blocked` em `src/shared/strength.ts` reconferido no main: o medidor do
+  `VaultModal` é só feedback, e quem recusa é o processo principal.
 - `KDF_LIMITS` na leitura do container (um arquivo adulterado não pode exigir
   CPU/memória ilimitadas) e o fail-closed de `decodeContainer`/`unseal`
   (tag inválida = `null`, jamais texto).

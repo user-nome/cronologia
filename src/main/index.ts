@@ -40,12 +40,14 @@ import {
   switchProvider,
 } from '@zero/main/drive';
 import {
+  changeMasterPassword,
+  changePin,
   createVault,
   destroyVault,
   isVaultError,
   lockVault,
+  resetPin,
   unlockVault,
-  vaultDir,
   vaultSession,
   vaultStatus,
 } from '@zero/main/vault';
@@ -56,9 +58,14 @@ import { APP_ORIGIN, registerAppProtocol, registerCoverProtocol } from '@zero/ma
 import type {
   AppSettings,
   BackupProviderId,
+  ChangeMasterInput,
+  ChangePinInput,
+  CreateVaultInput,
   DriveStatus,
   LibraryReset,
   PurgeResult,
+  ResetPinInput,
+  UnlockInput,
   VaultResult,
   VaultStatus,
   Work,
@@ -326,10 +333,10 @@ function registerIpc(): void {
     return vaultStatus();
   });
 
-  ipcMain.handle('vault:create', async (event, password: string): Promise<VaultResult> => {
+  ipcMain.handle('vault:create', async (event, input: CreateVaultInput): Promise<VaultResult> => {
     assertAppFrame(event);
     try {
-      const status = await createVault(password);
+      const status = await createVault(input);
       reloadDriveState();
       return { ok: true, status };
     } catch (error) {
@@ -337,12 +344,54 @@ function registerIpc(): void {
     }
   });
 
-  ipcMain.handle('vault:unlock', async (event, password: string): Promise<VaultResult> => {
+  ipcMain.handle('vault:unlock', async (event, input: UnlockInput): Promise<VaultResult> => {
     assertAppFrame(event);
     try {
-      const status = await unlockVault(password);
+      const status = await unlockVault(input);
       reloadDriveState();
       return { ok: true, status };
+    } catch (error) {
+      return vaultFailure(error);
+    }
+  });
+
+  /**
+   * Recuperação do PIN esquecido: prova posse da frase e reembrulha a chave
+   * com o PIN novo. O cofre já sai aberto, então o estado do drive é relido
+   * igual ao desbloqueio.
+   */
+  ipcMain.handle('vault:reset-pin', async (event, input: ResetPinInput): Promise<VaultResult> => {
+    assertAppFrame(event);
+    try {
+      const status = await resetPin(input);
+      reloadDriveState();
+      return { ok: true, status };
+    } catch (error) {
+      return vaultFailure(error);
+    }
+  });
+
+  /**
+   * Troca de credencial com o cofre aberto. Não recarrega o drive nem a
+   * biblioteca: a chave-mestra não muda (ela é aleatória, não derivada da
+   * senha), então trocar senha ou PIN só reescreve um embrulho do container.
+   */
+  ipcMain.handle(
+    'vault:change-master',
+    async (event, input: ChangeMasterInput): Promise<VaultResult> => {
+      assertAppFrame(event);
+      try {
+        return { ok: true, status: await changeMasterPassword(input) };
+      } catch (error) {
+        return vaultFailure(error);
+      }
+    },
+  );
+
+  ipcMain.handle('vault:change-pin', async (event, input: ChangePinInput): Promise<VaultResult> => {
+    assertAppFrame(event);
+    try {
+      return { ok: true, status: await changePin(input) };
     } catch (error) {
       return vaultFailure(error);
     }
@@ -451,7 +500,7 @@ function registerVaultShutdown(): void {
 function initApp(): void {
   // Manutenção de disco antes de qualquer handler responder. Não pode derrubar
   // o app: `runDiskCleanup` engole a própria falha de propósito.
-  runDiskCleanup(vaultDir());
+  runDiskCleanup();
 
   registerCoverProtocol();
   registerAppProtocol();

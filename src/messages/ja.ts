@@ -14,6 +14,8 @@ export const ja: Messages = {
     searchOptions: '入力して絞り込み…',
     clearSearch: '検索をクリア',
     noOptionsFound: '該当する選択肢がありません',
+    next: '次へ',
+    back: '戻る',
   },
 
   dialogs: {
@@ -339,51 +341,135 @@ export const ja: Messages = {
 
   /** シークレット金庫: モーダル、UI バッジ、ドメインエラー。 */
   vault: {
-    createTitle: 'シークレット金庫を作成',
-    unlockTitle: '金庫のロックを解除',
-    createBody:
-      'マスターパスワードを作成します。これは**ライブラリ全体**(作品とカバー、ディスク上で暗号化)' +
-      'とアプリの秘密情報(Dropbox のトークンやバックアップ用パスワード)を保護します。' +
-      'パスワードがなければアプリはライブラリを読み取れません。忘れると復元できません。',
-    unlockBody:
-      'ライブラリを復号して保存された秘密情報にアクセスするには、マスターパスワードを入力してください。',
-    passwordLabel: 'マスターパスワード',
-    confirmLabel: 'パスワードの確認',
-    createAction: '金庫を作成',
-    unlockAction: 'ロック解除',
-    hint: '12文字以上で、明らかな繰り返しや連続は避けてください。',
-    mismatch: 'パスワードが一致しません。',
-    strength: {
-      weak: '弱い',
-      fair: 'ふつう',
-      strong: '強い',
-    },
-    createHint: 'アプリの秘密情報を保管するマスターパスワードの金庫を作成します。',
     closeVault: '金庫をロック',
     autoLocked: 'しばらく操作がなかったため、金庫は自動的にロックされました。',
+    createHint: '暗号化されたライブラリとアプリの秘密情報を保管する金庫を作成します。',
     badge: {
       open: '金庫を開いている',
       closed: '金庫はロック中',
       none: '金庫なし',
     },
-    lockout: (seconds: number): string =>
-      seconds < 60
-        ? `${seconds} 秒後に再試行してください。`
-        : `${Math.ceil(seconds / 60)} 分後に再試行してください.`,
     errors: {
       vaultExists: 'このコンピュータにはすでに金庫があります。',
       vaultMissing: '金庫が見つかりません。',
       vaultLocked: '金庫はロックされています。',
-      vaultLockedOut: 'ロック解除の試行が多すぎます。しばらく待ってから再試行してください。',
-      vaultWrongPassword: 'マスターパスワードが正しくありません。',
+      vaultLockedOut: '試行が多すぎます。しばらく待ってから再試行してください。',
+      vaultInvalidMaster: 'マスターパスワードはちょうど 24 文字である必要があります。',
+      vaultWeakMaster:
+        '推測しやすいマスターパスワードです(同じ文字の繰り返し、連続、ブロックの繰り返し)。別のものにしてください。',
+      vaultWrongMaster: 'マスターパスワードが正しくありません。',
+      vaultInvalidPin: 'PIN はちょうど 8 桁の数字である必要があります。',
+      vaultWeakPin:
+        '推測しやすい PIN です(数字の繰り返し、連続、日付っぽい並び)。別のものにしてください。',
+      vaultWrongPin: 'PIN が正しくありません。',
+      vaultInvalidRecovery: '復元フレーズは 12 語以上である必要があります。',
+      vaultWeakRecovery: '推測しやすいフレーズです(異なる語が少ない、または繰り返しが过多)。',
+      vaultWrongRecovery: '復元フレーズが一致しません。',
       vaultTampered: '金庫が破損するか改ざんされています。',
       libraryTampered:
         '暗号化されたライブラリが破損するか改ざんされています。データは削除されていません。',
       vaultDestroyed:
         'このセッションで金庫は破棄されました。続行するには新しい金庫を作成してください。',
-      vaultWeakPassword: '推測しやすいパスワードです。より簡単ではないものにしてください。',
       vaultDirUnavailable: '保管庫フォルダーを作成できません。権限を確認してください。',
       vaultAuthCancelled: '保管庫フォルダーの作成をキャンセルしました。',
+    },
+  },
+
+  /**
+   * 金庫の入口: 3 つの資格情報と 4 つの作成ステップ。アプリで最も読まれる
+   * 文言(起動のたびに現れる画面)なので独立したブロックに置き、
+   * `MASTER_PASSWORD_LENGTH`/`PIN_LENGTH`/`RECOVERY_MIN_WORDS` を文中に
+   * 埋め込みます。
+   */
+  auth: {
+    createTitle: '金庫を作成',
+    createSubtitle:
+      'マスターパスワードはちょうど **24 文字**で、すべてを包む鍵です。' +
+      'アプリはこれを使ってライブラリと秘密情報を暗号化し、' +
+      '`/var/lib/.cronologia/.vault/` に保管します。',
+    masterLabel: 'マスターパスワード(24 文字)',
+    masterPlaceholder: '例: Kf7#mQ2!vZ9@pL4$xR8!nW3&',
+    masterConfirmLabel: 'マスターパスワードをもう一度',
+    masterMismatch: 'パスワードが一致しません。',
+    masterLength: (needed: number, actual: number): string =>
+      `マスターパスワードはちょうど ${needed} 文字である必要があります(入力は ${actual} 文字)。`,
+    pinLabel: 'PIN(8 桁)',
+    pinPlaceholder: '例: 49201733',
+    pinSubtitle: '日常的に金庫を開くのはこの PIN です。',
+    createAction: '金庫を作成',
+    creating: '金庫を作成しています…',
+    lockout: (time: string): string => `試行が多すぎます。${time} 後に再試行してください。`,
+    recoveryTitle: '復元フレーズ',
+    recoverySubtitle:
+      'PIN を忘れたときに PIN をリセットするフレーズを、**あなたの言葉で**書いてください。' +
+      'アプリはこの文を生成も保存もしません: 自分で決めて、コンピュータの外に書き留めてください。',
+    recoveryLabel: 'あなたの復元フレーズ',
+    recoveryPlaceholder: '例: 冬が明けた日の市場で馬が人参を食べた',
+    recoveryConfirmLabel: '復元フレーズをもう一度',
+    recoveryMismatch: 'フレーズが一致しません。',
+    recoveryTooShort: (needed: number, actual: number): string =>
+      `フレーズは ${needed} 語以上である必要があります(${actual} 語を入力)。`,
+    recoveryHint: '単語の大文字小文字は区別され、確認時は余分な空白だけ無視します。',
+    unlockTitle: '金庫はロック中です',
+    unlockSubtitle: 'ライブラリを復号して秘密情報を開くには PIN を入力してください。',
+    tabPin: 'PIN',
+    tabMaster: 'マスターパスワード',
+    masterAvailable: 'PIN を 3 回間違えました: マスターパスワードでも開けます。',
+    forgotPin: 'PIN を忘れた',
+    unlockAction: '金庫を開く',
+    unlocking: '開いています…',
+    resetTitle: 'PIN をリセット',
+    resetSubtitle:
+      '金庫を作ったときに**自分で**書いた復元フレーズで新しい PIN を決めます。' +
+      'そのあと金庫が開きます。',
+    newPinLabel: '新しい PIN(8 桁)',
+    newPinConfirmLabel: '新しい PIN をもう一度',
+    pinMismatch: 'PIN が一致しません。',
+    resetAction: 'リセットして開く',
+    resetting: 'リセットしています…',
+    backToPin: 'PIN に戻る',
+    changeTitle: '金庫の資格情報を変更',
+    changeMasterTitle: 'マスターパスワードを変更',
+    changeMasterSubtitle:
+      '金庫が開いている間、今のマスターパスワードはそのまま使えます。' +
+      '変更はライブラリを**再暗号化しません**: 鍵のラップを書き直すだけなので数秒で終わります。',
+    changeMasterCurrent: '現在のマスターパスワード',
+    changeMasterNew: '新しいマスターパスワード(24 文字)',
+    changeMasterConfirm: '新しいマスターパスワードをもう一度',
+    changePinTitle: 'PIN を変更',
+    changePinSubtitle:
+      '現在の PIN はそのまま使えます。変更は鍵のラップを書き直すだけなので、' +
+      'ディスク上のライブラリには触れません。',
+    changePinCurrent: '現在の PIN',
+    changePinNew: '新しい PIN(8 桁)',
+    changePinConfirm: '新しい PIN をもう一度',
+    changeAction: '変更',
+    changing: '変更しています…',
+  },
+
+  /** 資格情報の強度メーター(等級と減点理由)。 */
+  strength: {
+    hintMaster: '等級は目安です。アプリが拒むのは退化した値だけです。',
+    hintPin: '8 桁は「ふつう」を超えません: PIN を守るのはロックアウトです。',
+    hintPhrase: '長く繰り返すより、ばらばらで繰り返さない語の方が価値があります。',
+    levels: {
+      veryWeak: '非常に弱い',
+      weak: '弱い',
+      fair: 'ふつう',
+      strong: '強い',
+      veryStrong: '非常に強い',
+    },
+    reasons: {
+      allSame: '同じ文字の繰り返し',
+      sequence: '文字の連続',
+      repeatedBlock: 'ブロックの繰り返し',
+      dateLike: '日付っぽい並び',
+      fewKinds: '文字の種類が少ない',
+      lowVariety: '異なる文字が少ない',
+      commonWord: 'よく使う語を含む',
+      shortWords: '語が短すぎる',
+      fewUniqueWords: '異なる語が少ない',
+      repeatedWords: '同じ語を繰り返しすぎている',
     },
   },
 

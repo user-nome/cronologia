@@ -6,6 +6,10 @@ import type { Work } from '@zero/types';
 import { createApiMock, installApiMock } from '../../helpers/api.ts';
 import type { ApiMock } from '../../helpers/api.ts';
 import { makeWork } from '../../helpers/fixtures.ts';
+import { messages } from '@zero/messages';
+
+/** Bundle pt-BR: os títulos do cofre vivem em `m.auth`, e a suíte cita os dois. */
+const m = messages('pt-BR');
 
 /** Acervo mínimo: um card por status, com a pílula do Drive visível no topo. */
 const WORKS: Work[] = [
@@ -104,7 +108,7 @@ describe('App: zona de risco dentro das configurações', () => {
 
     await waitFor(() => expect(mock.vaultDestroy).toHaveBeenCalledTimes(1));
     // Sem cofre não há acervo para exibir: o modal some e a janela pede a senha.
-    expect(await screen.findByText('Criar o cofre de segredos')).toBeInTheDocument();
+    expect(await screen.findByText(m.auth.createTitle)).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /Configurações/ })).not.toBeInTheDocument();
   });
 });
@@ -119,11 +123,18 @@ describe('App: auto-lock sem cofre', () => {
     // Destruído de outra janela (ou no meio da sessão): o app não pode oferecer
     // desbloqueio de um cofre que não está mais lá.
     mock.vaultStatus.mockReturnValue(
-      Promise.resolve({ exists: false, unlocked: false, attempts: 0, lockUntil: 0 }),
+      Promise.resolve({
+        exists: false,
+        unlocked: false,
+        attempts: 0,
+        lockUntil: 0,
+        lockRemainingMs: 0,
+        hasRecovery: true,
+      }),
     );
     mock.emitVaultLocked(true);
 
-    expect(await screen.findByText('Criar o cofre de segredos')).toBeInTheDocument();
+    expect(await screen.findByText(m.auth.createTitle)).toBeInTheDocument();
     expect(screen.queryByText('Solo Leveling')).not.toBeInTheDocument();
   });
 });

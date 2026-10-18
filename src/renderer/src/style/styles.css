@@ -646,6 +646,46 @@ input[type='range']::-webkit-slider-thumb {
   margin-right: auto;
 }
 
+/**
+ * Par de ações dentro do corpo do modal (usado pelo `VaultModal`, que tem quatro
+ * passos e por isso não pode ter um rodapé fixo na casca): mesma anatomia do
+ * `modal-footer`, sem a borda e sem o padding.
+ */
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.modal-actions .spacer {
+  margin-right: auto;
+}
+
+/** Texto que age como botão (o "esqueci o PIN" da barreira). */
+.link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  align-self: flex-start;
+}
+
+.link:hover:not(:disabled) {
+  color: var(--accent-strong);
+}
+
+.link:disabled {
+  cursor: default;
+  opacity: 0.6;
+  text-decoration: none;
+}
+
 .form-row {
   display: flex;
   flex-wrap: wrap;
@@ -1419,17 +1459,24 @@ input[type='range']::-webkit-slider-thumb {
   transition: width 0.15s ease;
 }
 
-.vault-strength-bar.weak {
-  width: 33%;
+/* A largura vem do `score` (0..4) e a cor do nível; cada degrau da régua
+   `strengthFor()` ganha a sua, para o medidor não depender de texto. */
+.vault-strength-bar.veryWeak {
   background: #ef6a7a;
 }
 
+.vault-strength-bar.weak {
+  background: #f97362;
+}
+
 .vault-strength-bar.fair {
-  width: 66%;
   background: #fbbf24;
 }
 
 .vault-strength-bar.strong {
-  width: 100%;
+  background: #a3e635;
+}
+
+.vault-strength-bar.veryStrong {
   background: #34d399;
 }

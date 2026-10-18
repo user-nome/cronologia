@@ -24,7 +24,7 @@ import {
 } from '@zero/main/vault/secrets';
 import { isVaultError, type VaultError } from '@zero/main/vault/errors';
 import { resetSandbox, sandboxPath } from '../helpers/sandbox.ts';
-import { FAST_KDF, openTestVault, PASSWORD } from '../helpers/vault.ts';
+import { MASTER, openTestVault, VAULT_INPUT } from '../helpers/vault.ts';
 
 const TOKENS = {
   accessToken: 'token-abc',
@@ -303,7 +303,7 @@ describe('cofre é a única fonte de segredos e tokens', () => {
 
   describe('sessão e arquivo', () => {
     it('unlockVault devolve o que foi gravado antes de trancar', async () => {
-      await createVault(PASSWORD, FAST_KDF);
+      await createVault(VAULT_INPUT);
       saveSettings({
         driveClientId: 'id-x',
         drivePassphrase: 'frase-x',
@@ -312,7 +312,7 @@ describe('cofre é a única fonte de segredos e tokens', () => {
       });
       lockVault();
       expect(() => getSecret(VAULT_SECRET.drivePassphrase)).toThrow();
-      await unlockVault(PASSWORD);
+      await unlockVault({ credential: MASTER, kind: 'master' });
       expect(getSecret(VAULT_SECRET.drivePassphrase)).toBe('frase-x');
       expect(loadSettings()).toMatchObject({ driveClientId: 'id-x', language: 'ja' });
     });
@@ -374,7 +374,7 @@ describe('secrets.ts: leitura e escrita de segredo JSON', () => {
     lockVault();
     expect(readJsonSecret(VAULT_SECRET.dropboxTokens, isMarcador)).toBeNull();
 
-    await unlockVault(PASSWORD);
+    await unlockVault({ credential: MASTER, kind: 'master' });
     expect(readJsonSecret(VAULT_SECRET.dropboxTokens, isMarcador)).toEqual(MARCADOR);
 
     // Container ilegível é a mesma resposta: nada de objeto pela metade.
@@ -400,7 +400,7 @@ describe('secrets.ts: leitura e escrita de segredo JSON', () => {
     // está; o erro é engolido para o chamador não ter que tratar isso.
     expect(() => clearSecret(VAULT_SECRET.dropboxTokens)).not.toThrow();
 
-    await unlockVault(PASSWORD);
+    await unlockVault({ credential: MASTER, kind: 'master' });
     expect(readJsonSecret(VAULT_SECRET.dropboxTokens, isMarcador)).toEqual(MARCADOR);
   });
 

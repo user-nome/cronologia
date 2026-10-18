@@ -29,24 +29,30 @@ conteúdo cifrado do backup na nuvem e as preferências comuns, inclusive o
 
 ## Ciclo de vida
 
-1. **Criar**: Configurações → _Criar cofre_ → senha mestra + confirmação
-   (medidor de força na UI; a autoridade é o main, que recusa senha previsível
-   antes do Argon2id). O cofre nasce **aberto**. Qualquer ação que precise de
-   segredo sem cofre (Salvar configurações, Conectar, Backup, Restaurar,
-   Desconectar) abre esse mesmo fluxo antes de seguir.
+1. **Criar**: Configurações → _Criar cofre_ → senha mestra (24 caracteres) e PIN
+   (8 dígitos) na primeira etapa, frase de recuperação (12+ palavras) na
+   segunda. Há medidor de força na tela, mas a autoridade é o main, que recusa
+   formato errado e valor degenerado **antes** de qualquer Argon2id. O cofre
+   nasce **aberto**. Qualquer ação que precise de segredo sem cofre (Salvar
+   configurações, Conectar, Backup, Restaurar, Desconectar) abre esse mesmo
+   fluxo antes de seguir.
 2. **Usar**: com o cofre aberto, ler e gravar segredos é transparente
    (`loadSettings`, tokens do Drive). Fechar (botão _Fechar cofre_), reiniciar
    ou ficar 5 minutos ocioso (`auto-lock`) derruba a sessão; aí `loadSettings`
    devolve `''`, `loadState` zera os tokens e gravar lança `vaultLocked`
    (nada é gravado às cegas).
 3. **Desbloquear**: qualquer fluxo que precise de segredo (Conectar, Backup,
-   Restaurar, Salvar configurações, Desconectar) pede a senha mestra quando o
-   cofre existe fechado, e só então continua. Sucesso recarrega o estado do
-   Drive (os tokens vivem só no cofre).
+   Restaurar, Salvar configurações, Desconectar) pede o PIN (ou a senha mestra)
+   quando o cofre existe fechado, e só então continua. Sem o PIN, o link
+   "esqueci o PIN" redefine o PIN pela frase de recuperação. Sucesso recarrega
+   o estado do Drive (os tokens vivem só no cofre).
 4. **Rotacionar**: trocar a senha de backup nas Configurações regrava o
    segredo no cofre (com ele aberto). Desconectar apaga `dropbox.tokens` do
    cofre; sem desbloqueio o fluxo é interrompido antes (falha fechada: nada é
-   apagado às cegas).
+   apagado às cegas). Trocar a **senha mestra** ou o **PIN** é operação
+   própria (Configurações → _Trocar a senha mestra_ / _Trocar o PIN_), exige o
+   cofre aberto e a credencial atual, e só reescreve o embrulho da chave — o
+   acervo em disco não é tocado.
 5. **Reparo da pasta**: se `/var/lib/.cronologia/.vault` não puder ser
    escrita, a criação do cofre pede sudo pelo PolicyKit e tenta de novo
    (ver [`cofre.md`](cofre.md) § Criação e reparo da pasta).
@@ -54,20 +60,29 @@ conteúdo cifrado do backup na nuvem e as preferências comuns, inclusive o
    mestra protege tudo por conta própria. Não há mais caminho em claro
    nem `safeStorage` em nenhum fluxo.
 
-## Força da senha mestra
+## Força das credenciais
 
-Regra do processo main (`passwordProblem`, `src/main/vault/crypto.ts`),
-aplicada na criação **antes** de qualquer Argon2id:
+A régua é de `src/shared/strength.ts` e é a **mesma função** nos dois processos:
+o renderer mostra a nota e o main recusa (`blocked`). Duas decisões separadas:
 
-- mínimo de **12 caracteres**;
-- sem fragmentos previsíveis (comparados em minúsculas): `password`, `senha`,
-  `chronos`, `cronologia`, `biblioteca`, `dropbox`, `123456`, `qwerty`, `letmein`, `admin`;
-- sem padrão óbvio: caractere repetido (`aaa…`), sequência ±1 (`abcdef…`,
-  `123456…`) nem bloco repetido (`abcabc…`).
+- o que é **trivial** recusa (só o degenerado): caractere repetido, sequência
+  ±1, bloco repetido, PIN com cara de data, frase com poucas palavras distintas;
+- o nível e os motivos são heurística para orientar quem digita, e nunca
+  bloqueiam sozinhos.
 
-O modal mostra um medidor local (Fraca/Razoável/Forte) só para feedback; o
-back-end é quem recusa (`vaultWeakPassword`). A trava exponencial (10 s até
-24 h) protege o desbloqueio contra tentativas.
+| Credencial       | Formato       | Recusa quando...                                |
+| ---------------- | ------------- | ----------------------------------------------- |
+| Senha mestra     | 24 caracteres | fora do comprimento, ou `a…`/`abc…`/sequência   |
+| PIN do dia a dia | 8 dígitos     | fora do formato, ou repetido/sequência/**data** |
+| Frase            | 12+ palavras  | poucas palavras, ou quase tudo repetido         |
+
+PIN com cara de data (`01012020`) recusa de propósito: é o primeiro palpite de
+qualquer ataque a PIN de 8 dígitos, e não há motivo para o app aceitar o que o
+atacante já tem na ponta da lista.
+
+A trava exponencial (10 s até 24 h) protege as três da força bruta, e é
+**compartilhada** entre elas: um contador por credencial daria ao atacante que
+escolhe o método uma contagem maior que a do app.
 
 ## Sem cofre: falha fechada
 
@@ -80,36 +95,24 @@ back-end é quem recusa (`vaultWeakPassword`). A trava exponencial (10 s até
 - O app nunca quebra por causa disso: a UI abre o cria-cofre e o fluxo continua
   depois do desbloqueio.
 
-## Legado: sem migração, mas varrido no boot
+## Legado: sem migração, e sem varredura
 
 **Não existe migração.** Nada é importado de instalações antigas: o app não lê
-o segredo antigo para colocá-lo no cofre. O que ele faz é **apagar o que ficou
-em claro**, para que atualizar a instalação não deixe segredo nem acervo
-legível no disco.
+o segredo antigo para colocá-lo no cofre.
 
-A varredura roda no boot (`runDiskCleanup`, `src/main/cleanup.ts`), antes de
-qualquer handler IPC, e é idempotente e silenciosa (não encontrar nada não é
-erro):
+Desde a 2.0 também não existe **varredura** de resíduo antigo. O container v1
+do cofre não tem caminho de leitura (um arquivo de versão diferente é recusado
+como `vaultTampered`), o manifesto v1 do backup é tratado como não aproveitável,
+e nenhuma versão atual escreve token do Dropbox em claro (`dropbox-tokens.json`,
+`drive-tokens.json`), nem campo `enc:` no `settings.json`, nem acervo sem o
+sufixo `.enc`, nem pasta `.vault` em `~/.config`. Varrer arquivos que o app
+não escreve é código que só promete uma proteção que ninguém precisa, e ele
+saiu junto com a migração.
 
-| O que é varrido                                | Onde                                | Como                                             |
-| ---------------------------------------------- | ----------------------------------- | ------------------------------------------------ |
-| Segredo `dropbox.tokens` / `drive-tokens.json` | `~/.config/cronologia/`             | shred + remove                                   |
-| Cofre antigo em claro                          | `~/.config/cronologia/.vault/`      | shred de cada arquivo, depois `rmdir`            |
-| `settings.json` com o campo legado `enc:`      | `~/.config/cronologia/`             | shred + remove (só quando o campo está presente) |
-| Acervo em claro `library.json`                 | `~/.local/share/cronologia/`        | shred + remove                                   |
-| Capas sem o sufixo `.enc`                      | `~/.local/share/cronologia/covers/` | shred + remove                                   |
-
-Duas ressalvas importantes:
-
-- a varredura decide **por existência de arquivo**, nunca pelo conteúdo do
-  segredo: o segredo legado não é lido, é sobrescrito;
-- o `settings.json` vivo (só com `language`) e a pasta `.vault` nova em
-  `/var/lib/.cronologia` estão fora da lista e **nunca** são tocados — um
-  arquivo sem o campo `enc:` não é apagado, porque apagá-lo derrubaria o idioma
-  do usuário.
-
-O primeiro salvamento posterior regrava o `settings.json` só com o idioma (sem
-segredo em claro). Não é preciso limpar nada manualmente.
+O que sobrou em `src/main/cleanup.ts` é a varredura de **`.tmp` órfão**, que
+protege o app de hoje (escrita interrompida não tem outro dono) e vale para
+qualquer versão. O `settings.json` vivo continua sendo regravo só com o idioma
+(no primeiro salvamento posterior).
 
 ## Ver também
 

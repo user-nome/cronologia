@@ -214,21 +214,23 @@ paths:
       tags: [cofre]
       summary: Criar o cofre (destrutivo se já existir)
       description: >
-        Argumento posicional único: a senha. Deriva a chave com Argon2id e
-        nasce **desbloqueado**. Falha com `vaultExists` se o `vault.zkv` já
-        estiver lá (com rechecagem depois do reparo da pasta) e com
-        `vaultWeakPassword` antes de qualquer derivação. Pode abrir a caixa do
-        sistema (`vaultDirUnavailable` / `vaultAuthCancelled`) se a pasta do
-        cofre precisar de reparo via PolicyKit.
+        As três credenciais vêm juntas porque uma chave sem PIN obriga a digitar
+        24 caracteres todo dia, e uma frase sem valor é campo morto. Deriva a
+        chave com Argon2id (um embrulho por credencial, cada um com o custo do
+        segredo que o protege) e nasce **desbloqueado**. Formato e força são
+        reconferidos antes de qualquer derivação (`vaultInvalidMaster`,
+        `vaultWeakMaster`, `vaultInvalidPin`, `vaultWeakPin`,
+        `vaultInvalidRecovery`, `vaultWeakRecovery`). Falha com `vaultExists` se
+        o `vault.zkv` já estiver lá (com rechecagem depois do reparo da pasta).
+        Pode abrir a caixa do sistema (`vaultDirUnavailable` /
+        `vaultAuthCancelled`) se a pasta do cofre precisar de reparo via PolicyKit.
       x-ipc-channel: vault:create
-      x-ipc-args: [password]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: string
-              description: Senha mestra do cofre
+              $ref: '#/components/schemas/CreateVaultInput'
       responses:
         '200':
           description: Resultado com o novo estado
@@ -241,21 +243,116 @@ paths:
       tags: [cofre]
       summary: Desbloquear o cofre
       description: >
-        Argumento posicional único: a senha. Recusa **antes** do Argon2id se
-        houver trava por tentativas (`vaultLockedOut`, com `retryInMs`), e
-        depois por `vaultWrongPassword`, `vaultTampered` ou `vaultMissing`.
+        A cadeia de desbloqueio decide na ordem em que o custo cresce: trava
+        exponencial (`vaultLockedOut`, com `retryInMs`) **antes** do Argon2id,
+        depois o formato da credencial, a derivação e a integridade do payload
+        (`vaultTampered`). Credencial errada soma tentativa
+        (`vaultWrongMaster` / `vaultWrongPin`); a rampa é compartilhada pelas
+        três credenciais, porque um contador por método daria ao atacante uma
+        contagem maior que a do app.
       x-ipc-channel: vault:unlock
-      x-ipc-args: [password]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: string
-              description: Senha mestra do cofre
+              $ref: '#/components/schemas/UnlockInput'
       responses:
         '200':
           description: Resultado com o estado resultante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultResult'
+  /vault/reset-pin:
+    post:
+      tags: [cofre]
+      summary: Redefinir o PIN pela frase de recuperação
+      description: >
+        Prova de posse da frase: reembrulha a chave-mestra com o PIN novo e
+        devolve o cofre **já aberto**. A frase **não** é forma de login — ela
+        nunca libera a sessão sozinha, e é por isso que um backup da frase não
+        vale o mesmo que a chave. Frase errada soma tentativa na mesma rampa
+        (`vaultWrongRecovery`); sem frase gravada, `vaultMissing`.
+      x-ipc-channel: vault:reset-pin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phrase, newPin]
+              properties:
+                phrase:
+                  type: string
+                  description: A frase de recuperação escrita pelo usuário
+                newPin:
+                  type: string
+                  pattern: '^\d{8}$'
+                  description: O PIN novo (exatamente 8 dígitos)
+      responses:
+        '200':
+          description: Resultado com o cofre aberto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultResult'
+  /vault/change-master:
+    post:
+      tags: [cofre]
+      summary: Trocar a senha mestra (cofre aberto)
+      description: >
+        Exige cofre aberto **e** a senha mestra atual: cofre aberto é estado do
+        processo, não prova de posse. Como a chave-mestra é aleatória e não
+        derivada da senha, a troca só reescreve um embrulho — o acervo em disco
+        não é tocado e a UI não recarrega a biblioteca.
+      x-ipc-channel: vault:change-master
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword:
+                  type: string
+                  minLength: 24
+                  maxLength: 24
+                newPassword:
+                  type: string
+                  minLength: 24
+                  maxLength: 24
+      responses:
+        '200':
+          description: Resultado com o estado inalterado (a sessão continua aberta)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultResult'
+  /vault/change-pin:
+    post:
+      tags: [cofre]
+      summary: Trocar o PIN do dia a dia (cofre aberto)
+      description: Mesmas condições da troca da senha mestra.
+      x-ipc-channel: vault:change-pin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPin, newPin]
+              properties:
+                currentPin:
+                  type: string
+                  pattern: '^\d{8}$'
+                newPin:
+                  type: string
+                  pattern: '^\d{8}$'
+      responses:
+        '200':
+          description: Resultado com o estado inalterado (a sessão continua aberta)
           content:
             application/json:
               schema:
@@ -632,17 +729,51 @@ components:
         - vaultMissing
         - vaultLocked
         - vaultLockedOut
-        - vaultWrongPassword
+        - vaultInvalidMaster
+        - vaultWeakMaster
+        - vaultWrongMaster
+        - vaultInvalidPin
+        - vaultWeakPin
+        - vaultWrongPin
+        - vaultInvalidRecovery
+        - vaultWeakRecovery
+        - vaultWrongRecovery
         - vaultTampered
         - libraryTampered
         - vaultDestroyed
-        - vaultWeakPassword
         - vaultDirUnavailable
         - vaultAuthCancelled
       description: Código da recusa; a mensagem é localizada no bundle corrente
+    CreateVaultInput:
+      type: object
+      required: [masterPassword, pin, recoveryPhrase]
+      properties:
+        masterPassword:
+          type: string
+          minLength: 24
+          maxLength: 24
+          description: Senha mestra (exatamente 24 caracteres, sem padrão degenerado)
+        pin:
+          type: string
+          pattern: '^\d{8}$'
+          description: PIN do dia a dia (exatamente 8 dígitos, não degenerado nem com cara de data)
+        recoveryPhrase:
+          type: string
+          description: Frase de recuperação escrita pelo usuário (12+ palavras distintas); não abre o cofre, só redefine o PIN
+    UnlockInput:
+      type: object
+      required: [credential, kind]
+      properties:
+        credential:
+          type: string
+          description: O valor digitado (24 caracteres = senha mestra; 8 dígitos = PIN)
+        kind:
+          type: string
+          enum: [master, pin]
+          description: Como o valor é lido; a tela decide pelo comprimento
     VaultStatus:
       type: object
-      required: [exists, unlocked, attempts, lockUntil]
+      required: [exists, unlocked, attempts, lockUntil, lockRemainingMs, hasRecovery]
       properties:
         exists:
           type: boolean
@@ -658,6 +789,13 @@ components:
           type: integer
           minimum: 0
           description: Epoch em ms até quando o desbloqueio está suspenso (0 = sem trava)
+        lockRemainingMs:
+          type: integer
+          minimum: 0
+          description: Quanto falta da trava, em ms (0 = liberado); a UI reconta a cada segundo
+        hasRecovery:
+          type: boolean
+          description: Há frase de recuperação (o que habilita a tela "esqueci o PIN")
     VaultResult:
       description: Resposta dos canais de cofre; nunca lança, o erro vem por código.
       oneOf:

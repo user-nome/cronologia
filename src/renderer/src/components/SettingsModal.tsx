@@ -11,6 +11,7 @@ import type {
 import { LANGUAGES, LANGUAGE_LABELS, messages } from '@zero/messages';
 import { formatDate } from '@zero/renderer/constants';
 import { richText, useLanguage, useMessages } from '@zero/renderer/i18n';
+import CredentialModal from '@zero/renderer/components/CredentialModal';
 import RestorePasswordModal from '@zero/renderer/components/RestorePasswordModal';
 import Select from '@zero/renderer/components/Select';
 import type { SelectOption } from '@zero/renderer/components/Select';
@@ -59,6 +60,8 @@ export default function SettingsModal({
   const [promptRestore, setPromptRestore] = useState(false);
   const [vault, setVault] = useState<VaultStatus | null>(null);
   const [vaultPrompt, setVaultPrompt] = useState<'create' | 'unlock' | null>(null);
+  /** Troca de credencial em andamento; `null` = nenhum modal de troca aberto. */
+  const [credentialKind, setCredentialKind] = useState<'master' | 'pin' | null>(null);
   // Ação adiada enquanto o cofre está fechado (guardada em ref: não renderiza).
   const pendingVaultAction = useRef<(() => void) | null>(null);
 
@@ -369,7 +372,7 @@ export default function SettingsModal({
                       disabled={working}
                       title={m.vault.createHint}
                     >
-                      <i className="fa-solid fa-vault" /> {m.vault.createAction}
+                      <i className="fa-solid fa-vault" /> {m.auth.createAction}
                     </button>
                   ) : null}
                   {vault?.exists === true && !vault.unlocked ? (
@@ -378,19 +381,37 @@ export default function SettingsModal({
                       onClick={() => setVaultPrompt('unlock')}
                       disabled={working}
                     >
-                      <i className="fa-solid fa-unlock" /> {m.vault.unlockAction}
+                      <i className="fa-solid fa-unlock" /> {m.auth.unlockAction}
                     </button>
                   ) : null}
                   {vault?.unlocked === true ? (
-                    <button
-                      className="btn ghost"
-                      onClick={() => {
-                        void closeVault();
-                      }}
-                      disabled={working}
-                    >
-                      <i className="fa-solid fa-lock" /> {m.vault.closeVault}
-                    </button>
+                    <>
+                      <button
+                        className="btn ghost"
+                        onClick={() => {
+                          void closeVault();
+                        }}
+                        disabled={working}
+                      >
+                        <i className="fa-solid fa-lock" /> {m.vault.closeVault}
+                      </button>
+                      <button
+                        className="btn ghost"
+                        onClick={() => setCredentialKind('master')}
+                        disabled={working}
+                        title={m.auth.changeMasterSubtitle}
+                      >
+                        <i className="fa-solid fa-key" /> {m.auth.changeMasterTitle}
+                      </button>
+                      <button
+                        className="btn ghost"
+                        onClick={() => setCredentialKind('pin')}
+                        disabled={working}
+                        title={m.auth.changePinSubtitle}
+                      >
+                        <i className="fa-solid fa-hashtag" /> {m.auth.changePinTitle}
+                      </button>
+                    </>
                   ) : null}
                 </div>
               </div>
@@ -516,6 +537,19 @@ export default function SettingsModal({
             pendingVaultAction.current = null;
           }}
           onUnlocked={afterVaultPrompt}
+        />
+      ) : null}
+
+      {credentialKind !== null ? (
+        <CredentialModal
+          kind={credentialKind}
+          onClose={() => setCredentialKind(null)}
+          onChanged={() => {
+            // A troca só reescreve um embrulho: o acervo em disco é o mesmo, e
+            // o badge do cofre continua aberto. Só o modal fecha.
+            setCredentialKind(null);
+            void window.api.vault.status().then(setVault);
+          }}
         />
       ) : null}
     </>

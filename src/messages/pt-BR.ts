@@ -19,6 +19,8 @@ export const ptBR = {
     searchOptions: 'Digite para filtrar…',
     clearSearch: 'Limpar busca',
     noOptionsFound: 'Nenhuma opção encontrada',
+    next: 'Avançar',
+    back: 'Voltar',
   },
 
   dialogs: {
@@ -341,52 +343,134 @@ export const ptBR = {
     invalidId: 'Identificador de obra inválido.',
   },
 
-  /** Cofre de segredos: modal, badges da UI e erros do domínio. */
+  /** Cofre: barreira de entrada (criar, abrir, recuperar) e gestão na tela. */
   vault: {
-    createTitle: 'Criar o cofre de segredos',
-    unlockTitle: 'Desbloquear o cofre',
-    createBody:
-      'Crie uma senha mestra. Ela protege **a biblioteca inteira** (obras e capas, cifradas em ' +
-      'disco) e os segredos do app (tokens do Dropbox e senha do backup). Sem ela o acervo não ' +
-      'existe para o app. Se você esquecer a senha, não há como recuperá-la.',
-    unlockBody:
-      'Informe a senha mestra para decifrar a biblioteca e liberar os segredos guardados.',
-    passwordLabel: 'Senha mestra',
-    confirmLabel: 'Confirmar a senha',
-    createAction: 'Criar cofre',
-    unlockAction: 'Desbloquear',
-    hint: 'Use pelo menos 12 caracteres, sem sequências nem repetições óbvias.',
-    mismatch: 'As senhas não coincidem.',
-    strength: {
-      weak: 'Fraca',
-      fair: 'Razoável',
-      strong: 'Forte',
-    },
-    createHint: 'Crie um cofre com senha mestra para guardar os segredos do app.',
     closeVault: 'Fechar cofre',
     autoLocked: 'O cofre fechou sozinho por inatividade.',
+    createHint: 'Crie um cofre para guardar a biblioteca cifrada e os segredos do app.',
     badge: {
       open: 'Cofre aberto',
       closed: 'Cofre fechado',
       none: 'Sem cofre',
     },
-    lockout: (seconds: number): string =>
-      seconds < 60
-        ? `Aguarde ${seconds} segundos para tentar de novo.`
-        : `Aguarde ${Math.ceil(seconds / 60)} minuto(s) para tentar de novo.`,
     errors: {
       vaultExists: 'Já existe um cofre neste computador.',
       vaultMissing: 'Nenhum cofre encontrado.',
       vaultLocked: 'O cofre está fechado.',
-      vaultLockedOut: 'Muitas tentativas de desbloqueio. Aguarde antes de tentar de novo.',
-      vaultWrongPassword: 'Senha mestra incorreta.',
+      vaultLockedOut: 'Muitas tentativas. Aguarde antes de tentar de novo.',
+      vaultInvalidMaster: 'A senha mestra precisa ter exatamente 24 caracteres.',
+      vaultWeakMaster:
+        'Senha mestra previsível (caractere repetido, sequência ou bloco repetido). Escolha outra.',
+      vaultWrongMaster: 'Senha mestra incorreta.',
+      vaultInvalidPin: 'O PIN precisa ter exatamente 8 dígitos.',
+      vaultWeakPin: 'PIN previsível (dígitos repetidos, sequência ou data). Escolha outro.',
+      vaultWrongPin: 'PIN incorreto.',
+      vaultInvalidRecovery: 'A frase de recuperação precisa ter pelo menos 12 palavras.',
+      vaultWeakRecovery: 'Frase previsível (poucas palavras distintas ou muitas repetidas).',
+      vaultWrongRecovery: 'A frase de recuperação não confere.',
       vaultTampered: 'O cofre está danificado ou foi alterado.',
       libraryTampered:
         'A biblioteca cifrada está danificada ou foi alterada. Nenhum dado foi apagado.',
       vaultDestroyed: 'O cofre foi destruído nesta sessão. Crie um novo para continuar.',
-      vaultWeakPassword: 'Senha previsível. Escolha algo menos óbvio.',
       vaultDirUnavailable: 'Não foi possível criar a pasta do cofre. Verifique as permissões.',
       vaultAuthCancelled: 'A criação da pasta do cofre foi cancelada.',
+    },
+  },
+
+  /**
+   * Entrada do cofre: as três credenciais e os quatro passos de criação. Ficam
+   * em bloco próprio porque é o texto mais escrito do app (a barreira aparece
+   * em toda abertura de app) e porque precisa das constantes de
+   * `MASTER_PASSWORD_LENGTH`/`PIN_LENGTH`/`RECOVERY_MIN_WORDS` interpoladas.
+   */
+  auth: {
+    createTitle: 'Criar o cofre',
+    createSubtitle:
+      'A senha mestra tem exatamente **24 caracteres** e é a chave que embrulha tudo. ' +
+      'O app guarda a biblioteca e os segredos cifrados com ela, em `/var/lib/.cronologia/.vault/`.',
+    masterLabel: 'Senha mestra (24 caracteres)',
+    masterPlaceholder: 'Ex.: Kf7#mQ2!vZ9@pL4$xR8!nW3&',
+    masterConfirmLabel: 'Repita a senha mestra',
+    masterMismatch: 'As senhas não coincidem.',
+    masterLength: (needed: number, actual: number): string =>
+      `A senha mestra precisa ter exatamente ${needed} caracteres (você digitou ${actual}).`,
+    pinLabel: 'PIN (8 dígitos)',
+    pinPlaceholder: 'Ex.: 49201733',
+    pinSubtitle: 'É com ele que você abre o cofre no dia a dia.',
+    createAction: 'Criar cofre',
+    creating: 'Criando cofre…',
+    lockout: (time: string): string => `Muitas tentativas. Tente de novo em ${time}.`,
+    recoveryTitle: 'Frase de recuperação',
+    recoverySubtitle:
+      'Escreva **com as suas palavras** a frase que vai redefinir o PIN se você o esquecer. ' +
+      'O app não gera nem guarda esse texto: você decide e anota fora do computador.',
+    recoveryLabel: 'Sua frase de recuperação',
+    recoveryPlaceholder: 'Ex.: o cavalo comeu cenoura na feira depois do inverno',
+    recoveryConfirmLabel: 'Repita a frase de recuperação',
+    recoveryMismatch: 'As frases não coincidem.',
+    recoveryTooShort: (needed: number, actual: number): string =>
+      `A frase precisa de pelo menos ${needed} palavras (você escreveu ${actual}).`,
+    recoveryHint: 'A caixa das palavras conta. Só o espaço a mais é ignorado ao conferir.',
+    unlockTitle: 'Cofre bloqueado',
+    unlockSubtitle: 'Informe o PIN para decifrar a biblioteca e liberar os segredos.',
+    tabPin: 'PIN',
+    tabMaster: 'Senha mestra',
+    masterAvailable: 'PIN incorreto 3 vezes: agora a senha mestra também pode abrir o cofre.',
+    forgotPin: 'Esqueci o PIN',
+    unlockAction: 'Abrir cofre',
+    unlocking: 'Abrindo…',
+    resetTitle: 'Redefinir o PIN',
+    resetSubtitle:
+      'Use a frase de recuperação que **você** escreveu na criação do cofre para escolher ' +
+      'um PIN novo. O cofre abre em seguida.',
+    newPinLabel: 'Novo PIN (8 dígitos)',
+    newPinConfirmLabel: 'Repita o novo PIN',
+    pinMismatch: 'Os PINs não coincidem.',
+    resetAction: 'Redefinir e abrir',
+    resetting: 'Redefinindo…',
+    backToPin: 'Voltar para o PIN',
+    changeTitle: 'Trocar a credencial do cofre',
+    changeMasterTitle: 'Trocar a senha mestra',
+    changeMasterSubtitle:
+      'A senha mestra de hoje continua valendo enquanto o cofre estiver aberto. ' +
+      'A troca **não** recifra a biblioteca: só reescreve o embrulho da chave, em segundos.',
+    changeMasterCurrent: 'Senha mestra atual',
+    changeMasterNew: 'Nova senha mestra (24 caracteres)',
+    changeMasterConfirm: 'Repita a nova senha mestra',
+    changePinTitle: 'Trocar o PIN',
+    changePinSubtitle:
+      'O PIN de hoje continua valendo. A troca só reescreve o embrulho da chave, ' +
+      'então o acervo em disco não é tocado.',
+    changePinCurrent: 'PIN atual',
+    changePinNew: 'Novo PIN (8 dígitos)',
+    changePinConfirm: 'Repita o novo PIN',
+    changeAction: 'Trocar',
+    changing: 'Trocando…',
+  },
+
+  /** Medidor de força das credenciais do cofre (rótulo e motivo da nota). */
+  strength: {
+    hintMaster: 'A nota orienta; o app recusa só o que é degenerado.',
+    hintPin: 'Oito dígitos nunca passam de "razoável": o que protege o PIN é a trava.',
+    hintPhrase: 'Palavras varieties e sem repetição valem mais que palavras longas.',
+    levels: {
+      veryWeak: 'Muito fraca',
+      weak: 'Fraca',
+      fair: 'Razoável',
+      strong: 'Forte',
+      veryStrong: 'Muito forte',
+    },
+    reasons: {
+      allSame: 'o mesmo caractere repetido',
+      sequence: 'sequência de caracteres',
+      repeatedBlock: 'bloco repetido',
+      dateLike: 'parece uma data',
+      fewKinds: 'poucos tipos de caractere',
+      lowVariety: 'poucos caracteres distintos',
+      commonWord: 'contém palavra comum',
+      shortWords: 'palavras curtas demais',
+      fewUniqueWords: 'poucas palavras distintas',
+      repeatedWords: 'palavra repetida muitas vezes',
     },
   },
 

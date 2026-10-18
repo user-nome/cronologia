@@ -90,9 +90,15 @@ function coverHandler(): (request: { url: string }) => Response {
   return call[1];
 }
 
-/** Senha-mestra de teste; o cofre é criado com o KDF barato de `tests/helpers`. */
-const PASSWORD = 'uva-preta-42-estrela';
-
+/** Credenciais de teste nos formatos de produção; o KDF é o de `tests/helpers`. */
+const MASTER = 'Tz7#mQ2!vZ9@pL4$xR8!nW3&';
+const PIN = '49201733';
+const VAULT_INPUT = {
+  masterPassword: MASTER,
+  pin: PIN,
+  recoveryPhrase:
+    'cavalo cenoura feira inverno bibliografia zettelkasten kalamita peixoto velleda aurora jubileu silhueta',
+};
 /** URL que o `electron-vite dev` injeta para o renderer. */
 const DEV_URL = 'http://localhost:5173';
 
@@ -167,6 +173,9 @@ const expectedChannels = [
   'vault:status',
   'vault:create',
   'vault:unlock',
+  'vault:reset-pin',
+  'vault:change-master',
+  'vault:change-pin',
   'vault:lock',
   'vault:destroy',
   'vault:touch',
@@ -748,58 +757,6 @@ describe('atividade da interface alimenta a janela de ociosidade', () => {
   });
 });
 
-describe('canais do cofre pela ponte', () => {
-  it('vault:status começa sem cofre e acompanha o ciclo', async () => {
-    await openTestVault();
-    destroyVault();
-    expect(invoke('vault:status')).toEqual({
-      exists: false,
-      unlocked: false,
-      attempts: 0,
-      lockUntil: 0,
-    });
-
-    const criado = await invokeAsync<VaultResult>('vault:create', PASSWORD);
-    expect(criado).toEqual({
-      ok: true,
-      status: { exists: true, unlocked: true, attempts: 0, lockUntil: 0 },
-    });
-    expect(invoke('vault:status')).toMatchObject({ exists: true, unlocked: true });
-    expect(invoke('vault:lock')).toMatchObject({ exists: true, unlocked: false });
-  });
-
-  it('vault:create recusa senha previsível antes de qualquer escrita', async () => {
-    await openTestVault();
-    destroyVault();
-
-    const fraco = await invokeAsync<VaultResult>('vault:create', 'curta12');
-
-    expect(fraco).toEqual({ ok: false, code: 'vaultWeakPassword', retryInMs: 0 });
-    expect(invoke('vault:status')).toMatchObject({ exists: false });
-  });
-
-  it('vault:unlock conta a tentativa errada e depois reabre com a senha certa', async () => {
-    await openTestVault();
-
-    const errado = await invokeAsync<VaultResult>('vault:unlock', 'senha-errada-xyz');
-    expect(errado).toEqual({ ok: false, code: 'vaultWrongPassword', retryInMs: 10_000 });
-    // A tentativa falhada é registrada no disco, mas derrubar uma sessão já
-    // aberta seria jogar fora o acesso de quem digitou certo.
-    expect(invoke('vault:status')).toMatchObject({ attempts: 1, unlocked: true });
-    // E durante a espera nem o Argon2id roda.
-    expect(await invokeAsync<VaultResult>('vault:unlock', PASSWORD)).toMatchObject({
-      ok: false,
-      code: 'vaultLockedOut',
-    });
-
-    await openTestVault();
-    expect(await invokeAsync<VaultResult>('vault:unlock', PASSWORD)).toEqual({
-      ok: true,
-      status: { exists: true, unlocked: true, attempts: 0, lockUntil: 0 },
-    });
-  });
-});
-
 describe('modo desenvolvimento (ELECTRON_RENDERER_URL)', () => {
   it('a janela nasce no dev server e a navegação fica presa a ele', () => {
     vi.stubEnv('ELECTRON_RENDERER_URL', DEV_URL);
@@ -890,7 +847,7 @@ describe('falha real de disco vira resposta, não crash', () => {
     const erro = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     falhaEm('mkdirSync', 'ENOSPC');
 
-    const resultado = await invokeAsync<VaultResult>('vault:create', PASSWORD);
+    const resultado = await invokeAsync<VaultResult>('vault:create', VAULT_INPUT);
 
     expect(resultado).toEqual({ ok: false, code: 'vaultTampered', retryInMs: 0 });
     expect(erro).toHaveBeenCalled();
@@ -904,7 +861,14 @@ describe('falha real de disco vira resposta, não crash', () => {
 
     expect(resultado).toEqual({
       ok: true,
-      status: { exists: false, unlocked: false, attempts: 0, lockUntil: 0 },
+      status: {
+        exists: false,
+        unlocked: false,
+        attempts: 0,
+        lockUntil: 0,
+        lockRemainingMs: 0,
+        hasRecovery: false,
+      },
     });
     expect(fs.existsSync(path.join(coversDir(), 'capa.png.enc'))).toBe(false);
     // O acervo local continua no disco, mas sem chave ficou ilegível: some da

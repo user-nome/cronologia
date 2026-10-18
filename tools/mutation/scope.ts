@@ -20,6 +20,10 @@ export const DEFAULT_EXCLUDES = [
   // (`drive/backup.ts`, `vault/vault.ts`).
   /^src\/main\/(drive|vault)\/index\.ts$/,
   /^src\/main\/drive\/providers\/(dropbox|google)\/index\.ts$/,
+  // Barrel da camada compartilhada, pelo mesmo motivo: ninguém importa
+  // `src/shared/index.ts` diretamente, e os módulos que ele reexporta
+  // (`policy`, `format`, `strength`, `strategy`) são medidos um a um.
+  /^src\/shared\/index\.ts$/,
   // Entry point do renderer: monta o React em `#root` e nada mais. A suíte
   // renderiza `<App/>` diretamente, então este arquivo nunca é importado por um
   // teste, e a mutação dele mediria a montagem, que não tem decisão.

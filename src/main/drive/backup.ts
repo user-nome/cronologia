@@ -112,9 +112,9 @@ async function resolveLocalNames(
  * Salt da chave de nomes do backup anterior, para manter os nomes remotos
  * estáveis entre backups (mesmo `library.json`, resumo com id real).
  *
- * Devolve `null` quando não dá para aproveitar: primeiro backup (sem
- * manifesto), manifesto v1 (sem salt; o próximo migra para v2) ou manifesto
- * ilegível com a senha atual. O chamador sorteia um salt novo nesses casos.
+ * Devolve `null` quando não dá para aproveitar: primeiro backup (sem manifesto)
+ * ou manifesto ilegível com a senha atual. O chamador sorteia um salt novo
+ * nesses casos, e o próximo backup já sai no formato vigente.
  */
 async function previousNameSalt(
   remote: RemoteFile[],
@@ -127,7 +127,7 @@ async function previousNameSalt(
     const buffer = await currentProvider().downloadFile(manifestFile.id);
     return parseManifest(decryptWith(buffer, passphrase)).nameSalt;
   } catch {
-    // Manifesto v1, cifrado com outra senha ou corrompido: salt novo.
+    // Formato antigo, cifrado com outra senha ou corrompido: salt novo.
     return null;
   }
 }

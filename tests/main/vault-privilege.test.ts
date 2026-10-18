@@ -2,10 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createVault, isVaultDirUnavailable, setupVaultDirectory } from '@zero/main/vault';
+import { createVault, isDirUnavailable, setupVaultDirectory } from '@zero/main/vault';
 import { VaultError } from '@zero/main/vault/errors';
 import { resetSandbox, sandboxPath } from '../helpers/sandbox.ts';
-import { FAST_KDF, PASSWORD } from '../helpers/vault.ts';
+import { VAULT_INPUT } from '../helpers/vault.ts';
 
 vi.mock('node:child_process', () => {
   const spawnSync = vi.fn();
@@ -87,13 +87,13 @@ describe('setupVaultDirectory (pkexec)', () => {
 });
 
 describe('pasta do cofre indisponível', () => {
-  it('isVaultDirUnavailable reconhece EACCES/EPERM/EROFS e o código do cofre', () => {
-    expect(isVaultDirUnavailable({ code: 'EACCES' })).toBe(true);
-    expect(isVaultDirUnavailable({ code: 'EPERM' })).toBe(true);
-    expect(isVaultDirUnavailable({ code: 'EROFS' })).toBe(true);
-    expect(isVaultDirUnavailable({ code: 'ENOENT' })).toBe(false);
-    expect(isVaultDirUnavailable(new VaultError('vaultDirUnavailable'))).toBe(true);
-    expect(isVaultDirUnavailable(new VaultError('vaultLocked'))).toBe(false);
+  it('isDirUnavailable reconhece EACCES/EPERM/EROFS e o código do cofre', () => {
+    expect(isDirUnavailable({ code: 'EACCES' })).toBe(true);
+    expect(isDirUnavailable({ code: 'EPERM' })).toBe(true);
+    expect(isDirUnavailable({ code: 'EROFS' })).toBe(true);
+    expect(isDirUnavailable({ code: 'ENOENT' })).toBe(false);
+    expect(isDirUnavailable(new VaultError('vaultDirUnavailable'))).toBe(true);
+    expect(isDirUnavailable(new VaultError('vaultLocked'))).toBe(false);
   });
 
   it('createVault devolve vaultDirUnavailable sem tentar pkexec no sandbox', async () => {
@@ -104,7 +104,7 @@ describe('pasta do cofre indisponível', () => {
     fs.mkdirSync(parent, { mode: 0o500 });
     process.env.CRONOLOGIA_VAULT_DIR = dir;
 
-    await expect(createVault(PASSWORD, FAST_KDF)).rejects.toMatchObject({
+    await expect(createVault(VAULT_INPUT)).rejects.toMatchObject({
       code: 'vaultDirUnavailable',
     });
     expect(spawn).not.toHaveBeenCalled();

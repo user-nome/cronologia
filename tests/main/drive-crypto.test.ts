@@ -113,11 +113,12 @@ describe('formato do manifesto', () => {
     });
   });
 
-  it('aceita o formato antigo sem salt próprio (nameSalt nulo)', () => {
-    expect(parseManifest(manifestJson({ 'hash-antigo': 'library.json' }))).toEqual({
-      files: { 'hash-antigo': 'library.json' },
-      nameSalt: null,
-    });
+  it('recusa o formato antigo sem salt próprio', () => {
+    // O `v1` (mapa puro) saiu com a migração do cofre. Um backup desse formato
+    // é recusado com a mensagem de restauração, que é a resposta honesta: quem
+    // só tem esse backup precisa de um backup novo, não de um caminho antigo
+    // meio lido.
+    expect(() => parseManifest(manifestJson({ 'hash-antigo': 'library.json' }))).toThrow(INVALID);
   });
 
   it('recusa corpo que nem é JSON', () => {

@@ -27,7 +27,7 @@ import { isVaultError } from '@zero/main/vault/errors';
 import { lockVault, unlockVault } from '@zero/main/vault';
 import { makeDraft, makeWork } from '../helpers/fixtures.ts';
 import { resetSandbox, sandboxPath } from '../helpers/sandbox.ts';
-import { FAST_KDF, PASSWORD } from '../helpers/vault.ts';
+import { MASTER, VAULT_INPUT } from '../helpers/vault.ts';
 import { createVault, destroyVault } from '@zero/main/vault';
 
 /** Escreve uma capa cifrada pelo caminho normal do app (como `importCover`). */
@@ -50,7 +50,7 @@ function coverOnDisk(name: string): string {
  * criação vem depois dele.
  */
 async function openVault(): Promise<void> {
-  await createVault(PASSWORD, FAST_KDF);
+  await createVault(VAULT_INPUT);
 }
 
 describe('diretórios XDG', () => {
@@ -431,7 +431,7 @@ describe('acervo cifrado', () => {
     // Nada foi apagado: a falha é antes do disco.
     expect(fs.existsSync(libraryFile())).toBe(true);
 
-    return unlockVault(PASSWORD).then(() => {
+    return unlockVault({ credential: MASTER, kind: 'master' }).then(() => {
       expect(loadLibrary()[0]?.title).toBe('preservado');
     });
   });

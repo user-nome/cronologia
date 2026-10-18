@@ -7,6 +7,7 @@ import {
   closeButton,
   fillLabel,
   waitForHeading,
+  waitForHeadingGone,
   waitForText,
   waitForToast,
   workCard,
@@ -25,11 +26,23 @@ import {
 const pt = messages('pt-BR');
 const en = messages('en');
 
-/** Senha mestra do cofre de teste: longa e sem fragmento previsível. */
+/**
+ * Credenciais do cofre de teste, nos formatos de produção: senha mestra de 24
+ * caracteres sem fragmento previsível, PIN de 8 dígitos não degenero e frase de
+ * recuperação de 13 palavras distintas. A validação do app é conferida de
+ * verdade, e não por um atalho que só existe no teste.
+ */
 export const VAULT = {
   master: 'Kx7#mQ2v!Zt9@Lp4&Rw6$Bd8',
-  wrong: 'Zq4#nW8c!Yv2@Tg7&Sh1$Fj5',
-  weak: 'aaaaaaaaaaaa',
+  wrongMaster: 'Zq4#nW8c!Yv2@Tg7&Sh1$Fj5',
+  weakMaster: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+  pin: '49201733',
+  wrongPin: '00000000',
+  weakPin: '11111111',
+  newPin: '63084512',
+  phrase:
+    'cavalo cenoura feira inverno bibliografia zettelkasten kalamita peixoto velleda aurora jubileu silhueta',
+  wrongPhrase: 'gato relogio janela montanha livro nuvem farol vinho barco ponte folha chave mesa',
 } as const;
 
 /** Obra principal da jornada; o `title` muda na edição, por isso os dois campos. */
@@ -66,25 +79,70 @@ async function fillWorkForm(page: Page, work: { title: string; synopsis: string 
   await page.getByPlaceholder(pt.workModal.markerPlaceholder, { exact: true }).fill(WORK.marker);
 }
 
+/**
+ * Cria o cofre pelas duas etapas: credenciais (senha mestra + PIN) e frase de
+ * recuperação.
+ *
+ * Preenche tudo uma vez e depois muda **um campo por vez**, clicando em
+ * Avançar e conferindo a recusa. É assim que a pessoa de verdade encontra a
+ * tela: o formulário já está quase certo e o app diz o que falta. Cada recusa é
+ * exercitada porque o que a jornada precisa provar é que o app barra formato
+ * errado e valor degenerado **antes** de pagar o Argon2id.
+ */
 export async function createVault(page: Page): Promise<void> {
-  await waitForHeading(page, pt.vault.createTitle);
+  await waitForHeading(page, pt.auth.createTitle);
 
-  // Confirmação divergente: o botão responde sem chamar o main.
-  await fillLabel(page, pt.vault.passwordLabel, VAULT.master);
-  await fillLabel(page, pt.vault.confirmLabel, VAULT.wrong);
-  await clickButton(page, pt.vault.createAction);
-  await waitForText(page, pt.vault.mismatch);
+  await fillLabel(page, pt.auth.masterLabel, VAULT.master);
+  // Um caractere trocado na confirmação: o botão responde sem chamar o main.
+  await fillLabel(page, pt.auth.masterConfirmLabel, VAULT.wrongMaster);
+  await fillLabel(page, pt.auth.pinLabel, VAULT.pin);
+  await fillLabel(page, pt.auth.newPinConfirmLabel, VAULT.pin);
+  await clickButton(page, pt.common.next);
+  await waitForText(page, pt.auth.masterMismatch);
 
-  // Senha previsível: recusada pelo main antes do Argon2id.
-  await fillLabel(page, pt.vault.passwordLabel, VAULT.weak);
-  await fillLabel(page, pt.vault.confirmLabel, VAULT.weak);
-  await clickButton(page, pt.vault.createAction);
-  await waitForText(page, pt.vault.errors.vaultWeakPassword);
+  // Senha mestra degenerada com os 24 caracteres: recusada antes do Argon2id.
+  await fillLabel(page, pt.auth.masterLabel, VAULT.weakMaster);
+  await fillLabel(page, pt.auth.masterConfirmLabel, VAULT.weakMaster);
+  await clickButton(page, pt.common.next);
+  await waitForText(page, pt.vault.errors.vaultWeakMaster);
 
-  await fillLabel(page, pt.vault.passwordLabel, VAULT.master);
-  await fillLabel(page, pt.vault.confirmLabel, VAULT.master);
-  await clickButton(page, pt.vault.createAction);
-  // A criação deriva um Argon2id de 128 MiB: a biblioteca vazia cobre a espera.
+  // Senha mestra de volta ao valor válido: o que falta agora é o PIN.
+  await fillLabel(page, pt.auth.masterLabel, VAULT.master);
+  await fillLabel(page, pt.auth.masterConfirmLabel, VAULT.master);
+  await fillLabel(page, pt.auth.pinLabel, '123');
+  await fillLabel(page, pt.auth.newPinConfirmLabel, '123');
+  await clickButton(page, pt.common.next);
+  await waitForText(page, pt.vault.errors.vaultInvalidPin);
+
+  // PIN degenerado: 8 dígitos que o app recusa (o primeiro palpite de ataque).
+  await fillLabel(page, pt.auth.pinLabel, VAULT.weakPin);
+  await fillLabel(page, pt.auth.newPinConfirmLabel, VAULT.weakPin);
+  await clickButton(page, pt.common.next);
+  await waitForText(page, pt.vault.errors.vaultWeakPin);
+
+  // PIN válido em confirmação divergente: a dupla continua valendo.
+  await fillLabel(page, pt.auth.pinLabel, VAULT.pin);
+  await fillLabel(page, pt.auth.newPinConfirmLabel, VAULT.wrongPin);
+  await clickButton(page, pt.common.next);
+  await waitForText(page, pt.auth.pinMismatch);
+
+  // Agora as duas credenciais batem: a etapa da frase abre.
+  await fillLabel(page, pt.auth.newPinConfirmLabel, VAULT.pin);
+  await clickButton(page, pt.common.next);
+  await waitForHeading(page, pt.auth.recoveryTitle);
+
+  // Frase curta: recusada na etapa da recuperação.
+  await fillLabel(page, pt.auth.recoveryLabel, 'poucas palavras');
+  await clickButton(page, pt.auth.createAction);
+  await waitForText(page, pt.auth.recoveryTooShort(12, 2));
+
+  // Frase pronta, confirmada com espaço a mais: só o espaço é normalizado, e a
+  // caixa de cada palavra conta, então o Caps Lock aqui seria outra frase.
+  await fillLabel(page, pt.auth.recoveryLabel, VAULT.phrase);
+  await fillLabel(page, pt.auth.recoveryConfirmLabel, `  ${VAULT.phrase}  `);
+  await clickButton(page, pt.auth.createAction);
+  // A criação deriva um Argon2id por credencial (128 MiB na senha mestra, 256 MiB
+  // no PIN): a biblioteca vazia cobre a espera.
   await waitForText(page, pt.app.emptyLibraryTitle);
 }
 
@@ -254,37 +312,94 @@ export async function resetLibraryRequiresExactWord(page: Page): Promise<void> {
 }
 
 /**
- * O modal de tela cheia do cofre, localizado pelo título.
+ * O modal de tela cheia do cofre, localizado pelo título **da etapa**.
  *
- * O botão "Desbloquear" também existe no modal de configurações (que fica por
- * baixo, aberto), então as ações da barreira saem daqui para não ambiguar. A
- * subida é pelo DOM: `h2` → cabeçalho do modal → modal.
+ * O botão "Abrir cofre" também existe no modal de configurações (que fica por
+ * baixo, aberto), então as ações da barreira saem daqui para não ambiguar. E o
+ * título entra como argumento porque cada etapa é um `h2` próprio: esperar por
+ * "Cofre bloqueado" na tela de redefinição daria verde na hora, já que o `h2`
+ * anterior acabou de ser trocado pelo título da etapa seguinte.
+ *
+ * A subida é pelo DOM: `h2` → cabeçalho do modal → modal.
  */
-function vaultBarrier(page: Page): Locator {
-  return page
-    .getByRole('heading', { name: pt.vault.unlockTitle, exact: true })
-    .locator('xpath=../..');
+function vaultBarrier(page: Page, title: string): Locator {
+  return page.getByRole('heading', { name: title, exact: true }).locator('xpath=../..');
 }
 
-export async function lockAndUnlockVault(page: Page): Promise<void> {
+/** A barreira some do DOM quando a chave volta para a sessão. */
+async function barreiraClosed(page: Page, title: string): Promise<void> {
+  await waitForHeadingGone(page, title);
+}
+
+/** Fecha o cofre pelo modal de configurações e devolve a barreira de pé. */
+async function lockVault(page: Page): Promise<Locator> {
   await openSettings(page);
   await clickButton(page, pt.vault.closeVault);
-  await waitForHeading(page, pt.vault.unlockTitle);
-  const barreira = vaultBarrier(page);
+  await waitForHeading(page, pt.auth.unlockTitle);
+  return vaultBarrier(page, pt.auth.unlockTitle);
+}
 
-  await barreira.getByLabel(pt.vault.passwordLabel, { exact: true }).fill(VAULT.wrong);
-  await barreira.getByRole('button', { name: pt.vault.unlockAction, exact: true }).click();
-  await waitForText(page, pt.vault.errors.vaultWrongPassword);
+/**
+ * Fecha o cofre e abre de novo, errando o PIN uma vez antes. O PIN errado arma a
+ * trava exponencial, então o acerto logo em seguida prova que a trava só atrasa
+ * a tentativa: ela não a elimina.
+ */
+export async function lockAndUnlockVault(page: Page): Promise<void> {
+  const barreira = await lockVault(page);
 
-  await barreira.getByLabel(pt.vault.passwordLabel, { exact: true }).fill(VAULT.master);
-  await barreira.getByRole('button', { name: pt.vault.unlockAction, exact: true }).click();
-  // A barreira some quando a chave volta: o modal de configurações, que ficou
-  // aberto por baixo, é o que aparece no topo de novo.
-  await page
-    .getByRole('heading', { name: pt.vault.unlockTitle, exact: true })
-    .waitFor({ state: 'detached' });
+  await barreira.getByLabel(pt.auth.pinLabel, { exact: true }).fill(VAULT.wrongPin);
+  await barreira.getByRole('button', { name: pt.auth.unlockAction, exact: true }).click();
+  await waitForText(page, pt.vault.errors.vaultWrongPin);
+
+  await barreira.getByLabel(pt.auth.pinLabel, { exact: true }).fill(VAULT.pin);
+  await barreira.getByRole('button', { name: pt.auth.unlockAction, exact: true }).click();
+  await barreiraClosed(page, pt.auth.unlockTitle);
   await closeSettings(page);
   // O acervo voltou: o roundtrip da biblioteca cifrada passou pelo disco.
+  await waitForText(page, WORK.editedTitle);
+}
+
+/**
+ * A senha mestra abre o mesmo cofre, no mesmo campo e sem escolher: o app decide
+ * o método pelo comprimento do que foi digitado, porque 24 caracteres só podem
+ * ser a senha mestra. A etapa de redefinição do PIN deixa de existir, então a
+ * espera é pelo título de bloqueio.
+ */
+export async function unlockWithMaster(page: Page): Promise<void> {
+  const barreira = await lockVault(page);
+
+  await barreira.getByLabel(pt.auth.pinLabel, { exact: true }).fill(VAULT.master);
+  await barreira.getByRole('button', { name: pt.auth.unlockAction, exact: true }).click();
+  await barreiraClosed(page, pt.auth.unlockTitle);
+  await closeSettings(page);
+  await waitForText(page, WORK.editedTitle);
+}
+
+/**
+ * A frase de recuperação não é login: ela só redefine o PIN. O caminho existe a
+ * partir da tela de bloqueio e abre o cofre em seguida, com o PIN novo já
+ * reembrulhado (o acervo em disco não é tocado).
+ */
+export async function resetVaultPin(page: Page): Promise<void> {
+  const bloqueio = await lockVault(page);
+
+  await bloqueio.getByRole('button', { name: pt.auth.forgotPin, exact: true }).click();
+  await waitForHeading(page, pt.auth.resetTitle);
+  // A etapa trocou o `h2`: o alcance das ações passa a ser o novo modal.
+  const redefinicao = vaultBarrier(page, pt.auth.resetTitle);
+
+  // Frase errada: erro próprio, e a rampa conta como em qualquer credencial.
+  await redefinicao.getByLabel(pt.auth.recoveryLabel, { exact: true }).fill(VAULT.wrongPhrase);
+  await redefinicao.getByLabel(pt.auth.newPinLabel, { exact: true }).fill(VAULT.newPin);
+  await redefinicao.getByLabel(pt.auth.newPinConfirmLabel, { exact: true }).fill(VAULT.newPin);
+  await redefinicao.getByRole('button', { name: pt.auth.resetAction, exact: true }).click();
+  await waitForText(page, pt.vault.errors.vaultWrongRecovery);
+
+  // Frase certa: PIN novo reembrulhado e cofre aberto.
+  await redefinicao.getByLabel(pt.auth.recoveryLabel, { exact: true }).fill(VAULT.phrase);
+  await redefinicao.getByRole('button', { name: pt.auth.resetAction, exact: true }).click();
+  await barreiraClosed(page, pt.auth.resetTitle);
+  await closeSettings(page);
   await waitForText(page, WORK.editedTitle);
 }
 
@@ -302,7 +417,7 @@ export async function resetLibrary(page: Page): Promise<void> {
   await waitForText(page, pt.app.emptyLibraryTitle);
 }
 
-/** Fecha o cofre e prova que a barreira reaparece pedindo a senha mestra. */
+/** Fecha o cofre e prova que a barreira reaparece pedindo a criação de um novo. */
 export async function destroyVault(page: Page): Promise<void> {
   await openSettings(page);
   await page.getByTitle(pt.danger.destroyTitle, { exact: true }).click();
@@ -310,8 +425,8 @@ export async function destroyVault(page: Page): Promise<void> {
     .getByLabel(pt.danger.typeLabel(pt.danger.destroyWord), { exact: true })
     .fill('DESTRUIR');
   await clickButton(page, pt.danger.confirmAction);
-  await waitForHeading(page, pt.vault.createTitle);
-  await waitForText(page, pt.vault.hint);
+  await waitForHeading(page, pt.auth.createTitle);
+  await waitForText(page, pt.auth.pinSubtitle);
 }
 
 export async function openSettings(page: Page): Promise<void> {

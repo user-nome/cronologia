@@ -27,6 +27,7 @@ type Alias = readonly [prefix: string, target: string];
 const ALIASES: readonly Alias[] = [
   ['@zero/types', 'src/types'],
   ['@zero/messages', 'src/messages'],
+  ['@zero/shared', 'src/shared'],
   ['@zero/main', 'src/main'],
   ['@zero/preload', 'src/preload'],
   ['@zero/renderer', 'src/renderer/src'],

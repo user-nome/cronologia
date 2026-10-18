@@ -151,10 +151,10 @@ export function remoteName(localName: string, key: Buffer): string {
   return crypto.createHmac('sha256', key).update(localName, 'utf-8').digest('hex');
 }
 
-/** Manifesto decifrado: mapeamento + salt da chave de nomes (nulo no formato v1). */
+/** Manifesto decifrado: mapeamento de nomes + salt da chave de nomes. */
 export interface Manifest {
   files: Record<string, string>;
-  nameSalt: Buffer | null;
+  nameSalt: Buffer;
 }
 
 /** Versão do formato de manifesto que embute o salt da chave de nomes. */
@@ -162,8 +162,7 @@ const MANIFEST_V2 = 2;
 
 /**
  * Serializa o manifesto `{ nomeRemoto: nomeLocal }` com o salt da chave de
- * nomes embutido (cifrar antes de subir). O `v2` é o formato atual; backups
- * antigos (v1, sem salt) continuam legíveis via `parseManifest`.
+ * nomes embutido (cifrar antes de subir).
  */
 export function buildManifest(mapping: Record<string, string>, nameSalt: Buffer): Buffer {
   const payload = { v: MANIFEST_V2, salt: nameSalt.toString('base64'), files: mapping };
@@ -193,9 +192,11 @@ function parseNameSalt(value: unknown, invalid: Error): Buffer {
 /**
  * Valida o manifesto decifrado; qualquer forma estranha é rejeitada.
  *
- * - **v2** (`{ v, salt, files }`): formato atual, com o salt da chave de nomes.
- * - **v1** (mapa puro): backups antigos, legados sem salt próprio (`nameSalt`
- *   fica `null`; o próximo backup sorteia um e migra para v2).
+ * Só existe um formato: `{ v, salt, files }`. O `v1` (mapa puro, sem salt
+ * próprio) foi removido junto com a migração do cofre, porque manter um caminho
+ * de leitura para um formato que nenhuma versão publicada produz mais só
+ * serviria para quem não tem backup nenhum — e essa pessoa precisa de um backup
+ * novo, não de um caminho antigo meio lido.
  */
 export function parseManifest(data: Buffer): Manifest {
   const invalid = new Error(currentMessages().driveErrors.invalidManifest);
@@ -209,14 +210,11 @@ export function parseManifest(data: Buffer): Manifest {
     throw invalid;
   }
   const version: unknown = 'v' in parsed ? Reflect.get(parsed, 'v') : undefined;
-  if (version !== undefined) {
-    if (version !== MANIFEST_V2) throw invalid;
-    const salt: unknown = 'salt' in parsed ? Reflect.get(parsed, 'salt') : undefined;
-    const files: unknown = 'files' in parsed ? Reflect.get(parsed, 'files') : undefined;
-    return {
-      files: parseFiles(files, invalid),
-      nameSalt: parseNameSalt(salt, invalid),
-    };
-  }
-  return { files: parseFiles(parsed, invalid), nameSalt: null };
+  if (version !== MANIFEST_V2) throw invalid;
+  const salt: unknown = 'salt' in parsed ? Reflect.get(parsed, 'salt') : undefined;
+  const files: unknown = 'files' in parsed ? Reflect.get(parsed, 'files') : undefined;
+  return {
+    files: parseFiles(files, invalid),
+    nameSalt: parseNameSalt(salt, invalid),
+  };
 }

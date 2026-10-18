@@ -19,6 +19,11 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
   e backup na nuvem (`drive/`).
 - `src/messages/`: textos do app em pt-BR (canônico), en, ko, zh-CN e ja (`@zero/messages`);
   guia em `docs/messages.md`.
+- `src/shared/`: regras puras que o renderer e o main precisam concordar
+  (`@zero/shared`): formato e força das credenciais do cofre (`policy`,
+  `strength`, `strategy`) e normalização de frase/contagem de trava (`format`).
+  Sem Node e sem DOM, para rodar nos dois processos; sem regra duplicada, ou o
+  main acaba aceitando o que a tela recusa.
 - `src/preload/`: única ponte da UI; monta e expõe `window.api` tipado.
 - `src/renderer/`: React; não acessa disco, rede nem Node direto.
 - `src/types/`: contratos compartilhados (`@zero/types`, barrel).
@@ -34,11 +39,16 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
 - Cada arquivo do `main` responde por um domínio; o renderer só conhece o
   contrato de `window.api` (`docs/api.md`).
 - Persistência local: obras e capas em `~/.local/share/cronologia/`
-  (`library.json`, `covers/`), idioma em `~/.config/cronologia/settings.json`
-  e **todos os segredos** no cofre `/var/lib/.cronologia/.vault`
-  (Argon2id + AES-256-GCM; sem cofre aberto não há segredo nem backup, ver
-  `docs/cofre.md`/`docs/credenciais.md`). Não existe caminho legado
-  (`enc:`/keyring, `dropbox-tokens.json`, migração de marca). A nuvem
+  (`library.json.enc`, `covers/*.enc`), idioma em
+  `~/.config/cronologia/settings.json` e **todos os segredos** no cofre
+  `/var/lib/.cronologia/.vault` (Argon2id + AES-256-GCM; sem cofre aberto não há
+  segredo nem acervo nem backup, ver `docs/cofre.md`/`docs/credenciais.md`). O
+  cofre tem **três** credenciais — senha mestra de 24 caracteres, PIN de 8
+  dígitos do dia a dia e frase de recuperação de 12+ palavras, que só redefine o
+  PIN — e a chave-mestra é **aleatória**: trocar qualquer uma delas é reembrulhar
+  (`vault/wrapping.ts`), nunca recifrar o acervo. Não existe caminho legado: o
+  container v1, o manifesto v1 do backup e as varreduras de formato antigo saíram
+  na 2.0 (`src/main/cleanup.ts` só varre `.tmp` órfão). A nuvem
   passa pelo contrato `BackupProvider` (`docs/backup-providers.md`): Dropbox
   usa a App folder e Google Drive usa `appDataFolder` quando `GOOGLE_CLIENT_ID`
   está configurado no build. As chaves OAuth públicas são injetadas no bundle
@@ -103,7 +113,11 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
   antes de concluir qualquer mudança.
 - `npm test` (ou `test:coverage`): Vitest em `tests/**`; cobertura mínima de
   **95% por arquivo** nas quatro métricas (`perFile: true`). Comportamento novo
-  vem com teste.
+  vem com teste. O Argon2id da suíte é um stand-in barato
+  (`tests/helpers/kdf.ts`, registrado em `tests/mock-kdf.ts`) porque o perfil do
+  PIN custa 2,1 s por abertura; `tests/main/vault-crypto.test.ts` desfaz o
+  stand-in e compara a derivação do app com a da biblioteca, então a integração
+  com `hash-wasm` continua verificada por um teste.
 - `npm run test:e2e` / `test:e2e:bundled` / `test:e2e:packaged`: Playwright
   sobre o app compilado (`out/`) e o payload do `.deb`. Exige `npm run build` e
   `npm run dist:dir` antes. Entra no typecheck (`e2e/tsconfig.json`) e no lint,
@@ -183,9 +197,9 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
   salvamento sobrescrever o acervo.
 - Destruição: `shred.ts` recebe **sempre** um caminho já validado pelo domínio
   (nunca id ou nome cru), sobrescreve com `fsync` antes do `unlink` e não segue
-  symlink. `writeContainer` recusa com `vaultDestroyed` depois de uma
-  destruição, e só `createVault` limpa a marca. Ação destrutiva na interface
-  sempre em duas etapas (`DangerZone.tsx`) e a falha parcial da nuvem é
+  symlink. `writeContainer` (`vault/store.ts`) recusa com `vaultDestroyed`
+  depois de uma destruição, e só `createVault` limpa a marca. Ação destrutiva na
+  interface sempre em duas etapas (`DangerZone.tsx`) e a falha parcial da nuvem é
   **contada**, nunca escondida.
 - `.deb` nunca entra no git e a assinatura do repo APT acontece só no
   workflow, a partir dos secrets.

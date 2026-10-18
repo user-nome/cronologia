@@ -3,8 +3,8 @@ import {
   LAST_DELAY_MS,
   LOCKOUT_DELAYS_MS,
   delayFor,
+  lockRemainingMs,
   lockUntilFor,
-  lockoutState,
 } from '@zero/main/vault/lockout';
 
 describe('vault/lockout: trava exponencial', () => {
@@ -70,11 +70,13 @@ describe('vault/lockout: trava exponencial', () => {
     expect(lockUntilFor(3, now)).toBe(now + 60_000);
   });
 
-  it('lockoutState distingue espera de liberado', () => {
+  it('lockRemainingMs devolve o que falta da espera, e 0 quando já passou', () => {
     const now = 1_700_000_000_000;
-    expect(lockoutState(now + 5_000, now)).toEqual({ locked: true, retryInMs: 5_000 });
-    expect(lockoutState(now, now)).toEqual({ locked: false, retryInMs: 0 });
-    expect(lockoutState(now - 1, now)).toEqual({ locked: false, retryInMs: 0 });
-    expect(lockoutState(0, now)).toEqual({ locked: false, retryInMs: 0 });
+    expect(lockRemainingMs(now + 5_000, now)).toBe(5_000);
+    // Instante exato já liberou: a espera termina quando o relógio chega lá.
+    expect(lockRemainingMs(now, now)).toBe(0);
+    expect(lockRemainingMs(now - 1, now)).toBe(0);
+    // `lockUntil` de cofre novo é 0, e 0 não pode virar espera negativa.
+    expect(lockRemainingMs(0, now)).toBe(0);
   });
 });

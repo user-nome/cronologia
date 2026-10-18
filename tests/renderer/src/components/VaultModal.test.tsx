@@ -4,17 +4,40 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event';
 import VaultModal from '@zero/renderer/components/VaultModal';
 import { messages } from '@zero/messages';
-import type { VaultResult } from '@zero/types';
+import { MASTER_PASSWORD_LENGTH } from '@zero/shared';
+import type { VaultResult, VaultStatus } from '@zero/types';
 import { createApiMock, installApiMock } from '../../../helpers/api.ts';
 import type { ApiMock } from '../../../helpers/api.ts';
 
 /**
- * O cofre é a barreira do app: sem ele não há acervo para mostrar. O teste
- * olha duas decisões que a pessoa sente na tela, e não a chamada crua do main:
- * quando a senha pode ser enviada e o que a trava mostra enquanto espera.
+ * O cofre é a barreira do app: sem ele não há acervo para mostrar. O teste olha
+ * quatro decisões que a pessoa sente na tela, e não a chamada crua do main: em
+ * que passo dá para seguir, o que a trava mostra enquanto espera, quando a
+ * senha mestra vira caminho alternativo e quando a frase recupera o PIN.
  */
 
 const m = messages('pt-BR');
+
+/** Credenciais válidas: os formatos do app são conferidos de verdade. */
+const MASTER = 'Tz7#mQ2!vZ9@pL4$xR8!nW3&';
+const PIN = '49201733';
+const PHRASE =
+  'cavalo cenoura feira inverno bibliografia zettelkasten kalamita peixoto velleda aurora jubileu silhueta';
+/** Outra frase igualmente válida, para exercitar a divergência de confirmação. */
+const OUTRA_FRASE =
+  'martelo ribeira outono violeta estrondo bengala ciclone telhado giz pontaria alvorada';
+
+const ABERTO: VaultStatus = {
+  exists: true,
+  unlocked: true,
+  attempts: 0,
+  lockUntil: 0,
+  lockRemainingMs: 0,
+  hasRecovery: true,
+};
+
+/** PIN que o dublê recusa (8 dígitos, formato válido, valor errado). */
+const WRONG_PIN = '00000000';
 
 interface SetupResult {
   mock: ApiMock;
@@ -30,111 +53,366 @@ function setup(): SetupResult {
   return { mock, onClose, onUnlocked };
 }
 
-function passwordField(): HTMLElement {
-  return screen.getByLabelText(m.vault.passwordLabel);
+/** Preenche a primeira etapa de criação e avança para a da frase. */
+async function fillCredentials(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.type(screen.getByLabelText(m.auth.masterLabel), MASTER);
+  await user.type(screen.getByLabelText(m.auth.masterConfirmLabel), MASTER);
+  await user.type(screen.getByLabelText(m.auth.pinLabel), PIN);
+  await user.type(screen.getByLabelText(m.auth.newPinConfirmLabel), PIN);
 }
 
-describe('VaultModal: criação', () => {
-  it('recusa confirmação diferente sem chamar o backend', async () => {
+async function toRecoveryStep(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await fillCredentials(user);
+  await user.click(screen.getByRole('button', { name: m.common.next }));
+}
+
+function pinField(): HTMLElement {
+  return screen.getByLabelText(m.auth.pinLabel);
+}
+
+/**
+ * Preenche um campo de uma vez só. `user.type` é certo para credenciais curtas,
+ * porque simula o que a pessoa digita; para a frase de recuperação (centenas de
+ * caracteres) ele só mede o relógio, porque a régua de força roda a cada toque.
+ */
+function preencher(campo: HTMLElement, valor: string): void {
+  fireEvent.change(campo, { target: { value: valor } });
+}
+
+describe('VaultModal: criação, etapa das credenciais', () => {
+  it('recusa senha mestra fora dos 24 caracteres sem chamar o backend', async () => {
     const { mock, onUnlocked, onClose } = setup();
     render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText('Senha mestra'), 'segredo-longo-123');
-    await user.type(screen.getByLabelText('Confirmar a senha'), 'outra-senha-456');
-    await user.click(screen.getByRole('button', { name: /Criar cofre/ }));
+    await user.type(screen.getByLabelText(m.auth.masterLabel), 'curta');
+    await user.click(screen.getByRole('button', { name: m.common.next }));
 
-    expect(await screen.findByText('As senhas não coincidem.')).toBeInTheDocument();
+    expect(
+      await screen.findByText(m.auth.masterLength(MASTER_PASSWORD_LENGTH, 5)),
+    ).toBeInTheDocument();
     expect(mock.vaultCreate).not.toHaveBeenCalled();
     expect(onUnlocked).not.toHaveBeenCalled();
   });
 
-  it('mostra o medidor de força da senha digitada', async () => {
+  it('recusa senha mestra previsível de 24 caracteres', async () => {
+    const { mock, onClose, onUnlocked } = setup();
+    render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(m.auth.masterLabel), 'a'.repeat(24));
+    await user.type(screen.getByLabelText(m.auth.masterConfirmLabel), 'a'.repeat(24));
+    await user.click(screen.getByRole('button', { name: m.common.next }));
+
+    expect(await screen.findByText(m.vault.errors.vaultWeakMaster)).toBeInTheDocument();
+    expect(mock.vaultCreate).not.toHaveBeenCalled();
+  });
+
+  it('recusa confirmações divergentes de senha e de PIN', async () => {
+    const { mock, onClose, onUnlocked } = setup();
+    render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(m.auth.masterLabel), MASTER);
+    await user.type(screen.getByLabelText(m.auth.masterConfirmLabel), `${MASTER}x`);
+    await user.click(screen.getByRole('button', { name: m.common.next }));
+    expect(await screen.findByText(m.auth.masterMismatch)).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText(m.auth.masterConfirmLabel));
+    await user.type(screen.getByLabelText(m.auth.masterConfirmLabel), MASTER);
+    await user.type(screen.getByLabelText(m.auth.pinLabel), PIN);
+    await user.type(screen.getByLabelText(m.auth.newPinConfirmLabel), '00000000');
+    await user.click(screen.getByRole('button', { name: m.common.next }));
+
+    expect(await screen.findByText(m.auth.pinMismatch)).toBeInTheDocument();
+    expect(mock.vaultCreate).not.toHaveBeenCalled();
+  });
+
+  it('recusa PIN fora dos 8 dígitos e PIN degenerado', async () => {
     const { onClose, onUnlocked } = setup();
     render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText('Senha mestra'), 'abc123');
-    expect(await screen.findByText('Fraca')).toBeInTheDocument();
+    await user.type(screen.getByLabelText(m.auth.masterLabel), MASTER);
+    await user.type(screen.getByLabelText(m.auth.masterConfirmLabel), MASTER);
+    await user.type(screen.getByLabelText(m.auth.pinLabel), '123');
+    await user.click(screen.getByRole('button', { name: m.common.next }));
+    expect(await screen.findByText(m.vault.errors.vaultInvalidPin)).toBeInTheDocument();
 
-    await user.clear(screen.getByLabelText('Senha mestra'));
-    await user.type(screen.getByLabelText('Senha mestra'), 'casa-azul-7x');
-    expect(await screen.findByText('Razoável')).toBeInTheDocument();
+    await user.clear(screen.getByLabelText(m.auth.pinLabel));
+    await user.type(screen.getByLabelText(m.auth.pinLabel), '11111111');
+    await user.click(screen.getByRole('button', { name: m.common.next }));
+    expect(await screen.findByText(m.vault.errors.vaultWeakPin)).toBeInTheDocument();
   });
 
-  it('cria o cofre com senha válida e avisa o fluxo pendente', async () => {
-    const { mock, onUnlocked, onClose } = setup();
+  it('Enter na confirmação do PIN também avança, e a frase curta é barrada depois', async () => {
+    const { onClose, onUnlocked } = setup();
     render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText('Senha mestra'), 'uva-preta-42-estrela');
-    await user.type(screen.getByLabelText('Confirmar a senha'), 'uva-preta-42-estrela');
-    await user.click(screen.getByRole('button', { name: /Criar cofre/ }));
+    await user.type(screen.getByLabelText(m.auth.masterLabel), MASTER);
+    await user.type(screen.getByLabelText(m.auth.masterConfirmLabel), MASTER);
+    await user.type(screen.getByLabelText(m.auth.pinLabel), PIN);
+    await user.type(screen.getByLabelText(m.auth.newPinConfirmLabel), `${PIN}{Enter}`);
 
-    await waitFor(() => expect(onUnlocked).toHaveBeenCalledTimes(1));
-    expect(mock.vaultCreate).toHaveBeenCalledWith('uva-preta-42-estrela');
+    // A etapa da frase abriu, e é ela que barra a frase curta: cada passo tem a
+    // sua régua, e nenhuma deixa a seguinte passar sem ser conferida.
+    expect(await screen.findByRole('heading', { name: m.auth.recoveryTitle })).toBeInTheDocument();
+    preencher(screen.getByLabelText(m.auth.recoveryLabel), 'curta');
+    await user.click(screen.getByRole('button', { name: m.auth.createAction }));
+    expect(await screen.findByText(m.auth.recoveryTooShort(12, 1))).toBeInTheDocument();
   });
 
-  it('Enter no campo de confirmação também cria o cofre', async () => {
-    const { mock, onUnlocked, onClose } = setup();
+  it('mostra o medidor de força da senha mestra digitada', async () => {
+    const { onClose, onUnlocked } = setup();
     render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText('Senha mestra'), 'uva-preta-42-estrela');
-    await user.type(screen.getByLabelText('Confirmar a senha'), 'uva-preta-42-estrela{Enter}');
+    await user.type(screen.getByLabelText(m.auth.masterLabel), 'a'.repeat(24));
+    expect(await screen.findByText(m.strength.levels.veryWeak)).toBeInTheDocument();
 
-    await waitFor(() => expect(onUnlocked).toHaveBeenCalledTimes(1));
-    expect(mock.vaultCreate).toHaveBeenCalledWith('uva-preta-42-estrela');
+    await user.clear(screen.getByLabelText(m.auth.masterLabel));
+    await user.type(screen.getByLabelText(m.auth.masterLabel), MASTER);
+    expect(await screen.findByText(m.strength.levels.veryStrong)).toBeInTheDocument();
   });
 
-  it('Enter sem a confirmação não chega ao cofre e não acusa divergência', async () => {
-    const { mock, onUnlocked, onClose } = setup();
+  it('avança para a etapa da frase com as duas credenciais válidas', async () => {
+    const { mock, onClose, onUnlocked } = setup();
     render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText('Senha mestra'), 'uva-preta-42-estrela{Enter}');
+    await toRecoveryStep(user);
 
-    // Atalho de teclado não fura a dupla confirmação, e também não inventa erro.
+    expect(await screen.findByRole('heading', { name: m.auth.recoveryTitle })).toBeInTheDocument();
+    expect(screen.getByLabelText(m.auth.recoveryLabel)).toBeInTheDocument();
+    // Ainda nada foi gravado: o cofre só existe depois da frase.
+    expect(mock.vaultCreate).not.toHaveBeenCalled();
+  });
+
+  it('Enter na confirmação do PIN também avança', async () => {
+    const { onClose, onUnlocked } = setup();
+    render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(m.auth.masterLabel), MASTER);
+    await user.type(screen.getByLabelText(m.auth.masterConfirmLabel), MASTER);
+    await user.type(screen.getByLabelText(m.auth.pinLabel), PIN);
+    await user.type(screen.getByLabelText(m.auth.newPinConfirmLabel), `${PIN}{Enter}`);
+
+    expect(await screen.findByRole('heading', { name: m.auth.recoveryTitle })).toBeInTheDocument();
+  });
+
+  it('Enter sem confirmação não avança e não chega ao cofre', async () => {
+    const { mock, onClose, onUnlocked } = setup();
+    render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(m.auth.masterLabel), `${MASTER}{Enter}`);
+
+    // Atalho de teclado não fura a dupla confirmação: o passo da frase não abre
+    // e nada é gravado.
     expect(mock.vaultCreate).not.toHaveBeenCalled();
     expect(onUnlocked).not.toHaveBeenCalled();
-    expect(screen.queryByText(m.vault.mismatch)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: m.vault.createAction })).toBeDisabled();
+    expect(screen.queryByRole('heading', { name: m.auth.recoveryTitle })).not.toBeInTheDocument();
+  });
+});
+
+describe('VaultModal: criação, etapa da frase de recuperação', () => {
+  it('recusa frase com menos de 12 palavras', async () => {
+    const { mock, onClose, onUnlocked } = setup();
+    render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
+    const user = userEvent.setup();
+    await toRecoveryStep(user);
+
+    await user.type(screen.getByLabelText(m.auth.recoveryLabel), 'poucas palavras');
+    await user.click(screen.getByRole('button', { name: m.auth.createAction }));
+
+    expect(await screen.findByText(m.auth.recoveryTooShort(12, 2))).toBeInTheDocument();
+    expect(mock.vaultCreate).not.toHaveBeenCalled();
   });
 
-  it('recusa do cofre que não tem espera mostra o erro e libera o botão', async () => {
+  it('recusa frase previsível: 12+ palavras com quase tudo repetido', async () => {
+    const { mock, onClose, onUnlocked } = setup();
+    render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
+    const user = userEvent.setup();
+    await toRecoveryStep(user);
+
+    // Texto longo entra por `change`, não tecla a tecla: a régua roda a cada
+    // caractere e um `user.type` de 130 toques não mede nada além do relógio.
+    preencher(screen.getByLabelText(m.auth.recoveryLabel), `${'cavalo '.repeat(11)}aurora`);
+    preencher(screen.getByLabelText(m.auth.recoveryConfirmLabel), 'qualquer');
+    await user.click(screen.getByRole('button', { name: m.auth.createAction }));
+
+    expect(await screen.findByText(m.vault.errors.vaultWeakRecovery)).toBeInTheDocument();
+    expect(mock.vaultCreate).not.toHaveBeenCalled();
+  });
+
+  it('recusa confirmação divergente, mesmo com duas frases igualmente válidas', async () => {
+    const { mock, onClose, onUnlocked } = setup();
+    render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
+    const user = userEvent.setup();
+    await toRecoveryStep(user);
+
+    preencher(screen.getByLabelText(m.auth.recoveryLabel), PHRASE);
+    preencher(screen.getByLabelText(m.auth.recoveryConfirmLabel), OUTRA_FRASE);
+    await user.click(screen.getByRole('button', { name: m.auth.createAction }));
+
+    // A régua de força passa nas duas; o que barra é a divergência.
+    expect(await screen.findByText(m.auth.recoveryMismatch)).toBeInTheDocument();
+    expect(mock.vaultCreate).not.toHaveBeenCalled();
+  });
+
+  it('cria o cofre com as três credenciais e avisa o fluxo pendente', async () => {
+    const { mock, onUnlocked, onClose } = setup();
+    render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await toRecoveryStep(user);
+    preencher(screen.getByLabelText(m.auth.recoveryLabel), PHRASE);
+    preencher(screen.getByLabelText(m.auth.recoveryConfirmLabel), PHRASE);
+    await user.click(screen.getByRole('button', { name: m.auth.createAction }));
+
+    await waitFor(() => expect(onUnlocked).toHaveBeenCalledTimes(1));
+    expect(mock.vaultCreate).toHaveBeenCalledWith({
+      masterPassword: MASTER,
+      pin: PIN,
+      recoveryPhrase: PHRASE,
+    });
+  });
+
+  it('a confirmação da frase ignora o espaço a mais e a quebra de linha', async () => {
+    const { onUnlocked, onClose } = setup();
+    render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await toRecoveryStep(user);
+    preencher(screen.getByLabelText(m.auth.recoveryLabel), PHRASE);
+    preencher(screen.getByLabelText(m.auth.recoveryConfirmLabel), `  ${PHRASE}  `);
+    await user.click(screen.getByRole('button', { name: m.auth.createAction }));
+
+    await waitFor(() => expect(onUnlocked).toHaveBeenCalledTimes(1));
+  });
+
+  it('a caixa das palavras conta: confirmar em maiúsculas não é a mesma frase', async () => {
+    const { mock, onUnlocked, onClose } = setup();
+    render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await toRecoveryStep(user);
+    preencher(screen.getByLabelText(m.auth.recoveryLabel), PHRASE);
+    preencher(screen.getByLabelText(m.auth.recoveryConfirmLabel), PHRASE.toUpperCase());
+    await user.click(screen.getByRole('button', { name: m.auth.createAction }));
+
+    // A caixa é um bit a mais para quem escreve e para quem ataca: normalizá-la
+    // faria a pessoa repetir a frase sem ganhar nada.
+    expect(await screen.findByText(m.auth.recoveryMismatch)).toBeInTheDocument();
+    expect(mock.vaultCreate).not.toHaveBeenCalled();
+    expect(onUnlocked).not.toHaveBeenCalled();
+  });
+
+  it('recusa do cofre mostra o erro e libera o botão', async () => {
     const { mock, onUnlocked, onClose } = setup();
     const recusa: VaultResult = { ok: false, code: 'vaultExists', retryInMs: 0 };
     mock.vaultCreate.mockResolvedValueOnce(recusa);
     render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText('Senha mestra'), 'uva-preta-42-estrela');
-    await user.type(screen.getByLabelText('Confirmar a senha'), 'uva-preta-42-estrela');
-    await user.click(screen.getByRole('button', { name: m.vault.createAction }));
+    await toRecoveryStep(user);
+    preencher(screen.getByLabelText(m.auth.recoveryLabel), PHRASE);
+    preencher(screen.getByLabelText(m.auth.recoveryConfirmLabel), PHRASE);
+    await user.click(screen.getByRole('button', { name: m.auth.createAction }));
 
     expect(await screen.findByText(m.vault.errors.vaultExists)).toBeInTheDocument();
     // Recusa sem espera não trava a tentativa: já existir cofre não é motivo
     // para segurar a pessoa numa contagem regressiva.
-    expect(screen.queryByText(/Aguarde/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: m.vault.createAction })).toBeEnabled();
+    expect(screen.queryByText(/Tente novamente em/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: m.auth.createAction })).toBeEnabled();
     expect(onUnlocked).not.toHaveBeenCalled();
+  });
+
+  it('Voltar traz as credenciais digitadas sem perder o que já foi escrito', async () => {
+    const { onClose, onUnlocked } = setup();
+    render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await toRecoveryStep(user);
+    await user.click(screen.getByRole('button', { name: m.common.back }));
+
+    expect(await screen.findByLabelText(m.auth.masterLabel)).toHaveValue(MASTER);
+    expect(screen.getByLabelText(m.auth.pinLabel)).toHaveValue(PIN);
   });
 });
 
 describe('VaultModal: desbloqueio', () => {
-  it('mostra o erro do backend e a espera quando a senha está errada', async () => {
+  it('abre pelo PIN e diz ao main que é PIN', async () => {
     const { mock, onUnlocked, onClose } = setup();
     render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText('Senha mestra'), 'errada');
-    await user.click(screen.getByRole('button', { name: /Desbloquear/ }));
+    await user.type(pinField(), PIN);
+    await user.click(screen.getByRole('button', { name: m.auth.unlockAction }));
 
-    expect(await screen.findByText('Senha mestra incorreta.')).toBeInTheDocument();
-    expect(await screen.findByText(/Aguarde 10 segundos/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Desbloquear/ })).toBeDisabled();
+    await waitFor(() => expect(onUnlocked).toHaveBeenCalledTimes(1));
+    expect(mock.vaultUnlock).toHaveBeenCalledWith({ credential: PIN, kind: 'pin' });
+  });
+
+  it('o comprimento decide o método: 24 caracteres é a senha mestra', async () => {
+    // Sem aba para escolher: quem tem a senha mestra digita e o app sabe o que é.
+    const { mock, onUnlocked, onClose } = setup();
+    render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await user.type(pinField(), MASTER);
+    await user.click(screen.getByRole('button', { name: m.auth.unlockAction }));
+
+    await waitFor(() => expect(onUnlocked).toHaveBeenCalledTimes(1));
+    expect(mock.vaultUnlock).toHaveBeenCalledWith({ credential: MASTER, kind: 'master' });
+  });
+
+  it('mostra o erro do backend e a espera quando o PIN está errado', async () => {
+    const { mock, onUnlocked, onClose } = setup();
+    render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await user.type(pinField(), WRONG_PIN);
+    await user.click(screen.getByRole('button', { name: m.auth.unlockAction }));
+
+    expect(await screen.findByText(m.vault.errors.vaultWrongPin)).toBeInTheDocument();
+    expect(await screen.findByText(m.auth.lockout('10s'))).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: m.auth.unlockAction })).toBeDisabled();
     expect(onUnlocked).not.toHaveBeenCalled();
-    expect(mock.vaultUnlock).toHaveBeenCalledWith('errada');
+    expect(mock.vaultUnlock).toHaveBeenCalledWith({ credential: WRONG_PIN, kind: 'pin' });
+  });
+
+  it('a senha mestra só vira caminho depois de 3 PINs errados', async () => {
+    const { mock, onClose, onUnlocked } = setup();
+    render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    expect(screen.queryByText(m.auth.masterAvailable)).not.toBeInTheDocument();
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      await user.clear(pinField());
+      await user.type(pinField(), PIN);
+      await user.click(screen.getByRole('button', { name: m.auth.unlockAction }));
+      // A trava segura a tentativa seguinte: o contador vive no main, e a tela
+      // não pode inventar um terceiro erro que ninguém digitou.
+      mock.vaultUnlock.mockClear();
+      mock.vaultUnlock.mockResolvedValueOnce({
+        ok: false,
+        code: 'vaultWrongPin',
+        retryInMs: 0,
+      });
+      expect(screen.queryByText(m.auth.masterAvailable)).not.toBeInTheDocument();
+    }
+
+    mock.vaultUnlock.mockClear();
+    mock.vaultUnlock.mockResolvedValueOnce({ ok: false, code: 'vaultWrongPin', retryInMs: 0 });
+    await user.clear(pinField());
+    await user.type(pinField(), PIN);
+    await user.click(screen.getByRole('button', { name: m.auth.unlockAction }));
+
+    expect(await screen.findByText(m.auth.masterAvailable)).toBeInTheDocument();
   });
 
   it('a espera da trava desce um segundo por vez e some no fim', async () => {
@@ -142,36 +420,38 @@ describe('VaultModal: desbloqueio', () => {
     vi.useFakeTimers();
     try {
       render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
-      fireEvent.change(passwordField(), { target: { value: 'errada' } });
+      fireEvent.change(pinField(), { target: { value: '00000000' } });
       // O relógio é falso: o envio é assíncrono e o `waitFor` (que espera por
       // temporizador) não roda aqui, então um flush de microtarefa entrega a
       // resposta do main.
       await act(() => {
-        fireEvent.click(screen.getByRole('button', { name: m.vault.unlockAction }));
+        fireEvent.click(screen.getByRole('button', { name: m.auth.unlockAction }));
         return Promise.resolve();
       });
-      expect(screen.getByText(m.vault.lockout(10))).toBeInTheDocument();
+      expect(screen.getByText(m.auth.lockout('10s'))).toBeInTheDocument();
 
       act(() => {
         vi.advanceTimersByTime(1000);
       });
-      expect(screen.getByText(m.vault.lockout(9))).toBeInTheDocument();
+      expect(screen.getByText(m.auth.lockout('9s'))).toBeInTheDocument();
       // Contando é informação: a pessoa precisa ver o tempo diminuindo, e o
-      // campo fica travado para não perder a senha que ela digitou.
-      expect(passwordField()).toBeDisabled();
+      // campo fica travado para não perder o PIN que ela digitou.
+      expect(pinField()).toBeDisabled();
 
       act(() => {
         vi.advanceTimersByTime(8000);
       });
-      expect(screen.getByText(m.vault.lockout(1))).toBeInTheDocument();
+      expect(screen.getByText(m.auth.lockout('1s'))).toBeInTheDocument();
 
       act(() => {
         vi.advanceTimersByTime(1000);
       });
-      // No fim da espera a trava some e a tentativa volta a ficar disponível.
-      expect(screen.queryByText(/Aguarde/)).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: m.vault.unlockAction })).toBeEnabled();
-      expect(passwordField()).toBeEnabled();
+      // No fim da espera a trava some e a tentativa volta a ficar possível. O
+      // campo ficou vazio de propósito: o PIN errado não fica na tela.
+      expect(screen.queryByText(/Tente novamente em/)).not.toBeInTheDocument();
+      expect(pinField()).toBeEnabled();
+      expect(pinField()).toHaveValue('');
+      expect(screen.getByRole('button', { name: m.auth.unlockAction })).toBeDisabled();
     } finally {
       vi.useRealTimers();
     }
@@ -187,35 +467,160 @@ describe('VaultModal: desbloqueio', () => {
     render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
 
     const user = userEvent.setup();
-    await user.type(passwordField(), 'errada');
-    await user.click(screen.getByRole('button', { name: m.vault.unlockAction }));
+    await user.type(pinField(), PIN);
+    await user.click(screen.getByRole('button', { name: m.auth.unlockAction }));
 
     // Cinco minutos de espera em contagem de segundos seria mentira de quem lê.
-    expect(await screen.findByText(m.vault.lockout(300))).toBeInTheDocument();
-    expect(m.vault.lockout(300)).toContain('5 minuto');
+    expect(await screen.findByText(m.auth.lockout('5min'))).toBeInTheDocument();
   });
 
-  it('desbloqueia com a senha certa e avisa o fluxo pendente', async () => {
+  it('Enter no campo do PIN também tenta abrir', async () => {
     const { mock, onUnlocked, onClose } = setup();
     render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText('Senha mestra'), 'certa-longo-123');
-    await user.click(screen.getByRole('button', { name: /Desbloquear/ }));
+    await user.type(pinField(), `${PIN}{Enter}`);
 
     await waitFor(() => expect(onUnlocked).toHaveBeenCalledTimes(1));
-    expect(mock.vaultUnlock).toHaveBeenCalledWith('certa-longo-123');
+    expect(mock.vaultUnlock).toHaveBeenCalledWith({ credential: PIN, kind: 'pin' });
   });
 
-  it('Enter no campo de senha também tenta desbloquear', async () => {
+  it('campo vazio não chama o main', () => {
+    const { mock, onClose, onUnlocked } = setup();
+    render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    expect(screen.getByRole('button', { name: m.auth.unlockAction })).toBeDisabled();
+    expect(mock.vaultUnlock).not.toHaveBeenCalled();
+  });
+});
+
+describe('VaultModal: recuperação do PIN esquecido', () => {
+  it('a frase curta não chega ao main', async () => {
+    const { mock, onClose, onUnlocked } = setup();
+    render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: m.auth.forgotPin }));
+    await user.type(screen.getByLabelText(m.auth.recoveryLabel), 'poucas palavras');
+    await user.type(screen.getByLabelText(m.auth.newPinLabel), '73851042');
+    await user.type(screen.getByLabelText(m.auth.newPinConfirmLabel), '73851042');
+    await user.click(screen.getByRole('button', { name: m.auth.resetAction }));
+
+    expect(await screen.findByText(m.auth.recoveryTooShort(12, 2))).toBeInTheDocument();
+    expect(mock.vaultResetPin).not.toHaveBeenCalled();
+  });
+
+  it('recusa PIN novo malformado e divergente', async () => {
+    const { mock, onClose, onUnlocked } = setup();
+    render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: m.auth.forgotPin }));
+    await user.type(screen.getByLabelText(m.auth.recoveryLabel), PHRASE);
+    await user.type(screen.getByLabelText(m.auth.newPinLabel), '123');
+    await user.click(screen.getByRole('button', { name: m.auth.resetAction }));
+    expect(await screen.findByText(m.vault.errors.vaultInvalidPin)).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText(m.auth.newPinLabel));
+    await user.type(screen.getByLabelText(m.auth.newPinLabel), '73851042');
+    await user.type(screen.getByLabelText(m.auth.newPinConfirmLabel), '73851043');
+    await user.click(screen.getByRole('button', { name: m.auth.resetAction }));
+    expect(await screen.findByText(m.auth.pinMismatch)).toBeInTheDocument();
+
+    // PIN novo degenerado tem 8 dígitos e é barrado pela régua, antes da
+    // confirmação: a ordem importa, porque confirmar nada custaria ao usuário.
+    await user.clear(screen.getByLabelText(m.auth.newPinLabel));
+    await user.clear(screen.getByLabelText(m.auth.newPinConfirmLabel));
+    await user.type(screen.getByLabelText(m.auth.newPinLabel), '11111111');
+    await user.type(screen.getByLabelText(m.auth.newPinConfirmLabel), '11111111');
+    await user.click(screen.getByRole('button', { name: m.auth.resetAction }));
+    expect(await screen.findByText(m.vault.errors.vaultWeakPin)).toBeInTheDocument();
+    expect(mock.vaultResetPin).not.toHaveBeenCalled();
+  });
+
+  it('redefine o PIN com a frase e abre o cofre', async () => {
     const { mock, onUnlocked, onClose } = setup();
     render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
 
     const user = userEvent.setup();
-    await user.type(passwordField(), 'certa-longo-123{Enter}');
+    await user.click(screen.getByRole('button', { name: m.auth.forgotPin }));
+    await user.type(screen.getByLabelText(m.auth.recoveryLabel), PHRASE);
+    await user.type(screen.getByLabelText(m.auth.newPinLabel), '73851042');
+    await user.type(screen.getByLabelText(m.auth.newPinConfirmLabel), '73851042');
+    await user.click(screen.getByRole('button', { name: m.auth.resetAction }));
 
     await waitFor(() => expect(onUnlocked).toHaveBeenCalledTimes(1));
-    expect(mock.vaultUnlock).toHaveBeenCalledWith('certa-longo-123');
+    expect(mock.vaultResetPin).toHaveBeenCalledWith({ phrase: PHRASE, newPin: '73851042' });
+  });
+
+  it('frase errada mostra o erro próprio e mantém a trava visível', async () => {
+    const { mock, onClose, onUnlocked } = setup();
+    mock.vaultResetPin.mockResolvedValueOnce({
+      ok: false,
+      code: 'vaultWrongRecovery',
+      retryInMs: 30_000,
+    });
+    render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: m.auth.forgotPin }));
+    await user.type(screen.getByLabelText(m.auth.recoveryLabel), PHRASE);
+    await user.type(screen.getByLabelText(m.auth.newPinLabel), '73851042');
+    await user.type(screen.getByLabelText(m.auth.newPinConfirmLabel), '73851042');
+    await user.click(screen.getByRole('button', { name: m.auth.resetAction }));
+
+    expect(await screen.findByText(m.vault.errors.vaultWrongRecovery)).toBeInTheDocument();
+    expect(screen.getByText(m.auth.lockout('30s'))).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: m.auth.resetAction })).toBeDisabled();
+    expect(onUnlocked).not.toHaveBeenCalled();
+  });
+
+  it('Enter no PIN novo também confirma, e a divergência ainda barra', async () => {
+    const { mock, onUnlocked, onClose } = setup();
+    render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: m.auth.forgotPin }));
+    await user.type(screen.getByLabelText(m.auth.recoveryLabel), PHRASE);
+    await user.type(screen.getByLabelText(m.auth.newPinLabel), '73851042');
+    await user.type(screen.getByLabelText(m.auth.newPinConfirmLabel), '73851043{Enter}');
+
+    // O atalho de teclado não fura a dupla confirmação: o mesmo caminho do botão.
+    expect(await screen.findByText(m.auth.pinMismatch)).toBeInTheDocument();
+    expect(mock.vaultResetPin).not.toHaveBeenCalled();
+
+    await user.clear(screen.getByLabelText(m.auth.newPinConfirmLabel));
+    await user.clear(screen.getByLabelText(m.auth.newPinLabel));
+    await user.type(screen.getByLabelText(m.auth.newPinLabel), '11111111{Enter}');
+    expect(await screen.findByText(m.vault.errors.vaultWeakPin)).toBeInTheDocument();
+    expect(mock.vaultResetPin).not.toHaveBeenCalled();
+  });
+
+  it('Enter na confirmação do PIN novo também redefine', async () => {
+    const { mock, onUnlocked, onClose } = setup();
+    render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: m.auth.forgotPin }));
+    await user.type(screen.getByLabelText(m.auth.recoveryLabel), PHRASE);
+    await user.type(screen.getByLabelText(m.auth.newPinLabel), '73851042');
+    await user.type(screen.getByLabelText(m.auth.newPinConfirmLabel), '73851042{Enter}');
+
+    await waitFor(() => expect(onUnlocked).toHaveBeenCalledTimes(1));
+    expect(mock.vaultResetPin).toHaveBeenCalledWith({ phrase: PHRASE, newPin: '73851042' });
+  });
+
+  it('voltar do reset leva de volta à tela do PIN, sem o que foi digitado', async () => {
+    const { onClose, onUnlocked } = setup();
+    render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: m.auth.forgotPin }));
+    await user.type(screen.getByLabelText(m.auth.recoveryLabel), PHRASE);
+    await user.click(screen.getByRole('button', { name: m.auth.backToPin }));
+
+    expect(await screen.findByRole('heading', { name: m.auth.unlockTitle })).toBeInTheDocument();
+    expect(pinField()).toHaveValue('');
   });
 });
 
@@ -225,7 +630,7 @@ describe('VaultModal: sair do cofre', () => {
     render(<VaultModal mode="unlock" onClose={onClose} onUnlocked={onUnlocked} />);
 
     const card = screen
-      .getByRole('heading', { name: m.vault.unlockTitle })
+      .getByRole('heading', { name: m.auth.unlockTitle })
       .closest<HTMLElement>('.modal');
     if (card === null) throw new Error('Cartão do modal não encontrado.');
     const overlay = card.closest<HTMLElement>('.overlay');
@@ -246,11 +651,12 @@ describe('VaultModal: sair do cofre', () => {
 
     expect(screen.queryByRole('button', { name: m.common.close })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: m.common.cancel })).not.toBeInTheDocument();
-    // Só a barra de ação fica: quem precisa da senha não tem como escapar dela.
-    expect(screen.getAllByRole('button')).toHaveLength(1);
+    // Só "esqueci o PIN" e a barra de ação ficam: quem precisa da credencial não
+    // tem como escapar dela, mas ainda tem o caminho da recuperação.
+    expect(screen.getByRole('button', { name: m.auth.forgotPin })).toBeInTheDocument();
 
     const card = screen
-      .getByRole('heading', { name: m.vault.unlockTitle })
+      .getByRole('heading', { name: m.auth.unlockTitle })
       .closest<HTMLElement>('.modal');
     if (card === null) throw new Error('Cartão do modal não encontrado.');
     const overlay = card.closest<HTMLElement>('.overlay');
@@ -271,17 +677,18 @@ describe('VaultModal: sair do cofre', () => {
     render(<VaultModal mode="create" onClose={onClose} onUnlocked={onUnlocked} />);
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText(m.vault.passwordLabel), 'uva-preta-42-estrela');
-    await user.type(screen.getByLabelText(m.vault.confirmLabel), 'uva-preta-42-estrela');
-    await user.click(screen.getByRole('button', { name: m.vault.createAction }));
+    await toRecoveryStep(user);
+    preencher(screen.getByLabelText(m.auth.recoveryLabel), PHRASE);
+    preencher(screen.getByLabelText(m.auth.recoveryConfirmLabel), PHRASE);
+    await user.click(screen.getByRole('button', { name: m.auth.createAction }));
 
     const running = await screen.findByRole('button', { name: m.common.loading });
     expect(running).toBeDisabled();
     expect(screen.getByRole('button', { name: m.common.cancel })).toBeDisabled();
-    expect(passwordField()).toBeDisabled();
+    expect(screen.getByLabelText(m.auth.recoveryLabel)).toBeDisabled();
 
     const card = screen
-      .getByRole('heading', { name: m.vault.createTitle })
+      .getByRole('heading', { name: m.auth.recoveryTitle })
       .closest<HTMLElement>('.modal');
     if (card === null) throw new Error('Cartão do modal não encontrado.');
     const overlay = card.closest<HTMLElement>('.overlay');
@@ -291,7 +698,7 @@ describe('VaultModal: sair do cofre', () => {
     // Fechar no meio da escrita do cofre deixaria a pessoa sem saber se gravou.
     expect(onClose).not.toHaveBeenCalled();
 
-    release({ ok: true, status: { exists: true, unlocked: true, attempts: 0, lockUntil: 0 } });
+    release({ ok: true, status: ABERTO });
     await waitFor(() => expect(onUnlocked).toHaveBeenCalledTimes(1));
   });
 });

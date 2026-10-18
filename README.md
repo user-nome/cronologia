@@ -11,10 +11,12 @@ Feito para **Linux Mint 22.3 (Zena)** e distribuído como pacote **`.deb`**.
 
 ## Recursos
 
-- **Cofre com senha mestra**: obras e capas são gravadas **cifradas** em disco
-  (AES-256-GCM com a chave do cofre). Abrir o app pede a senha; sem ela o acervo
-  não existe para o app, e o auto-lock de 5 min de inatividade fecha a sessão.
-  Ver [`docs/cofre.md`](docs/cofre.md).
+- **Cofre com três credenciais**: obras e capas são gravadas **cifradas** em disco
+  (AES-256-GCM com a chave do cofre). A chave é abrada por uma **senha mestra** de
+  24 caracteres, por um **PIN** de 8 dígitos no dia a dia, e por uma **frase de
+  recuperação** de 12+ palavras que não abre o cofre: ela só redefine o PIN
+  esquecido. Sem cofre aberto o acervo não existe para o app, e o auto-lock de 5
+  min de inatividade fecha a sessão. Ver [`docs/cofre.md`](docs/cofre.md).
 - **Zona de risco**: apagar a biblioteca, apagar o backup na nuvem e destruir o
   cofre, cada uma em duas etapas com palavra digitada. Arquivos apagados são
   sobrescritos antes, e destruir o cofre torna todo o acervo irrecuperável sem
@@ -286,13 +288,16 @@ flowchart TD
         UI4["SettingsModal: credenciais e backup"]
         UI5["AttributionsModal: créditos em loop"]
         UI6["DonateModal: apoio via Mercado Pago"]
+        UI7["VaultModal: criar/abrir o cofre<br/>(senha mestra · PIN · frase)"]
         BRIDGE["window.api (contextBridge)"]
         UI1 --> UI2
         UI1 --> UI3
         UI1 --> UI4
         UI1 --> UI5
         UI1 --> UI6
+        UI1 --> UI7
         UI2 --> BRIDGE
+        UI7 --> BRIDGE
         UI3 --> BRIDGE
         UI4 --> BRIDGE
     end
@@ -303,6 +308,11 @@ flowchart TD
         LIB["library.ts + store-crypto.ts:<br/>acervo cifrado"]
         SET["settings.ts: App key, senha do backup e idioma"]
         DRV["drive/: Dropbox + Google Drive, OAuth PKCE, backup (AES-256-GCM)"]
+    end
+
+    subgraph SHARED["Regras compartilhadas (src/shared)"]
+        S1["policy: formato de cada credencial"]
+        S2["strength: régua que recusa o degenerado"]
     end
 
     subgraph MSG["Mensagens (src/messages)"]
@@ -391,8 +401,8 @@ cronologia/
 │   ├── arquitetura.md          # camadas, aliases @zero/*, IPC e ciclo de vida
 │   ├── telas.md                # telas e componentes do renderer
 │   ├── dropbox.md              # guia do backup + diagramas
-│   ├── cofre.md                # cofre de segredos: container, KDF, trava, sessão
-│   ├── credenciais.md          # segredos do app: o que é guardado e ciclo de vida
+│   ├── cofre.md                # cofre: três credenciais, container v2, cadeia, trava, sessão
+│   ├── credenciais.md          # segredos do app: o que é guardado, ciclo de vida e força
 │   ├── backup-providers.md     # provedores de nuvem (Dropbox · Google Drive)
 │   ├── distribuicao-apt.md     # distribuição: Release + repo APT flat assinado
 │   ├── build.md                # build, .deb, fuses e o gate de qualidade no CI
@@ -415,7 +425,15 @@ cronologia/
 │   │   ├── paths.ts          # diretórios XDG do app (sem dependências de domínio)
 │   │   ├── external.ts       # openExternalSafe (só https:)
 │   │   ├── i18n.ts           # currentMessages() (idioma corrente no main)
-│   │   ├── vault/            # cofre de segredos (Argon2id, container, sessão, privilege)
+│   │   ├── vault/            # cofre de segredos (três credenciais, container, sessão)
+│   │   │   ├── crypto.ts     # Argon2id, AES-256-GCM, HKDF e perfis de custo por credencial
+│   │   │   ├── container.ts  # formato CHRONOS1 v2 (um embrulho por credencial)
+│   │   │   ├── store.ts      # caminho, leitura/gravação do container e guarda pós-destruição
+│   │   │   ├── wrapping.ts   # Strategy de embrulhar a chave por credencial
+│   │   │   ├── unlock.ts     # cadeia de desbloqueio (trava → formato → KDF → integridade)
+│   │   │   ├── auth.ts       # tentativas e projeção do estado para a interface
+│   │   │   ├── lockout.ts    # rampa de espera exponencial
+│   │   │   └── session.ts    # chave na memória, auto-lock e wipe
 │   │   └── drive/            # provedores de nuvem, OAuth PKCE, backup/restauração
 │   │       ├── index.ts      # barrel da API pública (authorize, backupNow…)
 │   │       ├── provider.ts   # contrato BackupProvider + catálogo de provedores
@@ -436,6 +454,11 @@ cronologia/
 │   │   ├── ko.ts             # tradução tipada contra Messages
 │   │   ├── zh-CN.ts          # tradução tipada contra Messages
 │   │   └── ja.ts             # tradução tipada contra Messages
+│   ├── shared/               # regras puras que renderer e main precisam concordar
+│   │   ├── policy.ts         # formato aceito de cada credencial
+│   │   ├── strength.ts       # régua de força (blocked = o que recusa)
+│   │   ├── strategy.ts       # Strategy: qual régua para cada tipo
+│   │   └── format.ts         # normalização da frase (caixa vale) e contagem da trava
 │   ├── preload/index.ts      # contextBridge (window.api)
 │   ├── renderer/             # React + Vite
 │   │   ├── index.html        # CSP com scheme cover:
@@ -445,7 +468,7 @@ cronologia/
 │   │   ├── work.ts           # Work, WorkType, WorkStatus
 │   │   ├── settings.ts       # AppSettings
 │   │   ├── drive.ts          # DriveStatus, BackupSummary
-│   │   ├── vault.ts          # VaultStatus, VaultResult, ElectronApi.vault
+│   │   ├── vault.ts          # UnlockKind, CreateVaultInput, VaultStatus, VaultResult
 │   │   └── api.ts            # ElectronApi (contrato do preload)
 │   ├── node.loader.ts        # hooks module.registerHooks() dos aliases @zero/*
 │   └── package.json          # "type": "module" (Node executa src/ direto)
@@ -453,10 +476,11 @@ cronologia/
 │   ├── main/                 # boot, biblioteca, configurações, cofre e drive (<500 linhas cada)
 │   ├── renderer/             # App e componentes (jsdom)
 │   ├── preload/              # fachada window.api
-│   ├── shared/               # uniões fechadas e guards dos contratos
-│   ├── helpers/              # fixtures, sandbox, vault (openTestVault), drive (FakeDropbox)
+│   ├── shared/               # policy e strength (formato e régua das credenciais)
+│   ├── helpers/              # fixtures, sandbox, vault (openTestVault), drive (FakeDropbox), kdf
 │   ├── mocks/                # mock do electron para o Vitest
 │   ├── setup-env.ts          # sandbox HOME/XDG temporária por processo de teste
+│   ├── mock-kdf.ts           # Argon2id de mentira (o de produção custa 2,1 s por abertura)
 │   ├── setup.ts              # jest-dom, cleanup e restauração de mocks/timers
 │   └── tsconfig.json         # typecheck dos testes
 ├── e2e/                      # Playwright: app compilado e payload do .deb (não importa src/)
@@ -522,7 +546,7 @@ Detalhes da configuração (campo `build` do `package.json`):
 
 Fluxo resumido (passo a passo completo em [`docs/dropbox.md`](docs/dropbox.md)):
 
-1. ⚙ → crie o **cofre de segredos** (senha mestra) e defina a **senha de criptografia do
+1. ⚙ → crie o **cofre de segredos** (senha mestra + PIN + frase) e defina a **senha de criptografia do
    backup** (obrigatória). A App key do Dropbox vem da variável `DROPBOX_APP_KEY`
    injetada no bundle main durante o build; com PKCE ela é um identificador público,
    e o acesso real fica no `refresh_token` guardado na sua máquina.
@@ -551,7 +575,7 @@ sequenceDiagram
     G-->>App: redirect http://localhost:17431/callback?code=...
     App->>G: POST /oauth2/token (code + code_verifier, sem secret)
     G-->>App: access_token (curto) + refresh_token (duradouro)
-    App->>App: grava dropbox.tokens no cofre (senha mestra)
+    App->>App: grava dropbox.tokens no cofre (chave do cofre)
 
     U->>App: Fazer backup agora
     App->>App: criptografa library.json + capas (nomes opacos + AES-256-GCM)
@@ -584,30 +608,30 @@ python3 build/make-icon.py
 
 Guias e referências (tudo em pt-BR):
 
-| Documento                                              | Conteúdo                                                               |
-| ------------------------------------------------------ | ---------------------------------------------------------------------- |
-| [`docs/visao-geral.md`](docs/visao-geral.md)           | Visão geral: o que o app é (e o que não é), dependências e glossário   |
-| [`docs/arquitetura.md`](docs/arquitetura.md)           | Arquitetura: camadas, aliases `@zero/*`, fluxo de IPC e ciclo de vida  |
-| [`docs/telas.md`](docs/telas.md)                       | Telas e componentes do renderer, com os fluxos de navegação            |
-| [`docs/dropbox.md`](docs/dropbox.md)                   | Guia do backup: OAuth PKCE, App folder, troubleshooting                |
-| [`docs/cofre.md`](docs/cofre.md)                       | Cofre: container, KDF, trava, sessão e destruição                      |
-| [`docs/credenciais.md`](docs/credenciais.md)           | Segredos do app: o que é guardado e o ciclo de vida (sem migração)     |
-| [`docs/backup-providers.md`](docs/backup-providers.md) | Provedores de backup: contrato, catálogo e Google Drive oculto         |
-| [`docs/distribuicao-apt.md`](docs/distribuicao-apt.md) | Distribuição: Release, repo APT flat assinado e fluxo de release       |
-| [`docs/build.md`](docs/build.md)                       | Build e pacote: comandos, `.deb`, fuses e gate de qualidade no CI      |
-| [`docs/seguranca.md`](docs/seguranca.md)               | Mapa de segurança: onde vive cada medida e o que não enfraquecer       |
-| [`docs/atribuicoes.md`](docs/atribuicoes.md)           | Página de Atribuições: créditos em loop e licenças                     |
-| [`docs/doacoes.md`](docs/doacoes.md)                   | Página de Doações: Mercado Pago                                        |
-| [`docs/messages.md`](docs/messages.md)                 | i18n: bundles de mensagens (pt-BR/en/ko/zh-CN/ja) e regras de tradução |
-| [`docs/api.md`](docs/api.md)                           | Referência da API interna (`window.api` + canais IPC)                  |
-| [`docs/testes.md`](docs/testes.md)                     | Testes: como rodar, inventário, convenções e cobertura                 |
-| [`docs/e2e.md`](docs/e2e.md)                           | Testes ponta a ponta: app compilado e payload do `.deb` (Playwright)   |
-| [`docs/mutation.md`](docs/mutation.md)                 | Testes de mutação: operadores, escopo, garantias e score               |
-| [`docs/openapi.yaml`](docs/openapi.yaml)               | Mesma API em OpenAPI 3.1 (abre em Swagger UI/Redoc)                    |
-| [`CHANGELOG.md`](CHANGELOG.md)                         | Histórico de mudanças por versão                                       |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md)                   | Como contribuir (ambiente, scripts, convenções)                        |
-| [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)             | Código de conduta da comunidade                                        |
-| [`SECURITY.md`](SECURITY.md)                           | Política de segurança e como reportar falhas                           |
+| Documento                                              | Conteúdo                                                                              |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| [`docs/visao-geral.md`](docs/visao-geral.md)           | Visão geral: o que o app é (e o que não é), dependências e glossário                  |
+| [`docs/arquitetura.md`](docs/arquitetura.md)           | Arquitetura: camadas, aliases `@zero/*`, fluxo de IPC e ciclo de vida                 |
+| [`docs/telas.md`](docs/telas.md)                       | Telas e componentes do renderer, com os fluxos de navegação                           |
+| [`docs/dropbox.md`](docs/dropbox.md)                   | Guia do backup: OAuth PKCE, App folder, troubleshooting                               |
+| [`docs/cofre.md`](docs/cofre.md)                       | Cofre: três credenciais, container v2, cadeia de abertura, trava, sessão e destruição |
+| [`docs/credenciais.md`](docs/credenciais.md)           | Segredos do app: o que é guardado, o ciclo de vida e a força de cada credencial       |
+| [`docs/backup-providers.md`](docs/backup-providers.md) | Provedores de backup: contrato, catálogo e Google Drive oculto                        |
+| [`docs/distribuicao-apt.md`](docs/distribuicao-apt.md) | Distribuição: Release, repo APT flat assinado e fluxo de release                      |
+| [`docs/build.md`](docs/build.md)                       | Build e pacote: comandos, `.deb`, fuses e gate de qualidade no CI                     |
+| [`docs/seguranca.md`](docs/seguranca.md)               | Mapa de segurança: onde vive cada medida e o que não enfraquecer                      |
+| [`docs/atribuicoes.md`](docs/atribuicoes.md)           | Página de Atribuições: créditos em loop e licenças                                    |
+| [`docs/doacoes.md`](docs/doacoes.md)                   | Página de Doações: Mercado Pago                                                       |
+| [`docs/messages.md`](docs/messages.md)                 | i18n: bundles de mensagens (pt-BR/en/ko/zh-CN/ja) e regras de tradução                |
+| [`docs/api.md`](docs/api.md)                           | Referência da API interna (`window.api` + canais IPC)                                 |
+| [`docs/testes.md`](docs/testes.md)                     | Testes: como rodar, inventário, convenções e cobertura                                |
+| [`docs/e2e.md`](docs/e2e.md)                           | Testes ponta a ponta: app compilado e payload do `.deb` (Playwright)                  |
+| [`docs/mutation.md`](docs/mutation.md)                 | Testes de mutação: operadores, escopo, garantias e score                              |
+| [`docs/openapi.yaml`](docs/openapi.yaml)               | Mesma API em OpenAPI 3.1 (abre em Swagger UI/Redoc)                                   |
+| [`CHANGELOG.md`](CHANGELOG.md)                         | Histórico de mudanças por versão                                                      |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md)                   | Como contribuir (ambiente, scripts, convenções)                                       |
+| [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)             | Código de conduta da comunidade                                                       |
+| [`SECURITY.md`](SECURITY.md)                           | Política de segurança e como reportar falhas                                          |
 
 ---
 

@@ -14,6 +14,8 @@ export const ko: Messages = {
     searchOptions: '입력하여 필터링…',
     clearSearch: '검색 지우기',
     noOptionsFound: '일치하는 항목 없음',
+    next: '다음',
+    back: '뒤로',
   },
 
   dialogs: {
@@ -328,49 +330,131 @@ export const ko: Messages = {
 
   /** 비밀 금고: 모달, UI 배지, 도메인 오류. */
   vault: {
-    createTitle: '비밀 금고 만들기',
-    unlockTitle: '금고 잠금 해제',
-    createBody:
-      '마스터 비밀번호를 만드세요. 이 비밀번호는 **라이브러리 전체**(작품과 표지, 디스크에 암호화됨)와 ' +
-      '앱의 비밀(Dropbox 토큰 및 백업 비밀번호)을 보호합니다. 비밀번호가 없으면 앱은 라이브러리를 ' +
-      '볼 수 없습니다. 비밀번호를 잃어버리면 복구할 수 없습니다.',
-    unlockBody: '라이브러리를 복호화하고 저장된 비밀에 접근하려면 마스터 비밀번호를 입력하세요.',
-    passwordLabel: '마스터 비밀번호',
-    confirmLabel: '비밀번호 확인',
-    createAction: '금고 만들기',
-    unlockAction: '잠금 해제',
-    hint: '최소 12자 이상 입력하고, 눈에 띄는 반복이나 연속은 피하세요.',
-    mismatch: '비밀번호가 일치하지 않습니다.',
-    strength: {
-      weak: '약함',
-      fair: '보통',
-      strong: '강함',
-    },
-    createHint: '앱 비밀을 보관할 마스터 비밀번호 금고를 만드세요.',
     closeVault: '금고 닫기',
     autoLocked: '비밀 금고가 비활성 상태라 자동으로 잠겼습니다.',
+    createHint: '암호화된 라이브러리와 앱 비밀을 보관할 금고를 만드세요.',
     badge: {
       open: '금고 열림',
       closed: '금고 잠김',
       none: '금고 없음',
     },
-    lockout: (seconds: number): string =>
-      seconds < 60
-        ? `${seconds}초 후에 다시 시도하세요.`
-        : `${Math.ceil(seconds / 60)}분 후에 다시 시도하세요.`,
     errors: {
       vaultExists: '이 컴퓨터에 이미 금고가 있습니다.',
       vaultMissing: '금고를 찾을 수 없습니다.',
       vaultLocked: '금고가 잠겨 있습니다.',
-      vaultLockedOut: '잠금 해제 시도가 너무 많습니다. 잠시 후 다시 시도하세요.',
-      vaultWrongPassword: '마스터 비밀번호가 올바르지 않습니다.',
+      vaultLockedOut: '시도가 너무 많습니다. 잠시 후 다시 시도하세요.',
+      vaultInvalidMaster: '마스터 비밀번호는 정확히 24자여야 합니다.',
+      vaultWeakMaster:
+        '예측하기 쉬운 마스터 비밀번호입니다(반복 문자, 연속, 반복 블록). 다른 것을 쓰세요.',
+      vaultWrongMaster: '마스터 비밀번호가 올바르지 않습니다.',
+      vaultInvalidPin: 'PIN은 정확히 8자리 숫자여야 합니다.',
+      vaultWeakPin: '예측하기 쉬운 PIN입니다(반복 숫자, 연속, 날짜 형태). 다른 것을 쓰세요.',
+      vaultWrongPin: 'PIN이 올바르지 않습니다.',
+      vaultInvalidRecovery: '복구 문장은 최소 12단어여야 합니다.',
+      vaultWeakRecovery: '예측하기 쉬운 문장입니다(서로 다른 단어가 적거나 반복이 많음).',
+      vaultWrongRecovery: '복구 문장이 일치하지 않습니다.',
       vaultTampered: '금고가 손상되었거나 변경되었습니다.',
       libraryTampered:
         '암호화된 라이브러리가 손상되었거나 변경되었습니다. 데이터는 삭제되지 않았습니다.',
       vaultDestroyed: '이 세션에서 금고가 파괴되었습니다. 계속하려면 새 금고를 만드세요.',
-      vaultWeakPassword: '예측하기 쉬운 비밀번호입니다. 더 예측하기 어려운 것으로 바꾸세요.',
       vaultDirUnavailable: '보관함 폴더를 만들 수 없습니다. 권한을 확인하세요.',
       vaultAuthCancelled: '보관함 폴더 만들기가 취소되었습니다.',
+    },
+  },
+
+  /**
+   * 금고 진입: 세 가지 자격 증명과 네 단계 생성. 앱에서 가장 많이 읽히는
+   * 문안(실행할 때마다 나타나는 진입 화면)이므로 별도 블록에 두고,
+   * `MASTER_PASSWORD_LENGTH`/`PIN_LENGTH`/`RECOVERY_MIN_WORDS` 상수를 문장에
+   * 넣습니다.
+   */
+  auth: {
+    createTitle: '금고 만들기',
+    createSubtitle:
+      '마스터 비밀번호는 정확히 **24자**이며 모든 것을 감싸는 키입니다. ' +
+      '앱은 이 키로 라이브러리와 비밀을 암호화해 `/var/lib/.cronologia/.vault/`에 보관합니다.',
+    masterLabel: '마스터 비밀번호 (24자)',
+    masterPlaceholder: '예: Kf7#mQ2!vZ9@pL4$xR8!nW3&',
+    masterConfirmLabel: '마스터 비밀번호 다시 입력',
+    masterMismatch: '비밀번호가 일치하지 않습니다.',
+    masterLength: (needed: number, actual: number): string =>
+      `마스터 비밀번호는 정확히 ${needed}자여야 합니다(입력 ${actual}자).`,
+    pinLabel: 'PIN (8자리)',
+    pinPlaceholder: '예: 49201733',
+    pinSubtitle: '매일 금고를 열 때 사용합니다.',
+    createAction: '금고 만들기',
+    creating: '금고 만드는 중…',
+    lockout: (time: string): string => `시도가 너무 많습니다. ${time} 후에 다시 시도하세요.`,
+    recoveryTitle: '복구 문장',
+    recoverySubtitle:
+      'PIN을 잊었을 때 PIN을 초기화할 문장을 **직접 작성하세요**. ' +
+      '앱은 이 문장을 만들지도 저장하지도 않습니다: 직접 정해 컴퓨터 밖에 적어 두세요.',
+    recoveryLabel: '복구 문장',
+    recoveryPlaceholder: '예: 겨울 지나서 목마가 시내에서 당근을 먹었다',
+    recoveryConfirmLabel: '복구 문장 다시 입력',
+    recoveryMismatch: '문장이 일치하지 않습니다.',
+    recoveryTooShort: (needed: number, actual: number): string =>
+      `문장은 최소 ${needed}단어여야 합니다(${actual}단어 입력).`,
+    recoveryHint: '단어의 대소문자는 구분하며, 여분의 공백만 확인할 때 무시됩니다.',
+    unlockTitle: '금고 잠김',
+    unlockSubtitle: '라이브러리를 복호화하고 비밀을 쓰려면 PIN을 입력하세요.',
+    tabPin: 'PIN',
+    tabMaster: '마스터 비밀번호',
+    masterAvailable: 'PIN이 3번 틀렸습니다: 이제 마스터 비밀번호로도 열 수 있습니다.',
+    forgotPin: 'PIN을 잊었어요',
+    unlockAction: '금고 열기',
+    unlocking: '여는 중…',
+    resetTitle: 'PIN 초기화',
+    resetSubtitle:
+      '금고를 만들 때 **직접** 적어 둔 복구 문장으로 새 PIN을 정하세요. 금고는 바로 열립니다.',
+    newPinLabel: '새 PIN (8자리)',
+    newPinConfirmLabel: '새 PIN 다시 입력',
+    pinMismatch: 'PIN이 일치하지 않습니다.',
+    resetAction: '초기화하고 열기',
+    resetting: '초기화 중…',
+    backToPin: 'PIN으로 돌아가기',
+    changeTitle: '금고 자격 증명 변경',
+    changeMasterTitle: '마스터 비밀번호 바꾸기',
+    changeMasterSubtitle:
+      '금고가 열려 있는 동안 오늘의 마스터 비밀번호는 그대로 동작합니다. ' +
+      '변경은 라이브러리를 다시 암호화하지 **않고** 키 랩만 다시 씁니다(수 초).',
+    changeMasterCurrent: '현재 마스터 비밀번호',
+    changeMasterNew: '새 마스터 비밀번호 (24자)',
+    changeMasterConfirm: '새 마스터 비밀번호 다시 입력',
+    changePinTitle: 'PIN 바꾸기',
+    changePinSubtitle:
+      '오늘의 PIN은 그대로 동작합니다. 변경은 키 랩만 다시 쓰므로 ' +
+      '디스크의 라이브러리는 그대로 유지됩니다.',
+    changePinCurrent: '현재 PIN',
+    changePinNew: '새 PIN (8자리)',
+    changePinConfirm: '새 PIN 다시 입력',
+    changeAction: '변경',
+    changing: '변경 중…',
+  },
+
+  /** 자격 증명 강도 표시줄(등급과 그 이유). */
+  strength: {
+    hintMaster: '등급은 안내용이며, 앱은 퇴화한 값만 거절합니다.',
+    hintPin: '여덟 자리 숫자는 "보통"을 넘지 못합니다: PIN을 지키는 것은 잠금 장치입니다.',
+    hintPhrase: '길이보다 서로 다르고 반복이 없는 단어가 값어치가 큽니다.',
+    levels: {
+      veryWeak: '매우 약함',
+      weak: '약함',
+      fair: '보통',
+      strong: '강함',
+      veryStrong: '매우 강함',
+    },
+    reasons: {
+      allSame: '같은 문자 반복',
+      sequence: '문자 연속',
+      repeatedBlock: '블록 반복',
+      dateLike: '날짜처럼 보임',
+      fewKinds: '문자 종류가 부족',
+      lowVariety: '서로 다른 문자가 부족',
+      commonWord: '흔한 단어 포함',
+      shortWords: '단어가 너무 짧음',
+      fewUniqueWords: '서로 다른 단어가 부족',
+      repeatedWords: '단어가 너무 많이 반복됨',
     },
   },
 

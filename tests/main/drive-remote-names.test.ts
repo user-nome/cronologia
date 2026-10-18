@@ -66,7 +66,6 @@ describe('nomes remotos opacos', { timeout: 60_000 }, () => {
     expect(names).toContain(remoteName(MANIFEST_FILE, manifestKey));
 
     const manifest = readManifest(drive);
-    if (manifest.nameSalt === null) throw new Error('Manifesto v1 não era esperado.');
     expect(manifest.nameSalt).toHaveLength(16);
 
     const key = nameKeyFor(PASSPHRASE, manifest.nameSalt);
@@ -77,8 +76,8 @@ describe('nomes remotos opacos', { timeout: 60_000 }, () => {
     expect(names).toContain(remoteName('library.json', key));
     expect(names).toContain(remoteName('capa.png', key));
 
-    // Nem o salt fixo legado (o mesmo que localiza o manifesto) deriva esses
-    // nomes: a cadeia de conteúdo usa o salt aleatório do manifesto v2.
+    // Nem o salt fixo que localiza o manifesto deriva esses nomes: a cadeia de
+    // conteúdo usa o salt aleatório que mora dentro do manifesto.
     expect(remoteName('library.json', key)).not.toBe(remoteName('library.json', manifestKey));
   });
 
@@ -86,38 +85,43 @@ describe('nomes remotos opacos', { timeout: 60_000 }, () => {
     const drive = await backupWithCover();
     const first = remoteNames(drive);
     const firstSalt = readManifest(drive).nameSalt;
-    if (firstSalt === null) throw new Error('Manifesto sem salt no teste.');
 
     const again = await backupNow();
     expect(again.ok).toBe(true);
     expect(remoteNames(drive).sort()).toEqual(first.sort());
-    expect(readManifest(drive).nameSalt?.equals(firstSalt)).toBe(true);
+    expect(readManifest(drive).nameSalt.equals(firstSalt)).toBe(true);
   });
 
-  it('migra manifesto v1 (sem salt) para v2 com salt aleatório', async () => {
+  it('manifesto de formato antigo não é aproveitado: o backup nasce no vigente', async () => {
     await connect();
     saveLibrary([makeWork({ id: 'obra-2' })]);
     const drive = new FakeDropbox();
     stubFetch((call) => drive.handle(call));
 
-    // Backup no formato antigo: nomes com o salt fixo e manifesto sem salt.
+    // Backup no formato antigo: nomes com o salt fixo e manifesto sem salt. A
+    // leitura desse formato saiu com a migração, então o app trata o manifesto
+    // como não aproveitável e sorteia um salt novo.
     const legacyKey = manifestKeyFor(PASSPHRASE);
     const legacyLibrary = remoteName('library.json', legacyKey);
-    const legacyManifest = { [legacyLibrary]: 'library.json' };
     drive.seed(legacyLibrary, Buffer.from('[]'));
     drive.seed(
       remoteName(MANIFEST_FILE, legacyKey),
-      encryptWith(Buffer.from(JSON.stringify(legacyManifest), 'utf-8'), PASSPHRASE),
+      encryptWith(
+        Buffer.from(JSON.stringify({ [legacyLibrary]: 'library.json' }), 'utf-8'),
+        PASSPHRASE,
+      ),
     );
 
     const result = await backupNow();
     expect(result.ok).toBe(true);
 
     const manifest = readManifest(drive);
-    if (manifest.nameSalt === null) throw new Error('Manifesto não migrou para v2.');
+    expect(manifest.nameSalt).toHaveLength(16);
     const key = nameKeyFor(PASSPHRASE, manifest.nameSalt);
     expect(remoteName('library.json', key)).not.toBe(legacyLibrary);
     expect(manifest.files).toEqual({ [remoteName('library.json', key)]: 'library.json' });
+    // O blob antigo sai da lista: um arquivo que ninguém mais mapeia é lixo
+    // ocupando espaço na conta de quem paga pelo plano.
     expect(drive.findByName(legacyLibrary)).toBeUndefined();
   });
 

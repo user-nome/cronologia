@@ -3,18 +3,19 @@ import { pbkdf2Sync } from 'node:crypto';
 /**
  * Doppelgänger de `hash-wasm` para a varredura de mutação.
  *
- * A suíte do Cronologia deriva chaves com Argon2id (`KDF_DEFAULTS` tem 128 MiB,
- * e `tests/main/vault.test.ts` cria cofre em cada teste), e como um mutante roda
- * a suíte de novo, esse custo domina a varredura inteira. Aqui `argon2id` vira
- * um PBKDF2 com o número de iterações do próprio pedido: some em milissegundos e
- * continua sendo determinístico, sensível à senha, ao salt e **aos parâmetros**,
- * que é tudo que `tests/main/vault-crypto.test.ts` verifica (mesma senha e mesmo
- * salt dão a mesma chave; senha, salt ou custo diferentes, não).
+ * A suíte do Cronologia deriva chaves com Argon2id (`KDF_MASTER` tem 128 MiB e
+ * `KDF_PIN` 256 MiB, e `tests/main/vault.test.ts` cria cofre em cada teste), e
+ * como um mutante roda a suíte de novo, esse custo domina a varredura inteira.
+ * Aqui `argon2id` vira um PBKDF2 com o número de iterações do próprio pedido:
+ * some em milissegundos e continua sendo determinístico, sensível à senha, ao
+ * salt e **aos parâmetros**, que é tudo que `tests/main/vault-crypto.test.ts`
+ * verifica (mesma senha e mesmo salt dão a mesma chave; senha, salt ou custo
+ * diferentes, não).
  *
  * A troca só vale se a suíte continuar verde sem mutante: o runner exige esse
  * baseline antes de confiar em qualquer veredito. E como nenhum teste compara a
  * saída com um vetor do Argon2id, a derivação real continua coberta por
- * `npm test`.
+ * `npm test`, que usa o `hash-wasm` de verdade.
  *
  * Nada aqui protege segredo: isto roda só sob `vitest.mutation.config.mts`, que
  * aponta `hash-wasm` para cá. O Argon2id de verdade está em

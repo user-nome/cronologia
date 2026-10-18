@@ -6,7 +6,105 @@ em português do Brasil.
 
 ## [Não lançado]
 
+## [2.0.0]
+
+### Mudado
+
+- **O cofre passou a ter três credenciais** (o desenho é o do app Guardinha, já
+  auditado por aqui). A chave-mestra continua sendo **uma só, aleatória**; o que
+  mudou é o que a protege:
+  - **senha mestra** com **exatamente 24 caracteres** (antes: mínimo de 12). O
+    app não a gera nem sugere, e o formato fixo com recusa de padrão degenerado
+    substitui a dica de "use 12 caracteres ou mais";
+  - **PIN de 8 dígitos** para o dia a dia, novo. É o único segredo do cofre que
+    dá para enumerar (10^8 candidatos), então recebe o **perfil mais caro do
+    Argon2id**: 256 MiB e 4 iterações, contra 128 MiB e 3 da senha mestra e da
+    frase. Medido nesta máquina: 2,1 s por abertura com o PIN certo, 0,8 s pela
+    senha mestra;
+  - **frase de recuperação** de 12+ palavras, nova, escrita pelo próprio usuário.
+    Ela **não abre o cofre**: prova posse e **redefine o PIN**. Assim, um backup
+    da frase (foto, papel, gerenciador) não vale o mesmo que a chave. A
+    comparação **distingue maiúsculas de minúsculas** e normaliza apenas o
+    espaço (colapsa tabulação e quebra de linha): cada palavra capitalizada é um
+    bit a mais para quem escreve e para quem ataca, e ninguém decora o
+    espaçamento exato do que anotou no celular. Acento e pontuação também
+    contam.
+- **A tela de abertura é o PIN por padrão**, e a senha mestra aparece como
+  caminho alternativo depois de 3 PINs errados. Não há aba para escolher: 24
+  caracteres só podem ser a senha mestra e 8 dígitos só podem ser o PIN, então
+  o app decide pelo comprimento do que foi digitado.
+- **A criação virou duas etapas** (senha mestra + PIN, depois a frase), porque a
+  frase é um texto longo de escrever duas vezes e enfiar ela no mesmo bloco da
+  senha mestra fazia a pessoa perder o que já digitado quando errava o PIN logo
+  abaixo.
+- **Trocar senha mestra e trocar PIN** são operações novas, pelo menu do cofre
+  nas Configurações. Exigem cofre aberto **e** a credencial atual (cofre aberto é
+  estado do processo, não prova de posse), e só reescrevem o embrulho da chave:
+  o acervo em disco não é tocado e a biblioteca não recarrega.
+- **A rampa de tentativas é compartilhada pelas três credenciais.** Um contador
+  por método daria ao atacante que escolhe a credencial uma contagem maior que a
+  do app, e o PIN é justamente o que se erra todo dia. A frase errada também
+  entra nela, senão o caminho de recuperação seria o atalho para força bruta.
+- **A camada `src/shared/`** (nova) concentra as regras de credencial que o
+  renderer e o main precisam concordar: `policy.ts` (formato aceito),
+  `strength.ts` (régua que recusa o degenerado), `strategy.ts` (Strategy por
+  tipo) e `format.ts` (normalização da frase, contagem da trava). As duas cópias
+  divergiam antes, e o main acabava aceitando o que a tela recusava.
+- **O `VaultModal` foi dividido** por passo (`VaultCreateSteps`,
+  `VaultUnlockSteps`) e a casca virou `VaultShell`. O modal deixou de passar de
+  590 linhas e decide só qual fluxo aparece.
+
+### Adicionado
+
+- **Container `vault.zkv` versão 2**: a chave-mestra passa a ser **embrulhada por
+  cada credencial** (três blobs AES-256-GCM, cada um com o custo do segredo que
+  o protege) em vez de derivada da senha direto. O salt do payload virou campo
+  do cabeçalho (`payloadSalt`), o que permite trocar senha, PIN e frase sem
+  tocar no acervo cifrado em disco.
+- **Cadeia de desbloqueio** (`src/main/vault/unlock.ts`, Chain of Responsibility)
+  com a ordem que é a própria defesa: trava exponencial → formato da credencial →
+  Argon2id → integridade do payload. Se o Argon2id viesse primeiro, a espera de
+  24 h seria contornável por um `await` a menos e um PIN de dois dígitos
+  custaria 256 MiB só para ser recusado. O último elo pega a escrita
+  interrompida, que deixa o embrulho íntegro e o payload pela metade.
+- **Reembrulho automático do custo**: método gravado abaixo do perfil vigente é
+  reescrito no próprio desbloqueio (só quem tem a credencial consegue), e o
+  acervo em disco não é tocado.
+- Canais `vault:reset-pin`, `vault:change-master` e `vault:change-pin`, com
+  entrada em `docs/api.md` e `docs/openapi.yaml`.
+
+### Removido
+
+- **Sem caminho de leitura do container v1.** Um `vault.zkv` com versão
+  diferente é recusado como `vaultTampered` e a pessoa precisa criar um cofre
+  novo. A decisão vale porque nenhuma versão publicada do 2.0 existia para que
+  alguém tivesse um v1 em uso com acervo a perder.
+- **Varreduras de disco de formato antigo** (`src/main/cleanup.ts`): tokens do
+  Dropbox em claro (`dropbox-tokens.json`, `drive-tokens.json`), campo `enc:`
+  do `settings.json`, pasta `.vault` em `~/.config` e acervo sem o sufixo `.enc`.
+  Nenhuma versão atual escreve nada disso, e varrer arquivo que o app não
+  escreve é código que só promete uma proteção que ninguém precisa. Ficou a
+  varredura de `.tmp` órfão, que protege o app de hoje.
+- **Leitura do manifesto v1 do backup** (`src/main/drive/crypto.ts`): um backup
+  antigo é tratado como não aproveitável e o backup seguinte nasce no formato
+  vigente. Quem só tem esse backup precisa de um novo, e é a resposta honesta.
+- `passwordProblem` (substituído por `strengthFor(kind).evaluate().blocked`), o
+  KDF único `KDF_DEFAULTS` e o formato de "senha livre com mínimo de 12".
+
 ### Cobertura de teste
+
+- Suíte de **780 para 935 testes**, com 17 arquivos novos ou reescritos. O
+  stand-in de KDF (`tests/helpers/kdf.ts`) veio porque o PIN de produção custa
+  2,1 s por abertura e a suíte abre o cofre dezenas de vezes;
+  `tests/main/vault-crypto.test.ts` desfaz o stand-in e compara a derivação do
+  app com a da biblioteca, para a integração com `hash-wasm` continuar
+  verificada.
+- Todos os arquivos criados ou tocados na 2.0 passam do piso de **95% por
+  arquivo** nas quatro métricas. O que ficou abaixo do piso
+  (`src/main/drive/providers/*` e `src/renderer/src/components/Select.tsx`) já
+  estava antes desta mudança e não foi tocado aqui.
+
+### Cobertura de teste (1.9.2)
 
 - **cobertura de 95% por arquivo** nas quatro métricas (`perFile: true` em
   `vitest.config.mts`), subindo de 50% agregado. Estado medido na 1.9.2:

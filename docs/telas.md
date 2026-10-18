@@ -12,7 +12,13 @@ Todo texto vem do contexto de idioma (`useMessages()`), nunca embutido no JSX.
 | `components/WorkCard.tsx`             | Card da obra: capa, badges, barra e ações de progresso/status              |
 | `components/WorkModal.tsx`            | Criar/editar obra (capa, campos, progresso, excluir com confirmação)       |
 | `components/SettingsModal.tsx`        | Configurações: idioma, cofre, provedores, senha de backup e ações do Drive |
-| `components/VaultModal.tsx`           | Criar/desbloquear o cofre de segredos (senha mestra, força, trava)         |
+| `components/VaultModal.tsx`           | Escolhe o fluxo do cofre: criação ou abertura                              |
+| `components/VaultCreateSteps.tsx`     | Criar o cofre em duas etapas (senha mestra + PIN, depois a frase)          |
+| `components/VaultUnlockSteps.tsx`     | Abrir pelo PIN/senha mestra, com "esqueci o PIN" pela frase                |
+| `components/CredentialModal.tsx`      | Trocar a senha mestra ou o PIN com o cofre aberto                          |
+| `components/VaultShell.tsx`           | Casca dos modais de cofre (cabeçalho, ações, botão com spinner)            |
+| `components/StrengthMeter.tsx`        | Medidor de força da credencial (nota + motivo)                             |
+| `components/VaultBanners.tsx`         | Aviso de erro, aviso de trava com contagem e atalho de Enter               |
 | `components/RestorePasswordModal.tsx` | Pede a senha de criptografia para restaurar o backup                       |
 | `components/AttributionsModal.tsx`    | Créditos das dependências em rolagem (pós-créditos)                        |
 | `components/DonateModal.tsx`          | Página de doação (Mercado Pago: abrir e copiar o link)                     |

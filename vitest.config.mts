@@ -6,6 +6,7 @@ import { defineConfig } from 'vitest/config';
 export const aliases = {
   '@zero/types': resolve(import.meta.dirname, 'src/types'),
   '@zero/messages': resolve(import.meta.dirname, 'src/messages'),
+  '@zero/shared': resolve(import.meta.dirname, 'src/shared'),
   '@zero/main': resolve(import.meta.dirname, 'src/main'),
   '@zero/preload': resolve(import.meta.dirname, 'src/preload'),
   '@zero/renderer': resolve(import.meta.dirname, 'src/renderer/src'),
@@ -29,7 +30,7 @@ export default defineConfig({
     // O registro de IPC/scheme do processo main acontece no import; limpar mocks
     // antes de cada teste apagaria essas chamadas e quebraria os asserts.
     clearMocks: false,
-    setupFiles: ['tests/setup-env.ts', 'tests/setup.ts'],
+    setupFiles: ['tests/setup-env.ts', 'tests/mock-kdf.ts', 'tests/setup.ts'],
     include: ['tests/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',

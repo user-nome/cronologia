@@ -5,10 +5,35 @@ import SettingsModal from '@zero/renderer/components/SettingsModal';
 import type { AppSettings } from '@zero/types';
 import { createApiMock, installApiMock } from '../../../helpers/api.ts';
 import type { ApiMock } from '../../../helpers/api.ts';
+import { messages } from '@zero/messages';
 
-const SEM_COFRE = { exists: false, unlocked: false, attempts: 0, lockUntil: 0 };
-const FECHADO = { exists: true, unlocked: false, attempts: 0, lockUntil: 0 };
-const ABERTO = { exists: true, unlocked: true, attempts: 0, lockUntil: 0 };
+/** Bundle pt-BR: os títulos do cofre vivem em `m.auth`, e a suíte cita os dois. */
+const m = messages('pt-BR');
+
+const SEM_COFRE = {
+  exists: false,
+  unlocked: false,
+  attempts: 0,
+  lockUntil: 0,
+  lockRemainingMs: 0,
+  hasRecovery: true,
+};
+const FECHADO = {
+  exists: true,
+  unlocked: false,
+  attempts: 0,
+  lockUntil: 0,
+  lockRemainingMs: 0,
+  hasRecovery: true,
+};
+const ABERTO = {
+  exists: true,
+  unlocked: true,
+  attempts: 0,
+  lockUntil: 0,
+  lockRemainingMs: 0,
+  hasRecovery: true,
+};
 
 const SENHA = 'senha-qualquer-123';
 
@@ -34,7 +59,7 @@ function setup(vault: typeof SEM_COFRE): SetupResult {
 }
 
 /** Isola o `VaultModal`: a badge do cofre usa o mesmo rótulo do botão do modal. */
-function vaultModal(titulo: RegExp): HTMLElement {
+function vaultModal(titulo: string): HTMLElement {
   const modal = screen.getByRole('heading', { name: titulo }).closest<HTMLElement>('.modal');
   if (modal === null) throw new Error('Modal do cofre ausente.');
   return modal;
@@ -42,9 +67,9 @@ function vaultModal(titulo: RegExp): HTMLElement {
 
 /** Digita a senha mestra e confirma no modal do cofre. */
 async function unlockVault(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-  const modal = vaultModal(/Desbloquear o cofre/);
-  await user.type(within(modal).getByLabelText('Senha mestra'), SENHA);
-  await user.click(within(modal).getByRole('button', { name: /^Desbloquear$/ }));
+  const modal = vaultModal(m.auth.unlockTitle);
+  await user.type(within(modal).getByLabelText(m.auth.pinLabel), SENHA);
+  await user.click(within(modal).getByRole('button', { name: m.auth.unlockAction }));
 }
 
 describe('SettingsModal: tecla de fechamento', () => {
@@ -66,16 +91,16 @@ describe('SettingsModal: botões da badge do cofre', () => {
     setup(SEM_COFRE);
     expect(await screen.findByText('Sem cofre')).toBeInTheDocument();
 
-    await userEvent.setup().click(screen.getByRole('button', { name: /Criar cofre/ }));
-    expect(await screen.findByText('Criar o cofre de segredos')).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: m.auth.createAction }));
+    expect(await screen.findByText(m.auth.createTitle)).toBeInTheDocument();
   });
 
   it('oferece o desbloqueio quando o cofre está fechado', async () => {
     setup(FECHADO);
     expect(await screen.findByText('Cofre fechado')).toBeInTheDocument();
 
-    await userEvent.setup().click(screen.getByRole('button', { name: /^Desbloquear$/ }));
-    expect(await screen.findByText('Desbloquear o cofre')).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: m.auth.unlockAction }));
+    expect(await screen.findByText(m.auth.unlockTitle)).toBeInTheDocument();
   });
 
   it('fecha o cofre aberto e a badge acompanha', async () => {
@@ -96,14 +121,14 @@ describe('SettingsModal: ação adiada até o cofre abrir', () => {
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /^Salvar$/ }));
-    expect(await screen.findByText('Desbloquear o cofre')).toBeInTheDocument();
+    expect(await screen.findByText(m.auth.unlockTitle)).toBeInTheDocument();
     // Nada gravou antes da senha mestra: sem cofre não há segredo em disco.
     expect(mock.settingsSet).not.toHaveBeenCalled();
 
     await unlockVault(user);
 
     await waitFor(() => expect(mock.settingsSet).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.queryByText('Desbloquear o cofre')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(m.auth.unlockTitle)).not.toBeInTheDocument());
     expect(await screen.findByText('Cofre aberto')).toBeInTheDocument();
   });
 
@@ -113,19 +138,19 @@ describe('SettingsModal: ação adiada até o cofre abrir', () => {
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /^Salvar$/ }));
-    expect(await screen.findByText('Desbloquear o cofre')).toBeInTheDocument();
+    expect(await screen.findByText(m.auth.unlockTitle)).toBeInTheDocument();
     await user.click(
-      within(vaultModal(/Desbloquear o cofre/)).getByRole('button', { name: /^Cancelar$/ }),
+      within(vaultModal(m.auth.unlockTitle)).getByRole('button', { name: /^Cancelar$/ }),
     );
-    await waitFor(() => expect(screen.queryByText('Desbloquear o cofre')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(m.auth.unlockTitle)).not.toBeInTheDocument());
 
     // Reabre o prompt pela badge, que não rearma nenhuma ação, e desbloqueia: a
     // intenção antiga foi descartada junto com o modal, então nada é gravado por
     // baixo dos panos depois de o cofre abrir.
-    await user.click(screen.getByRole('button', { name: /^Desbloquear$/ }));
-    expect(await screen.findByText('Desbloquear o cofre')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: m.auth.unlockAction }));
+    expect(await screen.findByText(m.auth.unlockTitle)).toBeInTheDocument();
     await unlockVault(user);
-    await waitFor(() => expect(screen.queryByText('Desbloquear o cofre')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(m.auth.unlockTitle)).not.toBeInTheDocument());
     expect(mock.settingsSet).not.toHaveBeenCalled();
   });
 });

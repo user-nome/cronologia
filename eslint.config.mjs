@@ -62,12 +62,12 @@ const ENV_GUARD = [
     selector:
       'MemberExpression[computed=false][property.name=/^(CRONOLOGIA_VAR_LIB|CRONOLOGIA_VAULT_DIR|ELECTRON_RENDERER_URL)$/]',
     message:
-      'As variáveis que movem o cofre são lidas em vault/vault.ts (e vault/privilege.ts); ELECTRON_RENDERER_URL, em main/index.ts. Em outro módulo, isto é um caminho de redirecionamento.',
+      'As variáveis que movem o cofre são lidas em vault/store.ts (e vault/privilege.ts); ELECTRON_RENDERER_URL, em main/index.ts. Em outro módulo, isto é um caminho de redirecionamento.',
   },
 ];
 
 const VAULT_ENV_OWNERS = [
-  'src/main/vault/vault.ts',
+  'src/main/vault/store.ts',
   'src/main/vault/privilege.ts',
   'src/main/index.ts',
 ];
@@ -83,29 +83,43 @@ const ELECTRON_OWNERS = ['src/main/index.ts', 'src/main/protocols.ts', 'src/main
 const LAYERS = {
   'src/types/**/*.ts': {
     allow: ['@zero/types'],
-    deny: ['@zero/messages', '@zero/main/*', '@zero/preload/*', '@zero/renderer/*'],
+    deny: [
+      '@zero/messages',
+      '@zero/shared/*',
+      '@zero/main/*',
+      '@zero/preload/*',
+      '@zero/renderer/*',
+    ],
     granted: [],
   },
   'src/messages/**/*.ts': {
     allow: ['@zero/messages', '@zero/types'],
-    deny: ['@zero/main/*', '@zero/preload/*', '@zero/renderer/*'],
+    deny: ['@zero/shared/*', '@zero/main/*', '@zero/preload/*', '@zero/renderer/*'],
+    granted: [],
+  },
+  // Camada de regras puras: o renderer valida o que está sendo digitado e o
+  // main valida de novo antes de gravar, então as duas precisam das mesmas
+  // funções. Sem Node e sem DOM, para rodar nos dois processos.
+  'src/shared/**/*.ts': {
+    allow: ['@zero/shared/*', '@zero/types'],
+    deny: ['@zero/messages', '@zero/main/*', '@zero/preload/*', '@zero/renderer/*'],
     granted: [],
   },
   'src/main/**/*.ts': {
-    allow: ['@zero/main/*', '@zero/messages', '@zero/types'],
+    allow: ['@zero/main/*', '@zero/messages', '@zero/shared/*', '@zero/types'],
     deny: ['@zero/preload/*', '@zero/renderer/*'],
     // O `fs` é a natureza da camada main; `electron` e `spawn` são nomeados
     // por arquivo, logo abaixo.
     granted: ['fs'],
   },
   'src/preload/**/*.ts': {
-    allow: ['@zero/types'],
+    allow: ['@zero/types', '@zero/shared/*'],
     deny: ['@zero/main/*', '@zero/messages', '@zero/renderer/*'],
     granted: ['electron'],
     messages: { fs: RENDERER_MESSAGE, spawn: RENDERER_MESSAGE },
   },
   'src/renderer/**/*.{ts,tsx}': {
-    allow: ['@zero/renderer/*', '@zero/messages', '@zero/types'],
+    allow: ['@zero/renderer/*', '@zero/messages', '@zero/shared/*', '@zero/types'],
     deny: ['@zero/main/*', '@zero/preload/*'],
     granted: [],
     messages: { fs: RENDERER_MESSAGE, spawn: RENDERER_MESSAGE, electron: RENDERER_MESSAGE },

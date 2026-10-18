@@ -101,22 +101,40 @@ describe('preload (contextBridge)', () => {
 
   it('encaminha os canais do cofre', async () => {
     const api = exposedApi();
+    const create = { masterPassword: 'a'.repeat(24), pin: '49201733', recoveryPhrase: 'frase' };
+    const unlock = { credential: '49201733', kind: 'pin' as const };
+    const reset = { phrase: 'frase', newPin: '73851042' };
+    const master = { currentPassword: 'a'.repeat(24), newPassword: 'b'.repeat(24) };
+    const pin = { currentPin: '49201733', newPin: '73851042' };
+
     await api.vault.status();
-    await api.vault.create('senha-mestra-123');
-    await api.vault.unlock('senha-mestra-123');
+    await api.vault.create(create);
+    await api.vault.unlock(unlock);
+    await api.vault.resetPin(reset);
+    await api.vault.changeMaster(master);
+    await api.vault.changePin(pin);
     await api.vault.lock();
     await api.vault.destroy();
     await api.vault.touch();
+
     expect(ipcRenderer.invoke.mock.calls.map((call) => call[0])).toEqual([
       'vault:status',
       'vault:create',
       'vault:unlock',
+      'vault:reset-pin',
+      'vault:change-master',
+      'vault:change-pin',
       'vault:lock',
       'vault:destroy',
       'vault:touch',
     ]);
-    expect(ipcRenderer.invoke).toHaveBeenCalledWith('vault:create', 'senha-mestra-123');
-    expect(ipcRenderer.invoke).toHaveBeenCalledWith('vault:unlock', 'senha-mestra-123');
+    // O objeto inteiro atravessa o IPC, e não um campo solto: quem decide o que
+    // vale é o main, e a forma do pedido é parte do contrato.
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('vault:create', create);
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('vault:unlock', unlock);
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('vault:reset-pin', reset);
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('vault:change-master', master);
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('vault:change-pin', pin);
   });
 
   it('repassa ao ouvinte se o bloqueio foi automático ou pedido', () => {

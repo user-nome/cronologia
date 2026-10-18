@@ -5,7 +5,16 @@ import type {
   DriveStatus,
 } from '@zero/types/drive';
 import type { AppSettings } from '@zero/types/settings';
-import type { VaultErrorCode, VaultResult, VaultStatus } from '@zero/types/vault';
+import type {
+  ChangeMasterInput,
+  ChangePinInput,
+  CreateVaultInput,
+  ResetPinInput,
+  UnlockInput,
+  VaultErrorCode,
+  VaultResult,
+  VaultStatus,
+} from '@zero/types/vault';
 import type { Work } from '@zero/types/work';
 
 export interface ElectronApi {
@@ -45,8 +54,21 @@ export interface ElectronApi {
   };
   vault: {
     status: () => Promise<VaultStatus>;
-    create: (password: string) => Promise<VaultResult>;
-    unlock: (password: string) => Promise<VaultResult>;
+    /**
+     * Cria o cofre com os três segredos de uma vez: senha mestra de 24
+     * caracteres, PIN de 8 dígitos do dia a dia e frase de recuperação. Vêm
+     * juntos porque uma chave sem PIN obriga a digitar 24 caracteres todo dia,
+     * e uma frase sem valor é campo morto.
+     */
+    create: (input: CreateVaultInput) => Promise<VaultResult>;
+    /** Abre o cofre: `kind` decide se o valor é lido como senha mestra ou PIN. */
+    unlock: (input: UnlockInput) => Promise<VaultResult>;
+    /** Redefine o PIN pela frase de recuperação; o cofre já sai aberto. */
+    resetPin: (input: ResetPinInput) => Promise<VaultResult>;
+    /** Troca a senha mestra com o cofre aberto (exige a senha atual). */
+    changeMaster: (input: ChangeMasterInput) => Promise<VaultResult>;
+    /** Troca o PIN do dia a dia com o cofre aberto (exige o PIN atual). */
+    changePin: (input: ChangePinInput) => Promise<VaultResult>;
     lock: () => Promise<VaultStatus>;
     /** Destrói o cofre e o acervo local (destrutivo, irreversível). */
     destroy: () => Promise<VaultResult>;

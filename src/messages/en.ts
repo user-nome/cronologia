@@ -14,6 +14,8 @@ export const en: Messages = {
     searchOptions: 'Type to filter…',
     clearSearch: 'Clear search',
     noOptionsFound: 'No options found',
+    next: 'Next',
+    back: 'Back',
   },
 
   dialogs: {
@@ -333,50 +335,133 @@ export const en: Messages = {
     invalidId: 'Invalid work identifier.',
   },
 
-  /** Secrets vault: modal, UI badges and domain errors. */
+  /** Vault: entry barrier (create, unlock, recover) and management in the UI. */
   vault: {
-    createTitle: 'Create the secrets vault',
-    unlockTitle: 'Unlock the vault',
-    createBody:
-      'Create a master password. It protects **the whole library** (works and covers, encrypted ' +
-      'on disk) and the app secrets (Dropbox tokens and backup password). Without it the library ' +
-      'does not exist for the app. If you forget the password, it cannot be recovered.',
-    unlockBody: 'Enter the master password to decrypt the library and access the stored secrets.',
-    passwordLabel: 'Master password',
-    confirmLabel: 'Confirm password',
-    createAction: 'Create vault',
-    unlockAction: 'Unlock',
-    hint: 'Use at least 12 characters, without obvious sequences or repetitions.',
-    mismatch: 'The passwords do not match.',
-    strength: {
-      weak: 'Weak',
-      fair: 'Fair',
-      strong: 'Strong',
-    },
-    createHint: 'Create a master-password vault to store the app secrets.',
     closeVault: 'Lock vault',
     autoLocked: 'The vault locked itself after a period of inactivity.',
+    createHint: 'Create a vault to store the encrypted library and the app secrets.',
     badge: {
       open: 'Vault open',
       closed: 'Vault locked',
       none: 'No vault',
     },
-    lockout: (seconds: number): string =>
-      seconds < 60
-        ? `Wait ${seconds} seconds before trying again.`
-        : `Wait ${Math.ceil(seconds / 60)} minute(s) before trying again.`,
     errors: {
       vaultExists: 'A vault already exists on this computer.',
       vaultMissing: 'No vault found.',
       vaultLocked: 'The vault is locked.',
-      vaultLockedOut: 'Too many unlock attempts. Wait before trying again.',
-      vaultWrongPassword: 'Incorrect master password.',
+      vaultLockedOut: 'Too many attempts. Wait before trying again.',
+      vaultInvalidMaster: 'The master password must be exactly 24 characters long.',
+      vaultWeakMaster:
+        'Predictable master password (repeated character, sequence or repeated block). Choose another one.',
+      vaultWrongMaster: 'Incorrect master password.',
+      vaultInvalidPin: 'The PIN must be exactly 8 digits.',
+      vaultWeakPin: 'Predictable PIN (repeated digits, sequence or date). Choose another one.',
+      vaultWrongPin: 'Incorrect PIN.',
+      vaultInvalidRecovery: 'The recovery phrase must have at least 12 words.',
+      vaultWeakRecovery: 'Predictable phrase (too few distinct words or too many repetitions).',
+      vaultWrongRecovery: 'The recovery phrase does not match.',
       vaultTampered: 'The vault is damaged or was altered.',
       libraryTampered: 'The encrypted library is damaged or was altered. No data was deleted.',
       vaultDestroyed: 'The vault was destroyed in this session. Create a new one to continue.',
-      vaultWeakPassword: 'Predictable password. Choose something less obvious.',
       vaultDirUnavailable: 'Could not create the vault folder. Check the permissions.',
       vaultAuthCancelled: 'Creating the vault folder was cancelled.',
+    },
+  },
+
+  /**
+   * Vault entry: the three credentials and the four creation steps. They live in
+   * their own block because this is the most-read text in the app (the barrier
+   * shows on every launch) and because it needs the constants from
+   * `MASTER_PASSWORD_LENGTH`/`PIN_LENGTH`/`RECOVERY_MIN_WORDS` interpolated.
+   */
+  auth: {
+    createTitle: 'Create the vault',
+    createSubtitle:
+      'The master password is exactly **24 characters** and is the key that wraps everything. ' +
+      'The app keeps the library and the secrets encrypted with it, in `/var/lib/.cronologia/.vault/`.',
+    masterLabel: 'Master password (24 characters)',
+    masterPlaceholder: 'e.g. Kf7#mQ2!vZ9@pL4$xR8!nW3&',
+    masterConfirmLabel: 'Repeat the master password',
+    masterMismatch: 'The passwords do not match.',
+    masterLength: (needed: number, actual: number): string =>
+      `The master password must be exactly ${needed} characters (you typed ${actual}).`,
+    pinLabel: 'PIN (8 digits)',
+    pinPlaceholder: 'e.g. 49201733',
+    pinSubtitle: 'This is what you use to open the vault every day.',
+    createAction: 'Create vault',
+    creating: 'Creating vault…',
+    lockout: (time: string): string => `Too many attempts. Try again in ${time}.`,
+    recoveryTitle: 'Recovery phrase',
+    recoverySubtitle:
+      'Write **in your own words** the phrase that will reset the PIN if you forget it. ' +
+      'The app neither generates nor stores this text: you decide it and write it down outside the computer.',
+    recoveryLabel: 'Your recovery phrase',
+    recoveryPlaceholder: 'e.g. the horse ate the carrot at the fair after winter',
+    recoveryConfirmLabel: 'Repeat the recovery phrase',
+    recoveryMismatch: 'The phrases do not match.',
+    recoveryTooShort: (needed: number, actual: number): string =>
+      `The phrase needs at least ${needed} words (you wrote ${actual}).`,
+    recoveryHint: 'Capitalisation counts. Only extra spaces are ignored when checking.',
+    unlockTitle: 'Vault locked',
+    unlockSubtitle: 'Enter the PIN to decrypt the library and unlock the secrets.',
+    tabPin: 'PIN',
+    tabMaster: 'Master password',
+    masterAvailable: 'Wrong PIN 3 times: the master password can open the vault too.',
+    forgotPin: 'I forgot the PIN',
+    unlockAction: 'Open vault',
+    unlocking: 'Opening…',
+    resetTitle: 'Reset the PIN',
+    resetSubtitle:
+      'Use the recovery phrase **you** wrote when creating the vault to choose a new PIN. ' +
+      'The vault opens right after.',
+    newPinLabel: 'New PIN (8 digits)',
+    newPinConfirmLabel: 'Repeat the new PIN',
+    pinMismatch: 'The PINs do not match.',
+    resetAction: 'Reset and open',
+    resetting: 'Resetting…',
+    backToPin: 'Back to the PIN',
+    changeTitle: 'Change the vault credential',
+    changeMasterTitle: 'Change the master password',
+    changeMasterSubtitle:
+      "Today's master password keeps working while the vault is open. " +
+      'The change **does not** re-encrypt the library: it only rewrites the key wrap, in seconds.',
+    changeMasterCurrent: 'Current master password',
+    changeMasterNew: 'New master password (24 characters)',
+    changeMasterConfirm: 'Repeat the new master password',
+    changePinTitle: 'Change the PIN',
+    changePinSubtitle:
+      "Today's PIN keeps working. The change only rewrites the key wrap, " +
+      'so the library on disk is left untouched.',
+    changePinCurrent: 'Current PIN',
+    changePinNew: 'New PIN (8 digits)',
+    changePinConfirm: 'Repeat the new PIN',
+    changeAction: 'Change',
+    changing: 'Changing…',
+  },
+
+  /** Credential strength meter (label and reason for the grade). */
+  strength: {
+    hintMaster: 'The grade guides you; the app only rejects what is degenerate.',
+    hintPin: 'Eight digits never get past "fair": what protects the PIN is the lockout.',
+    hintPhrase: 'Varied, non-repeated words are worth more than long ones.',
+    levels: {
+      veryWeak: 'Very weak',
+      weak: 'Weak',
+      fair: 'Fair',
+      strong: 'Strong',
+      veryStrong: 'Very strong',
+    },
+    reasons: {
+      allSame: 'the same character repeated',
+      sequence: 'a character sequence',
+      repeatedBlock: 'a repeated block',
+      dateLike: 'looks like a date',
+      fewKinds: 'too few character kinds',
+      lowVariety: 'too few distinct characters',
+      commonWord: 'contains a common word',
+      shortWords: 'words too short',
+      fewUniqueWords: 'too few distinct words',
+      repeatedWords: 'a word repeated too many times',
     },
   },
 

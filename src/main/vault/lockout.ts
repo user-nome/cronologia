@@ -1,7 +1,10 @@
 /**
- * Trava exponencial persistida no container do cofre: cada falha de
- * desbloqueio soma uma espera maior, e a espera sobrevive a reinício porque
- * fica em `lockUntil` (campo em claro do cabeçalho).
+ * Trava exponencial: cada falha de desbloqueio soma uma espera maior, e a
+ * espera sobrevive a reinício porque fica em `lockUntil` (campo em claro do
+ * cabeçalho do container).
+ *
+ * A rampa é uma função pura do número de tentativas, sem estado próprio: quem
+ * aplica é `auth.ts`, que a persiste no container.
  */
 
 /** Espera em ms por tentativa errada: 10 s, 30 s, 1 min, 1 h e depois 24 h. */
@@ -16,12 +19,6 @@ export const LOCKOUT_DELAYS_MS = [
  */
 export const LAST_DELAY_MS: (typeof LOCKOUT_DELAYS_MS)[4] = LOCKOUT_DELAYS_MS[4];
 
-export interface LockoutState {
-  locked: boolean;
-  /** Quanto falta da espera (0 quando não está em espera). */
-  retryInMs: number;
-}
-
 /** Espera aplicada à `attempts`-ésima falha (1ª falha = primeiro da lista). */
 export function delayFor(attempts: number): number {
   const index = Math.min(Math.max(attempts, 1), LOCKOUT_DELAYS_MS.length) - 1;
@@ -33,8 +30,7 @@ export function lockUntilFor(attempts: number, now: number): number {
   return now + delayFor(attempts);
 }
 
-/** Estado da trava agora: em espera ou liberado. */
-export function lockoutState(lockUntil: number, now: number): LockoutState {
-  if (lockUntil > now) return { locked: true, retryInMs: lockUntil - now };
-  return { locked: false, retryInMs: 0 };
+/** Quanto falta da espera que termina em `lockUntil` (0 quando já passou). */
+export function lockRemainingMs(lockUntil: number, now: number): number {
+  return lockUntil > now ? lockUntil - now : 0;
 }

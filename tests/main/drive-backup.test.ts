@@ -35,7 +35,7 @@ import {
   resetDrive,
   stubFetch,
 } from '../helpers/drive.ts';
-import { PASSWORD } from '../helpers/vault.ts';
+import { MASTER } from '../helpers/vault.ts';
 
 function uploadedNames(drive: FakeDropbox): string[] {
   return [...drive.files.values()].map((file) => file.name);
@@ -432,11 +432,9 @@ describe('restoreNow', { timeout: 60_000 }, () => {
     const nameSalt = Buffer.alloc(16, 11);
     const libraryRemote = remoteName('library.json', nameKeyFor(PASSPHRASE, nameSalt));
     drive.seed(libraryRemote, Buffer.from(JSON.stringify([makeWork({ id: 'opaca' })])));
-    // Manifesto em claro: o que está em teste é a resolução dos nomes pelo
-    // manifesto, não a cifra (que tem suíte própria).
     drive.seed(
       remoteName(MANIFEST_FILE, manifestKeyFor(PASSPHRASE)),
-      Buffer.from(JSON.stringify({ [libraryRemote]: 'library.json' }), 'utf-8'),
+      encryptWith(buildManifest({ [libraryRemote]: 'library.json' }, nameSalt), PASSPHRASE),
     );
     stubFetch((call) => drive.handle(call));
 
@@ -469,7 +467,7 @@ describe('disconnect', { timeout: 60_000 }, () => {
     expect(status.connected).toBe(false);
     expect(status.lastError).toBeNull();
 
-    await unlockVault(PASSWORD);
+    await unlockVault({ credential: MASTER, kind: 'master' });
     initDrive();
     expect(getStatus().connected).toBe(false);
   });

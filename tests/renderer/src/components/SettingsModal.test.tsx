@@ -6,6 +6,10 @@ import SettingsModal from '@zero/renderer/components/SettingsModal';
 import type { AppSettings, BackupSummary, DriveStatus } from '@zero/types';
 import { createApiMock, installApiMock } from '../../../helpers/api.ts';
 import type { ApiMock } from '../../../helpers/api.ts';
+import { messages } from '@zero/messages';
+
+/** Bundle pt-BR: os títulos do cofre vivem em `m.auth`, e a suíte cita os dois. */
+const m = messages('pt-BR');
 
 const CONNECTED: DriveStatus = {
   connected: true,
@@ -378,25 +382,41 @@ describe('SettingsModal: idioma', () => {
 describe('SettingsModal: cofre obrigatório para segredos', () => {
   it('sem cofre, salvar abre a criação do cofre e não grava nada', async () => {
     const { mock } = setup({
-      vault: { exists: false, unlocked: false, attempts: 0, lockUntil: 0 },
+      vault: {
+        exists: false,
+        unlocked: false,
+        attempts: 0,
+        lockUntil: 0,
+        lockRemainingMs: 0,
+        hasRecovery: true,
+      },
     });
     await screen.findByText('Desconectado');
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /^Salvar$/ }));
 
-    expect(await screen.findByText('Criar o cofre de segredos')).toBeInTheDocument();
+    expect(await screen.findByText(m.auth.createTitle)).toBeInTheDocument();
     expect(mock.settingsSet).not.toHaveBeenCalled();
   });
 
   it('cofre fechado, conectar abre o desbloqueio e não chama o OAuth', async () => {
-    const { mock } = setup({ vault: { exists: true, unlocked: false, attempts: 0, lockUntil: 0 } });
+    const { mock } = setup({
+      vault: {
+        exists: true,
+        unlocked: false,
+        attempts: 0,
+        lockUntil: 0,
+        lockRemainingMs: 0,
+        hasRecovery: true,
+      },
+    });
     await screen.findByText('Desconectado');
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /Conectar/ }));
 
-    expect(await screen.findByText('Desbloquear o cofre')).toBeInTheDocument();
+    expect(await screen.findByText(m.auth.unlockTitle)).toBeInTheDocument();
     expect(mock.driveAuth).not.toHaveBeenCalled();
   });
 });

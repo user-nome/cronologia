@@ -14,6 +14,8 @@ export const zhCN: Messages = {
     searchOptions: '输入以筛选…',
     clearSearch: '清除搜索',
     noOptionsFound: '没有找到选项',
+    next: '下一步',
+    back: '返回',
   },
 
   dialogs: {
@@ -307,47 +309,126 @@ export const zhCN: Messages = {
 
   /** 密码库：模态框、界面标识和领域错误。 */
   vault: {
-    createTitle: '创建密码库',
-    unlockTitle: '解锁密码库',
-    createBody:
-      '创建一个主密码。它保护**整个书库**（作品与封面，在磁盘上加密）以及应用机密' +
-      '（Dropbox 令牌和备份密码）。没有主密码，应用无法读取书库。如果忘记密码，将无法恢复。',
-    unlockBody: '输入主密码以解密书库并访问已保存的机密。',
-    passwordLabel: '主密码',
-    confirmLabel: '确认密码',
-    createAction: '创建密码库',
-    unlockAction: '解锁',
-    hint: '至少 12 个字符，不要使用明显的序列或重复。',
-    mismatch: '两次输入的密码不一致。',
-    strength: {
-      weak: '弱',
-      fair: '一般',
-      strong: '强',
-    },
-    createHint: '创建一个由主密码保护的密码库来保存应用机密。',
     closeVault: '锁定密码库',
     autoLocked: '密码库因长时间无操作已自动锁定。',
+    createHint: '创建一个密码库，用于保存加密的书库和应用机密。',
     badge: {
       open: '密码库已打开',
       closed: '密码库已锁定',
       none: '无密码库',
     },
-    lockout: (seconds: number): string =>
-      seconds < 60
-        ? `请等待 ${seconds} 秒后重试。`
-        : `请等待 ${Math.ceil(seconds / 60)} 分钟后重试。`,
     errors: {
       vaultExists: '此计算机上已存在密码库。',
       vaultMissing: '未找到密码库。',
       vaultLocked: '密码库已锁定。',
-      vaultLockedOut: '解锁尝试次数过多，请稍候再试。',
-      vaultWrongPassword: '主密码不正确。',
+      vaultLockedOut: '尝试次数过多，请稍候再试。',
+      vaultInvalidMaster: '主密码必须正好为 24 个字符。',
+      vaultWeakMaster: '主密码过于常见（字符重复、连续或整块重复）。请换一个。',
+      vaultWrongMaster: '主密码不正确。',
+      vaultInvalidPin: 'PIN 必须正好为 8 位数字。',
+      vaultWeakPin: 'PIN 过于常见（数字重复、连续或像日期）。请换一个。',
+      vaultWrongPin: 'PIN 不正确。',
+      vaultInvalidRecovery: '恢复短语至少需要 12 个词。',
+      vaultWeakRecovery: '短语过于常见（不同的词太少或重复太多）。',
+      vaultWrongRecovery: '恢复短语不匹配。',
       vaultTampered: '密码库已损坏或被篡改。',
       libraryTampered: '加密的书库已损坏或被篡改。没有数据被删除。',
       vaultDestroyed: '本次会话中密码库已被销毁。请创建一个新的以继续。',
-      vaultWeakPassword: '密码过于常见，请换一个更难猜的。',
       vaultDirUnavailable: '无法创建保管库文件夹，请检查权限。',
       vaultAuthCancelled: '已取消创建保管库文件夹。',
+    },
+  },
+
+  /**
+   * 密码库入口：三种凭据与四个创建步骤。它单独成块，因为这是整个应用里
+   * 读得最多的文字（每次启动都会出现），而且要把
+   * `MASTER_PASSWORD_LENGTH`/`PIN_LENGTH`/`RECOVERY_MIN_WORDS` 三个常量
+   * 插进句子里。
+   */
+  auth: {
+    createTitle: '创建密码库',
+    createSubtitle:
+      '主密码正好 **24 个字符**，它是包裹一切的密钥。' +
+      '应用用它加密书库和机密，保存在 `/var/lib/.cronologia/.vault/`。',
+    masterLabel: '主密码（24 个字符）',
+    masterPlaceholder: '例如：Kf7#mQ2!vZ9@pL4$xR8!nW3&',
+    masterConfirmLabel: '再次输入主密码',
+    masterMismatch: '两次输入的密码不一致。',
+    masterLength: (needed: number, actual: number): string =>
+      `主密码必须正好 ${needed} 个字符（你输入了 ${actual} 个）。`,
+    pinLabel: 'PIN（8 位数字）',
+    pinPlaceholder: '例如：49201733',
+    pinSubtitle: '日常打开密码库用的就是它。',
+    createAction: '创建密码库',
+    creating: '正在创建密码库…',
+    lockout: (time: string): string => `尝试次数过多，请在 ${time} 后重试。`,
+    recoveryTitle: '恢复短语',
+    recoverySubtitle:
+      '用**你自己的话**写一句在忘记 PIN 时用来重置 PIN 的短语。' +
+      '应用既不生成也不保存这句话：由你决定，并写到计算机之外。',
+    recoveryLabel: '你的恢复短语',
+    recoveryPlaceholder: '例如：冬天过后白马在集市吃掉了胡萝卜',
+    recoveryConfirmLabel: '再次输入恢复短语',
+    recoveryMismatch: '两次输入的短语不一致。',
+    recoveryTooShort: (needed: number, actual: number): string =>
+      `短语至少需要 ${needed} 个词（你写了 ${actual} 个）。`,
+    recoveryHint: '单词的大小写会计入，核对时只忽略多余的空格。',
+    unlockTitle: '密码库已锁定',
+    unlockSubtitle: '输入 PIN 以解密书库并解锁机密。',
+    tabPin: 'PIN',
+    tabMaster: '主密码',
+    masterAvailable: 'PIN 已错 3 次：现在也可以用主密码打开。',
+    forgotPin: '我忘记 PIN 了',
+    unlockAction: '打开密码库',
+    unlocking: '正在打开…',
+    resetTitle: '重置 PIN',
+    resetSubtitle: '用创建密码库时**你自己**写的恢复短语来设定新 PIN。之后密码库会立即打开。',
+    newPinLabel: '新 PIN（8 位数字）',
+    newPinConfirmLabel: '再次输入新 PIN',
+    pinMismatch: '两次输入的 PIN 不一致。',
+    resetAction: '重置并打开',
+    resetting: '正在重置…',
+    backToPin: '返回 PIN',
+    changeTitle: '更改密码库凭据',
+    changeMasterTitle: '更改主密码',
+    changeMasterSubtitle:
+      '密码库打开期间，当前主密码继续有效。' +
+      '更改**不会**重新加密书库，只会重写密钥封装，几秒钟完成。',
+    changeMasterCurrent: '当前主密码',
+    changeMasterNew: '新主密码（24 个字符）',
+    changeMasterConfirm: '再次输入新主密码',
+    changePinTitle: '更改 PIN',
+    changePinSubtitle: '当前 PIN 继续有效。更改只会重写密钥封装，磁盘上的书库不受影响。',
+    changePinCurrent: '当前 PIN',
+    changePinNew: '新 PIN（8 位数字）',
+    changePinConfirm: '再次输入新 PIN',
+    changeAction: '更改',
+    changing: '正在更改…',
+  },
+
+  /** 凭据强度表（等级与扣分原因）。 */
+  strength: {
+    hintMaster: '等级只是提示，应用只拒绝退化的值。',
+    hintPin: '八位数字不会超过"一般"：真正保护 PIN 的是锁定机制。',
+    hintPhrase: '用词多样、少重复，比用词更长更有价值。',
+    levels: {
+      veryWeak: '非常弱',
+      weak: '弱',
+      fair: '一般',
+      strong: '强',
+      veryStrong: '非常强',
+    },
+    reasons: {
+      allSame: '同一字符重复',
+      sequence: '字符连续',
+      repeatedBlock: '整块重复',
+      dateLike: '看起来像日期',
+      fewKinds: '字符种类太少',
+      lowVariety: '不同字符太少',
+      commonWord: '含常见词',
+      shortWords: '词太短',
+      fewUniqueWords: '不同的词太少',
+      repeatedWords: '同一个词重复太多次',
     },
   },
 

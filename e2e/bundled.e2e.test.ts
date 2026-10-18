@@ -10,9 +10,11 @@ import {
   lockAndUnlockVault,
   resetLibrary,
   resetLibraryRequiresExactWord,
+  resetVaultPin,
   searchAndEditWork,
   switchLanguage,
   trackProgressFromCard,
+  unlockWithMaster,
   visitAttributions,
   visitDonate,
 } from './support/flows.ts';
@@ -83,8 +85,16 @@ describe('App compilado (out/)', () => {
     await resetLibraryRequiresExactWord(current().page);
   });
 
-  it('fecha e reabre o cofre, recusando a senha errada', async () => {
+  it('fecha e reabre o cofre, recusando o PIN errado', async () => {
     await lockAndUnlockVault(current().page);
+  });
+
+  it('abre o cofre com a senha mestra no mesmo campo do PIN', async () => {
+    await unlockWithMaster(current().page);
+  });
+
+  it('redefine o PIN com a frase de recuperação', async () => {
+    await resetVaultPin(current().page);
   });
 
   it('apaga a biblioteca pela palavra de confirmação', async () => {

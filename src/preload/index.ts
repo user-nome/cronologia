@@ -2,10 +2,15 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
   AppSettings,
   BackupProviderId,
+  ChangeMasterInput,
+  ChangePinInput,
+  CreateVaultInput,
   DriveStatus,
   ElectronApi,
   LibraryReset,
   PurgeResult,
+  ResetPinInput,
+  UnlockInput,
   VaultResult,
   VaultStatus,
   Work,
@@ -41,10 +46,15 @@ const api: ElectronApi = {
   },
   vault: {
     status: () => ipcRenderer.invoke('vault:status'),
-    create: (password: string): Promise<VaultResult> =>
-      ipcRenderer.invoke('vault:create', password),
-    unlock: (password: string): Promise<VaultResult> =>
-      ipcRenderer.invoke('vault:unlock', password),
+    create: (input: CreateVaultInput): Promise<VaultResult> =>
+      ipcRenderer.invoke('vault:create', input),
+    unlock: (input: UnlockInput): Promise<VaultResult> => ipcRenderer.invoke('vault:unlock', input),
+    resetPin: (input: ResetPinInput): Promise<VaultResult> =>
+      ipcRenderer.invoke('vault:reset-pin', input),
+    changeMaster: (input: ChangeMasterInput): Promise<VaultResult> =>
+      ipcRenderer.invoke('vault:change-master', input),
+    changePin: (input: ChangePinInput): Promise<VaultResult> =>
+      ipcRenderer.invoke('vault:change-pin', input),
     lock: (): Promise<VaultStatus> => ipcRenderer.invoke('vault:lock'),
     destroy: (): Promise<VaultResult> => ipcRenderer.invoke('vault:destroy'),
     /** Registra atividade do usuário para a janela de ociosidade do cofre. */

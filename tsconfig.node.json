@@ -12,6 +12,7 @@
     "src/node.loader.ts",
     "src/main/**/*",
     "src/messages/**/*",
+    "src/shared/**/*",
     "src/preload/**/*",
     "src/types/**/*"
   ]

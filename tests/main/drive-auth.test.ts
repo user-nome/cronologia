@@ -13,7 +13,7 @@ import { VaultError } from '@zero/main/vault/errors';
 import { VAULT_SECRET } from '@zero/main/vault/secrets';
 import { shell } from '../mocks/electron.ts';
 import { APP_KEY, connect, json, resetDrive, stubFetch, tokensPath } from '../helpers/drive.ts';
-import { PASSWORD } from '../helpers/vault.ts';
+import { MASTER } from '../helpers/vault.ts';
 
 describe('estado do Dropbox', { timeout: 60_000 }, () => {
   beforeEach(async () => {
@@ -52,7 +52,7 @@ describe('estado do Dropbox', { timeout: 60_000 }, () => {
     initDrive();
     expect(getStatus().connected).toBe(false);
 
-    await unlockVault(PASSWORD);
+    await unlockVault({ credential: MASTER, kind: 'master' });
     initDrive();
     const status = getStatus();
     expect(status.connected).toBe(true);

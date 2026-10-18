@@ -19,7 +19,7 @@ import {
   writeJsonSecret,
 } from '@zero/main/vault/secrets';
 import { resetSandbox } from '../helpers/sandbox.ts';
-import { closeTestVault, openTestVault, PASSWORD } from '../helpers/vault.ts';
+import { closeTestVault, MASTER, openTestVault } from '../helpers/vault.ts';
 
 /**
  * Escolher o destino do backup é uma decisão de duas metades: a **preferência**
@@ -81,7 +81,7 @@ function gravarSessao(id: keyof typeof ENTRADA, tokens: typeof DROPBOX): void {
 
 function cofreAberto(): void {
   // `expiresAt` no passado não importa aqui: o alvo é a troca, não a leitura.
-  saveSettings({ ...loadSettings(), drivePassphrase: PASSWORD });
+  saveSettings({ ...loadSettings(), drivePassphrase: MASTER });
   state.provider = 'dropbox';
   state.tokens = DROPBOX;
   gravarSessao('dropbox', DROPBOX);

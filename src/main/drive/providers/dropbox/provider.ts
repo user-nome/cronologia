@@ -1,9 +1,7 @@
 import type { BackupProvider } from '@zero/main/drive/provider';
 import { providerLabel } from '@zero/main/drive/constants';
 import { appKey } from '@zero/main/drive/state';
-import {
-  authorize,
-} from '@zero/main/drive/providers/dropbox/session';
+import { authorize } from '@zero/main/drive/providers/dropbox/session';
 import {
   deleteFile,
   downloadFile,
