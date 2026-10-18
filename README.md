@@ -65,19 +65,19 @@ publicação e regras de manutenção: [`docs/distribuicao-apt.md`](docs/distrib
 Na primeira instalação:
 
 ```bash
-curl -fsSL https://github.com/chronos-atalante/cronologia/releases/latest/download/public.key \
+curl -fsSL https://github.com/user-nome/cronologia/releases/latest/download/public.key \
   | sudo gpg --dearmor --yes -o /usr/share/keyrings/cronologia.gpg
 echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cronologia.gpg] \
-https://github.com/chronos-atalante/cronologia/releases/latest/download/ ./" \
+https://github.com/user-nome/cronologia/releases/latest/download/ ./" \
   | sudo tee /etc/apt/sources.list.d/cronologia.list
 sudo apt update && sudo apt install cronologia
 ```
 
 ### Download direto
 
-Baixe o `.deb` da [página de Releases](https://github.com/chronos-atalante/cronologia/releases)
+Baixe o `.deb` da [página de Releases](https://github.com/user-nome/cronologia/releases)
 (baixar direto:
-`https://github.com/chronos-atalante/cronologia/releases/latest/download/cronologia_amd64.deb`)
+`https://github.com/user-nome/cronologia/releases/latest/download/cronologia_amd64.deb`)
 e instale:
 
 ```bash
@@ -532,7 +532,7 @@ Detalhes da configuração (campo `build` do `package.json`):
   correta no menu/ALT+TAB do Mint)
 - Ícone empacotado em `usr/share/icons/hicolor/512x512/apps/`
 - `homepage` no `package.json` aponta para o repositório
-  (`https://github.com/chronos-atalante/cronologia`): o alvo `deb` do
+  (`https://github.com/user-nome/cronologia`): o alvo `deb` do
   electron-builder exige uma URL no campo `Homepage:` do controle do pacote
 - `postinst` do electron-builder instala o perfil AppArmor real
   (`build/apparmor-profile`, pulado onde a base é antiga) e cuida do `chrome-sandbox`;

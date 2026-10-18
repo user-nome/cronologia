@@ -12,8 +12,8 @@ que apareceram no caminho e as regras que não podem ser quebradas.
 Configuração única, feita uma só vez:
 
 ```bash
-curl -fsSL https://github.com/chronos-atalante/cronologia/releases/latest/download/public.key | sudo gpg --dearmor --yes -o /usr/share/keyrings/cronologia.gpg
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cronologia.gpg] https://github.com/chronos-atalante/cronologia/releases/latest/download/ ./" | sudo tee /etc/apt/sources.list.d/cronologia.list
+curl -fsSL https://github.com/user-nome/cronologia/releases/latest/download/public.key | sudo gpg --dearmor --yes -o /usr/share/keyrings/cronologia.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cronologia.gpg] https://github.com/user-nome/cronologia/releases/latest/download/ ./" | sudo tee /etc/apt/sources.list.d/cronologia.list
 ```
 
 Instalação da primeira vez e atualizações seguintes:
@@ -25,7 +25,7 @@ sudo apt update && sudo apt upgrade                      # cada nova versão
 
 Tudo aponta para um endereço só, o da última Release:
 
-`https://github.com/chronos-atalante/cronologia/releases/latest/download/`
+`https://github.com/user-nome/cronologia/releases/latest/download/`
 
 ## Motivo da escolha: um repo só, sem estourar os limites
 
@@ -109,7 +109,7 @@ Onde vive cada parte:
 ### 2. Landing passa a ler a Release
 
 - `fetch-release.mjs` consulta
-  `GET /repos/chronos-atalante/cronologia/releases/latest` em cada
+  `GET /repos/user-nome/cronologia/releases/latest` em cada
   `npm run build` do Vercel e grava `src/app/release-info.json`.
 - A página ganhou o botão **Baixar .deb** (mostra a versão viva) e a seção
   **Instalação (APT)** com os comandos desta página, incluindo aviso para
@@ -158,7 +158,7 @@ errada ou secret ausente.
 Para testar o APT sem tocar no sistema, o teste usa diretórios próprios:
 
 ```bash
-BASE=https://github.com/chronos-atalante/cronologia/releases/latest/download
+BASE=https://github.com/user-nome/cronologia/releases/latest/download
 D=/tmp/apt-test
 mkdir -p "$D/empty.d" "$D/lists/partial" "$D/cache/archives/partial"
 curl -fsSL "$BASE/public.key" | gpg --dearmor -o "$D/repo.gpg"
@@ -269,7 +269,7 @@ Casos de exceção (o mesmo workflow, sem checar a versão):
 ## Verificação rápida de sanidade
 
 ```bash
-BASE=https://github.com/chronos-atalante/cronologia/releases/latest/download
+BASE=https://github.com/user-nome/cronologia/releases/latest/download
 curl -fsSL -o Packages "$BASE/Packages"         # índices acessíveis
 curl -fsSL -o InRelease "$BASE/InRelease"       # baixa assinatura
 curl -fsSL -o public.key "$BASE/public.key"     # baixa chave
