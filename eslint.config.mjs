@@ -52,7 +52,7 @@ const BANNED_SYNTAX = [
 
 /**
  * Guarda de ambiente: as duas variáveis que movem o cofre são lidas em
- * `vault/vault.ts` e `vault/privilege.ts`, e `ELECTRON_RENDERER_URL` decide o que
+ * `vault/store.ts` e `vault/privilege.ts`, e `ELECTRON_RENDERER_URL` decide o que
  * a janela carrega. Qualquer outro módulo lendo-as seria um caminho de
  * redirecionamento do cofre (ou do bundle servido), e é por isso que o dono é
  * nomeado em vez de a regra valer para todo o `src/`.
@@ -62,15 +62,22 @@ const ENV_GUARD = [
     selector:
       'MemberExpression[computed=false][property.name=/^(CRONOLOGIA_VAR_LIB|CRONOLOGIA_VAULT_DIR|ELECTRON_RENDERER_URL)$/]',
     message:
-      'As variáveis que movem o cofre são lidas em vault/store.ts (e vault/privilege.ts); ELECTRON_RENDERER_URL, em main/index.ts. Em outro módulo, isto é um caminho de redirecionamento.',
+      'As variáveis que movem o cofre são lidas em vault/store.ts (e vault/privilege.ts); ELECTRON_RENDERER_URL, em protocols.ts (appPageUrl). Em outro módulo, isto é um caminho de redirecionamento.',
   },
 ];
 
-const VAULT_ENV_OWNERS = [
-  'src/main/vault/store.ts',
-  'src/main/vault/privilege.ts',
-  'src/main/index.ts',
-];
+/**
+ * Donos das variáveis de ambiente, por variável e não por arquivo único.
+ *
+ * A lista é separada porque as duas leituras têm razões opostas para ficarem
+ * concentradas: o cofre precisa que `CRONOLOGIA_*` seja lido em um lugar só (é
+ * o caminho que decide **onde os segredos vivem**), enquanto
+ * `ELECTRON_RENDERER_URL` precisa ser lido em um lugar só justamente porque
+ * **duas** guardas o consultam: a `will-navigate` da janela e a guarda de
+ * origem do IPC. O dono de cada variável fica nomeado pela razão de existir.
+ */
+const VAULT_ENV_OWNERS = ['src/main/vault/store.ts', 'src/main/vault/privilege.ts'];
+const RENDERER_URL_OWNERS = ['src/main/protocols.ts'];
 
 /** Módulos do `main` que usam a superfície do Electron por natureza. */
 const ELECTRON_OWNERS = ['src/main/index.ts', 'src/main/protocols.ts', 'src/main/external.ts'];
@@ -458,11 +465,11 @@ export default tseslint.config(
       },
     },
   },
-  // `vault/vault.ts`, `vault/privilege.ts` e `main/index.ts` são os donos do
+  // `vault/store.ts`, `vault/privilege.ts` e `protocols.ts` são os donos do
   // ambiente, então o guarda de `CRONOLOGIA_*`/`ELECTRON_RENDERER_URL` não vale
   // para eles (o resto do `src/` continua valendo).
   {
-    files: VAULT_ENV_OWNERS,
+    files: [...VAULT_ENV_OWNERS, ...RENDERER_URL_OWNERS],
     rules: {
       'no-restricted-syntax': ['error', ...BANNED_SYNTAX],
     },

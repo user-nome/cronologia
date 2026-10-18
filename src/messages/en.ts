@@ -86,6 +86,9 @@ export const en: Messages = {
       '(AES-256-GCM), so set the encryption password below before the first backup.',
     languageLabel: 'Language',
     providersLabel: 'Backup providers',
+    noOperationalProvider:
+      'No backup provider is available in this build: the client keys were not ' +
+      'embedded in the binary. The reason for each one is in the list below.',
     hiddenFolder: 'Hidden folder',
     operational: 'Operational',
     notOperational: 'Not operational',
@@ -471,5 +474,19 @@ export const en: Messages = {
     doneTitle: 'Authorization complete',
     deniedBody: 'You can close this tab.',
     doneBody: 'You can close this tab and return to the application.',
+  },
+
+  /**
+   * Errors that **cross the IPC boundary**: the main throws, the renderer
+   * receives the rejected `Error` and the person reads it on screen.
+   *
+   * In a block of its own (not inside `driveErrors`/`libraryErrors`) because
+   * their origin is not a subsystem, it is the window boundary. A Drive error
+   * belongs to Drive; this one belongs to the whole app, and filing it under
+   * either would make the origin look narrower than it is.
+   */
+  errors: {
+    /** Origin guard: the emitter is not the app page. */
+    foreignFrame: 'IPC blocked: the request did not come from the app page.',
   },
 };

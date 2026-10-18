@@ -111,6 +111,29 @@ existe com tipo em `src/types/` e linha em `api.md`.
 | `contextIsolation` / `sandbox` | Ligados; o preload sai como CommonJS por causa do sandbox                                    |
 | Fuses do electron-builder      | `runAsNode`, `NODE_OPTIONS` e inspetor desligados (`package.json`)                           |
 
+### A base da URL é uma função só
+
+`appPageUrl()` (`main/protocols.ts`) é a **única** resolução de qual é a página
+oficial do app: dev server do Vite quando `ELECTRON_RENDERER_URL` está de pé,
+`cronologia://app/index.html` em produção. Duas guardas dependem dela:
+
+- `will-navigate` da janela, que barra salto para outra URL;
+- `assertAppFrame`, que decide se o emissor do IPC é a página oficial (rodando em
+  **todo** handler, antes da regra de domínio).
+
+Se qualquer uma resolvesse a base por conta própria, as duas poderiam divergir e
+o sintoma seria "o app não salva nada", sem erro visível em lugar nenhum. Daí a
+regra de ambiente do ESLint nomear `protocols.ts` como dono de
+`ELECTRON_RENDERER_URL` (o cofre tem dono próprio, em `vault/store.ts`).
+
+A recusa da guarda sai de `m.errors.foreignFrame`, e não de um literal em
+português no código: esse erro **atravessa o IPC** e chega ao renderer como
+`Error` rejeitado, então a pessoa lê a frase no idioma que escolheu.
+
+Os corpos das respostas do `protocol.handle` (`Forbidden`, `Not Found`,
+`Internal Error`) são literais em inglês de propósito: é transporte, não
+interface, e quem chega ali é o carregador de asset.
+
 ## Ciclo de vida da inicialização
 
 ```mermaid

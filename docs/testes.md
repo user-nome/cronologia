@@ -38,11 +38,12 @@ São sob demanda (ver os guias linkados no topo).
 
 | Arquivo                                    | O que cobre                                                                                                                                                 |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/main/index.test.ts`                 | Boot (instância única, protocolos, IPC), handlers, `cover://`, ciclo da janela, F11, diretórios XDG, guarda de origem de frame                              |
+| `tests/main/index.test.ts`                 | Boot (instância única, protocolos, IPC), handlers, `cover://`, ciclo da janela, F11 e diretórios XDG                                                        |
 | `tests/main/index.dev.test.ts`             | Modo desenvolvimento (Vite dev server, ausência em produção)                                                                                                |
 | `tests/main/index-startup.test.ts`         | Arranque resiliente: falha de disco em `initDrive` não impede a janela nem o registro de IPC                                                                |
 | `tests/main/index-vault.test.ts`           | Canais `vault:*` (criar/desbloquear/trava/destruir), guarda `assertAppFrame` e auto-lock (`vault:locked`)                                                   |
-| `tests/main/protocols.test.ts`             | Scheme `cronologia://`: tabela de MIME por extensão, 403 em traversal percent-encoded, 404 e 500                                                            |
+| `tests/main/protocols.test.ts`             | Scheme `cronologia://`: tabela de MIME por extensão, 403 em traversal percent-encoded, 404 e 500, e `appPageUrl` como base única                            |
+| `tests/main/ipc-origem.test.ts`            | Guarda de origem do IPC: frames recusados, origem com porta diferente, dev server e a recusa no idioma em uso                                               |
 | `tests/main/node-loader.test.ts`           | Loader de aliases `@zero/*` rodando o Node de verdade em processo filho                                                                                     |
 | `tests/main/external.test.ts`              | `openExternalSafe`: só `https`, esquema em qualquer caixa, URL malformada e recusa do shell                                                                 |
 | `tests/main/cleanup.test.ts`               | Varredura de legado no boot: o que é sobrescrito, o que é contado como falha e o log sem caminho do home                                                    |

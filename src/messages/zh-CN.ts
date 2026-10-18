@@ -82,6 +82,9 @@ export const zhCN: Messages = {
       '下方设置加密密码。',
     languageLabel: '语言',
     providersLabel: '备份服务商',
+    noOperationalProvider:
+      '此版本没有可用的备份服务商：客户端密钥没有被嵌入二进制文件。' +
+      '下面列出了各个服务商的原因。',
     hiddenFolder: '隐藏文件夹',
     operational: '可用',
     notOperational: '不可用',
@@ -438,5 +441,18 @@ export const zhCN: Messages = {
     doneTitle: '授权完成',
     deniedBody: '您可以关闭此选项卡。',
     doneBody: '可以关闭此选项卡并返回应用。',
+  },
+
+  /**
+   * 穿过 IPC 边界的错误：主进程抛出，渲染进程收到被拒绝的 `Error`，用户
+   * 在屏幕上读到它。
+   *
+   * 单独成块（不放进 `driveErrors`/`libraryErrors`）是因为它们的来源不是某个
+   * 子系统，而是窗口边界。Drive 的错误属于 Drive；这条属于整个应用，放进
+   * 任何一边都会让来源看起来比实际更窄。
+   */
+  errors: {
+    /** 来源守卫：发送方不是应用页面。 */
+    foreignFrame: 'IPC 已阻止：请求并非来自应用页面。',
   },
 };

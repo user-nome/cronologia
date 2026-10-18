@@ -3,7 +3,8 @@ import type { Mock } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import SettingsModal from '@zero/renderer/components/SettingsModal';
-import type { AppSettings, BackupSummary, DriveStatus } from '@zero/types';
+import type { AppSettings, BackupProviderInfo, BackupSummary, DriveStatus } from '@zero/types';
+import { listProviders } from '@zero/main/drive/provider';
 import { createApiMock, installApiMock } from '../../../helpers/api.ts';
 import type { ApiMock } from '../../../helpers/api.ts';
 import { messages } from '@zero/messages';
@@ -26,6 +27,25 @@ const SUMMARY: BackupSummary = {
   size: 2048,
   works: 7,
 };
+
+/**
+ * Catálogos alternativos para o par provedor.
+ *
+ * O padrão da suíte é o catálogo real com **só o Dropbox** operante (build sem
+ * `GOOGLE_CLIENT_ID`), que é o caso comum em dev. Estes dois cobrem a outra
+ * ponta: build publicado, com as duas chaves embutidas, e build sem nenhuma.
+ */
+const AMBOS_OPERANTES: BackupProviderInfo[] = listProviders().map((provider) => ({
+  ...provider,
+  operational: true,
+  unavailableReason: null,
+}));
+const NENHUM_OPERANTE: BackupProviderInfo[] = listProviders().map((provider) => ({
+  ...provider,
+  operational: false,
+  unavailableReason:
+    provider.id === 'dropbox' ? m.driveErrors.configureAppKey : m.providers.googleNoCredentials,
+}));
 
 interface SetupResult {
   mock: ApiMock;
@@ -116,6 +136,58 @@ describe('SettingsModal: carregamento', () => {
     await userEvent.click(seletor);
     expect(screen.getAllByRole('option')).toHaveLength(1);
     expect(screen.getByRole('option', { name: 'Dropbox' })).toBeInTheDocument();
+  });
+
+  it('trocar o provedor muda o botão de conectar junto', async () => {
+    // O botão é o que a pessoa lê para decidir, então ele precisa acompanhar a
+    // escolha: "Conectar com Dropbox" é uma promessa que o Google Drive não
+    // cumpre (e vice-versa). Sem isso o app tentaria autorizar a conta no
+    // destino errado.
+    setup({ providers: AMBOS_OPERANTES });
+    await screen.findByText('Provedores de backup');
+    expect(screen.getByRole('button', { name: /Conectar ao Dropbox/ })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dropbox' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Google Drive' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Conectar ao Google Drive/ })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: /Conectar ao Dropbox/ })).toBeNull();
+  });
+
+  it('conectar depois de trocar manda o provedor escolhido para o main', async () => {
+    // O `drive.auth` do main autoriza o provedor **ativo**, e ele só muda se o
+    // `setProvider` tiver sido aplicado. Trocar o rótulo do botão sem trocar o
+    // destino abriria o consentimento da conta errada.
+    const { mock } = setup({ providers: AMBOS_OPERANTES });
+    await screen.findByText('Provedores de backup');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dropbox' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Google Drive' }));
+    await waitFor(() => {
+      expect(mock.driveSetProvider).toHaveBeenCalledWith('google-drive');
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: /Conectar ao Google Drive/ }));
+
+    await waitFor(() => expect(mock.driveAuth).toHaveBeenCalled());
+    expect(mock.driveAuth.mock.calls.length).toBe(1);
+  });
+
+  it('build sem chave nenhuma desabilita o seletor e diz por quê', async () => {
+    // O defeito que a pessoa encontrou: o seletor desabilitado sem nenhuma
+    // linha embaixo lê como interface quebrada. Aqui a causa vem escrita.
+    setup({ providers: NENHUM_OPERANTE });
+    await screen.findByText('Provedores de backup');
+
+    // Sem opção para escolher, o gatilho cai no placeholder do `Select`, então
+    // ele também não pode aparecer com o nome de um provedor que não existe
+    // aqui: seria um rótulo que promete uma escolha que a tela não tem.
+    expect(screen.getByRole('button', { name: m.common.select })).toBeDisabled();
+    expect(screen.getByText(m.settings.noOperationalProvider)).toBeInTheDocument();
+    // E o motivo de cada provedor continua na lista, com o texto do main.
+    expect(screen.getByText(m.providers.googleNoCredentials)).toBeInTheDocument();
   });
 
   it('mostra o estado vazio quando não há conexão nem backup', async () => {

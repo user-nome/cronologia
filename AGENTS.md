@@ -89,8 +89,9 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
   nomeada (o `fs` é do `src/main/**`; `electron` só de `index.ts`,
   `protocols.ts` e `external.ts`; `child_process` só de
   `vault/privilege.ts`). `CRONOLOGIA_VAR_LIB`, `CRONOLOGIA_VAULT_DIR` e
-  `ELECTRON_RENDERER_URL` só são lidos por `vault/vault.ts`,
-  `vault/privilege.ts` e `main/index.ts`.
+  `ELECTRON_RENDERER_URL` só são lidos por `vault/store.ts`,
+  `vault/privilege.ts` e `main/protocols.ts` (`appPageUrl`, que as duas guardas
+  de URL da janela e do IPC precisam compartilhar).
 - Type safety: `strict`, `noUncheckedIndexedAccess`,
   `exactOptionalPropertyTypes`, `noImplicitReturns` e
   `verbatimModuleSyntax` (import de tipo sempre `import type`). Sem `any`,

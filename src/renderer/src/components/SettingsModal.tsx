@@ -314,6 +314,14 @@ export default function SettingsModal({
                     void switchProvider(next);
                   }}
                 />
+                {/* Seletor desabilitado sem nenhuma linha embaixo lê como
+                    interface quebrada, e não como "este build não tem chave".
+                    A causa de cada provedor está na lista seguinte; aqui vai o
+                    resumo, porque o campo desabilitado é o que a pessoa
+                    tenta clicar primeiro. */}
+                {providerOptions.length === 0 && !working ? (
+                  <span className="help warn">{m.settings.noOperationalProvider}</span>
+                ) : null}
               </div>
             </div>
 

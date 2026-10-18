@@ -289,6 +289,33 @@ export async function switchLanguage(page: Page): Promise<void> {
 }
 
 /**
+ * Seletor de provedor sem chave embutida: desabilitado **e explicado**.
+ *
+ * Este passo só vale no alvo compilado com o `.env` ausente, que é como o
+ * `npm run build` sai sem ninguém configurar `DROPBOX_APP_KEY` nem
+ * `GOOGLE_CLIENT_ID`. Foi exatamente assim que o defeito chegou: o controle
+ * aparecia desabilitado e mudo, e a leitura era "a tela quebrou" em vez de "este
+ * build não tem chave". O motivo por provedor continua na lista do catálogo,
+ * com o texto que o main devolveu.
+ */
+export async function providerUnavailableExplainsWhy(page: Page): Promise<void> {
+  await openSettings(page);
+
+  // O gatilho cai no placeholder do `Select` (não há opção para nomear), então
+  // o nome acessível é o do placeholder, e ele precisa estar desabilitado.
+  const seletor = button(page, pt.common.select);
+  expect(await seletor.isDisabled()).toBe(true);
+  await waitForText(page, pt.settings.noOperationalProvider);
+  await waitForText(page, pt.providers.googleNoCredentials);
+  await waitForText(page, pt.driveErrors.configureAppKey);
+  // O botão de conectar continua visível e nomeado: é ele que diz qual conta
+  // seria autorizada, e um rótulo ausente seria pior que o aviso.
+  expect(await button(page, pt.settings.connectAction('Dropbox')).isVisible()).toBe(true);
+
+  await closeSettings(page);
+}
+
+/**
  * Ação destrutiva sem a palavra exata: o botão de confirmar não habilita.
  *
  * A comparação da palavra ignora caixa (`typed.toUpperCase() === word.toUpperCase()`),

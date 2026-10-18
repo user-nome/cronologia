@@ -1075,6 +1075,13 @@ input[type='range']::-webkit-slider-thumb {
   line-height: 1.6;
 }
 
+/* Ajuda que explica por que algo está indisponível, e não um detalhe. */
+.help.warn {
+  color: var(--warning);
+  display: block;
+  margin-top: 6px;
+}
+
 .help ol {
   margin: 8px 0 0;
   padding-left: 18px;

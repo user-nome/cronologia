@@ -8,6 +8,7 @@ import {
   destroyVault,
   filterByStatus,
   lockAndUnlockVault,
+  providerUnavailableExplainsWhy,
   resetLibrary,
   resetLibraryRequiresExactWord,
   resetVaultPin,
@@ -83,6 +84,10 @@ describe('App compilado (out/)', () => {
 
   it('não apaga a biblioteca sem a palavra exata', async () => {
     await resetLibraryRequiresExactWord(current().page);
+  });
+
+  it('explica por que o seletor de provedor está desabilitado', async () => {
+    await providerUnavailableExplainsWhy(current().page);
   });
 
   it('fecha e reabre o cofre, recusando o PIN errado', async () => {

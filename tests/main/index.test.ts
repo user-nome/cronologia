@@ -113,14 +113,6 @@ function falhaEm(alvo: 'mkdirSync' | 'lstatSync', code: string): void {
   });
 }
 
-/** Ajustes neutros para exercitar a gravação sem segredo de verdade. */
-const AJUSTES: AppSettings = {
-  driveClientId: '',
-  drivePassphrase: '',
-  backupProvider: 'dropbox',
-
-  language: 'pt-BR',
-};
 const AJUSTES_NOVOS: AppSettings = {
   driveClientId: 'id',
   drivePassphrase: 'frase',
@@ -654,42 +646,6 @@ describe('F11 depois que a janela é fechada', () => {
   });
 });
 
-/** Frames que não são a página do app e portanto não podem chamar handler nenhum. */
-const FORA_DA_PAGINA: unknown[] = [
-  {},
-  null,
-  { senderFrame: null },
-  { senderFrame: {} },
-  // URL que não é parseável não pode "dar branco" e liberar o handler.
-  { senderFrame: { url: ':::nao-e-url' } },
-  // `url` fora de string é tratado como ausente, nunca como confiado.
-  { senderFrame: { url: 42 } },
-  { senderFrame: { url: 'https://evil.example/pagina' } },
-  // Mesmo scheme, outra origem, ou nenhum origin.
-  { senderFrame: { url: 'cronologia://outro/index.html' } },
-  { senderFrame: { url: 'file:///etc/passwd' } },
-];
-
-describe('guarda de origem do IPC', () => {
-  it('recusa frame ausente, de URL inválida e de outra origem', () => {
-    for (const frame of FORA_DA_PAGINA) {
-      expect(() => handler('library:get')(frame)).toThrow('IPC bloqueado');
-      expect(() => handler('settings:set')(frame, AJUSTES)).toThrow('IPC bloqueado');
-    }
-  });
-
-  it('aceita a página do app e recusa a mesma origem com porta diferente', () => {
-    // Só o origin interessa: o reload com query de cache bust é a mesma página.
-    expect(handler('library:get')(FAKE_EVENT)).toBeInstanceOf(Array);
-    expect(handler('library:get')(frameDe('cronologia://app/index.html?v=2'))).toBeInstanceOf(
-      Array,
-    );
-    expect(() => handler('library:get')(frameDe('cronologia://app:1234/index.html'))).toThrow(
-      'IPC bloqueado',
-    );
-  });
-});
-
 describe('o aviso de cofre fechado chega na janela', () => {
   beforeEach(async () => {
     await openTestVault();
@@ -752,7 +708,7 @@ describe('atividade da interface alimenta a janela de ociosidade', () => {
     expect(tocar).toHaveBeenCalledTimes(1);
     expect(vaultSession.isUnlocked()).toBe(true);
     expect(() => handler('vault:touch')(frameDe('https://evil.example/pagina'))).toThrow(
-      'IPC bloqueado',
+      currentMessages().errors.foreignFrame,
     );
   });
 });
@@ -774,10 +730,12 @@ describe('modo desenvolvimento (ELECTRON_RENDERER_URL)', () => {
 
       // Em desenvolvimento quem manda na origem é o Vite, não `cronologia://`.
       expect(() => handler('drive:providers')(frameDe(`${DEV_URL}/index.html`))).not.toThrow();
-      expect(() => handler('drive:providers')(FAKE_EVENT)).toThrow('IPC bloqueado');
+      expect(() => handler('drive:providers')(FAKE_EVENT)).toThrow(
+        currentMessages().errors.foreignFrame,
+      );
       expect(() =>
         handler('drive:providers')(frameDe('http://outro.local:5173/index.html')),
-      ).toThrow('IPC bloqueado');
+      ).toThrow(currentMessages().errors.foreignFrame);
     } finally {
       vi.unstubAllEnvs();
     }

@@ -201,7 +201,7 @@ O projeto roda com o máximo de rigor disponível:
   `electron` só de `index.ts`/`protocols.ts`/`external.ts` (mais o preload), e o
   `child_process` só de `vault/privilege.ts`. `CRONOLOGIA_VAR_LIB`,
   `CRONOLOGIA_VAULT_DIR` e `ELECTRON_RENDERER_URL` só são lidos por
-  `vault/vault.ts`, `vault/privilege.ts` e `main/index.ts`.
+  `vault/store.ts`, `vault/privilege.ts` e `main/protocols.ts`.
 - **Teto de tamanho** (`max-lines`, pulando linha em branco e comentário): 520 em
   `src/`, 750 em `tests/`, `e2e/` e `tools/`.
 - `eslint-plugin-react-hooks` com `rules-of-hooks`, `exhaustive-deps` e as regras

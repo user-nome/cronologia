@@ -27,20 +27,40 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 /**
+ * URL da página do app: o dev server do Vite em desenvolvimento, o scheme
+ * `cronologia://` em produção.
+ *
+ * Fica em um lugar só porque **duas** guardas precisam concordar com essa base:
+ * a `will-navigate` da janela (que barra salto para outra URL) e a guarda de
+ * origem do IPC, que decide se o emissor é a página oficial. Se as duas
+ * resolvessem a base por conta própria, uma delas passaria a recusar o frame
+ * legítimo em silêncio, e o sintoma seria "o app não salva nada" em vez de um
+ * erro visível.
+ */
+export function appPageUrl(): string {
+  const devUrl = process.env.ELECTRON_RENDERER_URL;
+  return devUrl !== undefined && devUrl !== '' ? devUrl : `${APP_ORIGIN}/index.html`;
+}
+
+/**
  * Serve a capa decifrada da biblioteca. O arquivo em disco é `.enc` (AES-256-GCM
  * com a chave do cofre), então a decifração acontece aqui, a cada requisição:
  * com o cofre fechado ou a capa ilegível, `readCoverBuffer` devolve `null` e a
  * imagem simplesmente não aparece. `basename` no nome segue sendo a barreira
  * de path traversal.
+ *
+ * O corpo das respostas de erro é status de transporte, em inglês e literal de
+ * propósito (mesma razão de `registerAppProtocol`): quem chega aqui é o
+ * carregador de imagem, não a pessoa, e não há tela para traduzir.
  */
 export function registerCoverProtocol(): void {
   protocol.handle('cover', (request) => {
     try {
       const url = new URL(request.url);
       const name = path.basename(decodeURIComponent(url.pathname));
-      if (name === '') return new Response('Não encontrado', { status: 404 });
+      if (name === '') return new Response(NOT_FOUND, { status: 404 });
       const buffer = readCoverBuffer(name);
-      if (buffer === null) return new Response('Não encontrado', { status: 404 });
+      if (buffer === null) return new Response(NOT_FOUND, { status: 404 });
       return new Response(new Uint8Array(buffer), {
         headers: {
           'Content-Type': mimeFor(name),
@@ -48,10 +68,23 @@ export function registerCoverProtocol(): void {
         },
       });
     } catch {
-      return new Response('Erro', { status: 500 });
+      return new Response(INTERNAL_ERROR, { status: 500 });
     }
   });
 }
+
+/**
+ * Frases de status do protocolo.
+ *
+ * Uma constante só para as duas, porque a alternativa foi o arquivo ter
+ * `'Forbidden'` ao lado de `'Não encontrado.'`: dois idiomas no mesmo arquivo de
+ * transporte, sem regra para dizer qual usar, é como se pega `'Erro'` na
+ * próxima linha. O idioma é trabalho de `src/messages/`, e este não é um
+ * lugar visível para a pessoa.
+ */
+const FORBIDDEN = 'Forbidden';
+const NOT_FOUND = 'Not Found';
+const INTERNAL_ERROR = 'Internal Error';
 
 /** Extensão → tipo MIME mínimo para servir a SPA local. */
 function rendererMime(file: string): string {
@@ -97,6 +130,11 @@ function rendererMime(file: string): string {
  * `path.resolve` + prefixo (`/../../../../etc/passwd` cai fora e vira 403;
  * o parser de URL do Chromium normaliza os `..` antes, então o handler
  * enxerga um caminho já relativo).
+ *
+ * Os corpos das respostas são frases de status do protocolo, em inglês e
+ * literais de propósito: é transporte, não interface. Quem chega aqui é o
+ * carregador de asset, não a pessoa, então localizá-los seria ler um bundle de
+ * mensagens por requisição sem ganho nenhum.
  */
 export function registerAppProtocol(): void {
   const root = path.join(__dirname, '../renderer');
@@ -106,16 +144,16 @@ export function registerAppProtocol(): void {
       const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '');
       const full = path.resolve(root, rel === '' ? 'index.html' : rel);
       if (!full.startsWith(`${root}${path.sep}`)) {
-        return new Response('Forbidden', { status: 403 });
+        return new Response(FORBIDDEN, { status: 403 });
       }
       if (!fs.existsSync(full) || fs.statSync(full).isDirectory()) {
-        return new Response('Não encontrado.', { status: 404 });
+        return new Response(NOT_FOUND, { status: 404 });
       }
       return new Response(new Uint8Array(fs.readFileSync(full)), {
         headers: { 'Content-Type': rendererMime(full) },
       });
     } catch {
-      return new Response('Erro', { status: 500 });
+      return new Response(INTERNAL_ERROR, { status: 500 });
     }
   });
 }

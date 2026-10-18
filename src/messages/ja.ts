@@ -85,6 +85,9 @@ export const ja: Messages = {
       'されるため、最初のバックアップ前に以下の暗号化パスフレーズを設定してください。',
     languageLabel: '言語',
     providersLabel: 'バックアップ先',
+    noOperationalProvider:
+      'このビルドで利用できるバックアップ先がありません: クライアントキーがバイナリに ' +
+      '埋め込まれていません。下のリストに各々の理由があります。',
     hiddenFolder: '非公開フォルダ',
     operational: '利用可能',
     notOperational: '未対応',
@@ -479,5 +482,18 @@ export const ja: Messages = {
     doneTitle: '認証が完了しました',
     deniedBody: 'このタブは閉じて構いません。',
     doneBody: 'このタブを閉じて、アプリケーションに戻ってください。',
+  },
+
+  /**
+   * IPC 境界を越えるエラー: main が投げ、renderer が拒否された `Error` として
+   * 受け取り、ユーザーが画面上で読む。
+   *
+   * `driveErrors`/`libraryErrors` の中ではなく独立したブロックなのは、発生源が
+   * サブシステムではなくウィンドウ境界だから。Drive のエラーは Drive のもので、
+   * これはアプリ全体のもの。どちらに入れても発生源が実際より狭く見える。
+   */
+  errors: {
+    /** 発生源ガード: 送信者がアプリページではない。 */
+    foreignFrame: 'IPC ブロック：リクエストがアプリのページからではありません。',
   },
 };

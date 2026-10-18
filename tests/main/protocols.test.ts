@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { protocol } from '../mocks/electron.ts';
-import { APP_SCHEME, registerAppProtocol } from '@zero/main/protocols';
+import { APP_ORIGIN, APP_SCHEME, appPageUrl, registerAppProtocol } from '@zero/main/protocols';
 
 /**
  * O scheme `cronologia://` é o que serve a SPA empacotada em produção (no lugar
@@ -157,5 +157,35 @@ describe('protocolo cronologia://', () => {
     } finally {
       fs.rmSync(comEspaco, { force: true });
     }
+  });
+});
+
+describe('appPageUrl: a base é uma só', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('sem ELECTRON_RENDERER_URL aponta para o scheme da SPA', () => {
+    vi.stubEnv('ELECTRON_RENDERER_URL', '');
+    expect(appPageUrl()).toBe(`${APP_ORIGIN}/index.html`);
+  });
+
+  it('com a variável, aponta para o dev server do Vite', () => {
+    vi.stubEnv('ELECTRON_RENDERER_URL', 'http://localhost:5173/index.html');
+    expect(appPageUrl()).toBe('http://localhost:5173/index.html');
+  });
+
+  it('é a função que o main importa, e não uma cópia da fórmula', () => {
+    // Duas guardas dependem desta base: a `will-navigate` da janela (que barra
+    // salto para outra URL) e a guarda de origem do IPC (que decide se o
+    // emissor é a página oficial). Se qualquer uma resolver a URL por conta
+    // própria, as duas podem divergir e o sintoma passa a ser "o app não salva
+    // nada", sem erro em lugar nenhum. Este teste é o que impede a cópia.
+    const fonte = fs.readFileSync(
+      path.join(import.meta.dirname, '..', '..', 'src', 'main', 'index.ts'),
+      'utf-8',
+    );
+    expect(fonte).not.toMatch(/process\.env\.ELECTRON_RENDERER_URL/);
+    expect(fonte).toContain('appPageUrl()');
   });
 });

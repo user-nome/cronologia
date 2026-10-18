@@ -54,7 +54,7 @@ import {
 import { runDiskCleanup } from '@zero/main/cleanup';
 import { currentMessages } from '@zero/main/i18n';
 import { openExternalSafe } from '@zero/main/external';
-import { APP_ORIGIN, registerAppProtocol, registerCoverProtocol } from '@zero/main/protocols';
+import { appPageUrl, registerAppProtocol, registerCoverProtocol } from '@zero/main/protocols';
 import type {
   AppSettings,
   BackupProviderId,
@@ -146,8 +146,9 @@ function createWindow(): void {
 
   // O app é uma SPA local: navegação só vale para a própria página (o reload
   // mantém a mesma URL); qualquer salto para outra URL é recusado.
-  const devUrl = process.env.ELECTRON_RENDERER_URL;
-  const targetUrl = devUrl !== undefined && devUrl !== '' ? devUrl : `${APP_ORIGIN}/index.html`;
+  // A URL da página vem de `appPageUrl()`: a mesma base que `isAppFrameUrl`
+  // confere antes de cada handler IPC. As duas guardas precisam concordar.
+  const targetUrl = appPageUrl();
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (url !== targetUrl) event.preventDefault();
   });
@@ -178,14 +179,17 @@ function registerPermissionPolicy(): void {
  * Só aceita URL da página oficial do app: dev server do Vite em dev, ou o
  * scheme `cronologia://` em produção. Qualquer frame fora desse host (ex.: um
  * `<webview>` injetado) é bloqueado antes do handler de domínio rodar.
+ *
+ * Compara protocolo/host/porta e **não** o caminho: um frame de dev é
+ * `http://localhost:5173/index.html` e um reload pode legitimately levar barra,
+ * mas o host tem de ser o mesmo. A base vem de `appPageUrl()`, a mesma função
+ * que a `will-navigate` da janela usa, para as duas guardas não divergirem.
  */
 function isAppFrameUrl(url: string | undefined): boolean {
   if (url === undefined) return false;
-  const devUrl = process.env.ELECTRON_RENDERER_URL;
-  const base = devUrl !== undefined && devUrl !== '' ? devUrl : `${APP_ORIGIN}/index.html`;
   try {
     const frame = new URL(url);
-    const expected = new URL(base);
+    const expected = new URL(appPageUrl());
     return (
       frame.protocol === expected.protocol &&
       frame.host === expected.host &&
@@ -203,11 +207,15 @@ function isAppFrameUrl(url: string | undefined): boolean {
  * O evento entra como `IpcFrameEvent`: o tipo real do Electron é um superconjunto
  * deste, então ele atravessa a função sem `as`. O que fica `unknown` é a URL, e é
  * a decisão certa: ela só vira string depois de `isAppFrameUrl` conferir.
+ *
+ * A mensagem sai do bundle porque este erro **atravessa o IPC**: chega ao
+ * renderer como `Error` rejeitado, igual aos outros, e a pessoa pode estar no
+ * idioma escolhido.
  */
 function assertAppFrame(event: IpcFrameEvent | null | undefined): void {
   const url = event?.senderFrame?.url;
   if (!isAppFrameUrl(typeof url === 'string' ? url : undefined)) {
-    throw new Error('IPC bloqueado: frame fora da página oficial do app.');
+    throw new Error(currentMessages().errors.foreignFrame);
   }
 }
 

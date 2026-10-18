@@ -98,6 +98,29 @@ biblioteca.
   `RestorePasswordModal`) e Fazer backup agora; ações ocupadas mostram
   spinner e travam o resto.
 
+O botão **Conectar ao `<provedor>`** acompanha o provedor escolhido no seletor
+logo acima, ícone incluso. Isso não é cosmético: `drive.auth` do main autoriza
+o provedor **ativo**, e o destino só muda quando `drive:setProvider` é aplicado.
+Um rótulo que não acompanhasse a escolha faria a pessoa autorizar a conta
+certa na conta errada.
+
+### Seletor de provedor e build sem chave
+
+O seletor só lista os provedores que **este build** consegue usar
+(`operational`, que vem de `hasGoogleCredentials()`/`appKey()` no main). Não é
+filtro de UI arbitrário: sem a chave embutida no binário, o OAuth falharia na
+hora de autorizar, e oferecer a escolha seria pior que não oferecer.
+
+Com nenhum provedor operante o seletor fica desabilitado **e explica o motivo**
+(`m.settings.noOperationalProvider`, em `.help.warn`), porque um controle
+desabilitado sem nenhuma linha embaixo lê como interface quebrada. O motivo
+específico de cada provedor segue na lista do catálogo, com o texto que o main
+devolveu.
+
+Ver `docs/backup-providers.md` para onde cadastrar as chaves (`.env` local ou
+Secrets and variables → Actions no CI) e `docs/build.md` para a conferência que
+o `publish.yml` faz antes de publicar.
+
 ## VaultModal
 
 Abre em dois contextos:

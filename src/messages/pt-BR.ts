@@ -91,6 +91,9 @@ export const ptBR = {
       'criptografia abaixo antes do primeiro backup.',
     languageLabel: 'Idioma',
     providersLabel: 'Provedores de backup',
+    noOperationalProvider:
+      'Nenhum provedor de backup está disponível neste build: as chaves do cliente ' +
+      'não foram embutidas no binário. O motivo de cada um está na lista abaixo.',
     hiddenFolder: 'Pasta oculta',
     operational: 'Operante',
     notOperational: 'Não operante',
@@ -480,6 +483,20 @@ export const ptBR = {
     doneTitle: 'Autorização concluída',
     deniedBody: 'Você pode fechar esta aba.',
     doneBody: 'Pode fechar esta aba e voltar para o aplicativo.',
+  },
+
+  /**
+   * Erros que **atravessam o IPC**: o main lança, o renderer recebe o `Error`
+   * rejeitado e a pessoa lê a mensagem na tela.
+   *
+   * Ficam num bloco próprio (e não dentro de `driveErrors`/`libraryErrors`) porque
+   * a origem delas não é um subsistema, é a fronteira da janela. Um erro do
+   * Drive é do Drive; este é do app inteiro, e localizá-lo num dos dois faria a
+   * origem parecer mais específica do que é.
+   */
+  errors: {
+    /** Guarda de origem do IPC: o emissor não é a página oficial do app. */
+    foreignFrame: 'IPC bloqueado: a requisição não veio da página do app.',
   },
 };
 

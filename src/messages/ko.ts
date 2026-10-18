@@ -85,6 +85,9 @@ export const ko: Messages = {
       '비밀번호를 설정하세요.',
     languageLabel: '언어',
     providersLabel: '백업 제공업체',
+    noOperationalProvider:
+      '이 빌드에서 사용할 수 있는 백업 제공업체가 없습니다: 클라이언트 키가 바이너리에 ' +
+      '포함되지 않았습니다. 아래 목록에 각 제공업체의 이유가 있습니다.',
     hiddenFolder: '숨김 폴더',
     operational: '사용 가능',
     notOperational: '사용 불가',
@@ -464,5 +467,18 @@ export const ko: Messages = {
     doneTitle: '인증 완료',
     deniedBody: '이 탭을 닫으셔도 됩니다.',
     doneBody: '이 탭을 닫고 앱으로 돌아가세요.',
+  },
+
+  /**
+   * IPC 경계를 통과하는 오류: 메인이 던지고 렌더러가 거부된 `Error`로 받아
+   * 사용자가 화면에서 읽는다.
+   *
+   * `driveErrors`/`libraryErrors` 안이 아니라 별도 블록인 이유는 발생지가
+   * 하위 시스템이 아니라 창 경계이기 때문이다. Drive 오류는 Drive의 것이고
+   * 이건 앱 전체의 것이므로, 둘 중 어디에 넣어도 발생지가 실제보다 좁아 보인다.
+   */
+  errors: {
+    /** 출처 가드: 발신자가 앱 페이지가 아니다. */
+    foreignFrame: 'IPC 차단: 요청이 앱 페이지에서 오지 않았습니다.',
   },
 };

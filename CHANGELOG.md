@@ -8,6 +8,29 @@ em português do Brasil.
 
 ### Mudado
 
+- **A URL da página do app passou a ser resolvida em um lugar só**
+  (`appPageUrl()`, em `main/protocols.ts`). `ELECTRON_RENDERER_URL` era lida e a
+  base montada em **dois** lugares: a `will-navigate` da janela e a guarda de
+  origem do IPC. Se as duas cópias divergissem, uma delas passaria a recusar o
+  frame legítimo sem mensagem visível, e o sintoma seria "o app não salva
+  nada". O dono da variável na regra de ambiente do ESLint mudou para
+  `protocols.ts`, ao lado do dono do cofre em `vault/store.ts`.
+- **A recusa da guarda de origem do IPC saiu do código e foi para o bundle**
+  (`m.errors.foreignFrame`, nos cinco idiomas). O erro **atravessa o IPC** e
+  chega ao renderer como `Error` rejeitado, então a pessoa lê a frase na tela e
+  pode estar em qualquer idioma; estava escrito como literal em português.
+- **Os corpos de resposta do `protocol.handle` ficaram consistentes.** O mesmo
+  arquivo tinha `'Forbidden'` (inglês) ao lado de `'Não encontrado.'`
+  (português), sem regra para dizer qual usar. Agora são literais em inglês, com
+  a razão anotada: é transporte, não interface.
+- **O seletor de provedor desabilitado agora diz por quê.** Num build sem
+  credencial embutida (`DROPBOX_APP_KEY`/`GOOGLE_CLIENT_ID`), os dois provedores
+  ficam fora do seletor e o controle aparece desabilitado e mudo, o que lê como
+  interface quebrada. Agora há uma linha explicando que nenhum provedor está
+  disponível neste build, com o motivo de cada um logo abaixo na lista do
+  catálogo. O gate de credencial continua: sem a chave no binário o OAuth
+  falharia na hora de autorizar, e oferecer a escolha seria pior que não
+  oferecer.
 - **Fechar a janela agora desregistra o atalho global do F11.** Ele era
   registrado no `browser-window-focus` e desregistrado no `browser-window-blur`;
   fechar uma janela **focada** não emite `blur`, então o registro sobrevivia no
@@ -49,6 +72,10 @@ error?: string }` aparecia em **cinco** arquivos como retorno de
   porque uma bandeja ou um `preventDefault` no `close` só se revelam no `ps` e
   no painel do desktop. O app **já** encerrava ao fechar a janela e **não** tem
   bandeja; o que faltava era a trava contra a regressão.
+- `tests/main/ipc-origem.test.ts`: a guarda de origem do IPC saiu do
+  `index.test.ts` para o arquivo próprio. É a primeira coisa que roda em todos os
+  canais, e o conjunto de frames recusados precisa ficar explícito num lugar que
+  não compete com o teto de linhas do boot.
 - `tests/main/index-ciclo-de-vida.test.ts`: trava a **ausência** dos quatro
   mecanismos que produziriam o app vivo com a janela fechada (`Tray`,
   `preventDefault` no `close`, `setLoginItemSettings`, `powerSaveBlocker`) e do
