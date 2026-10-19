@@ -147,11 +147,14 @@ Biblioteca:
 | Secret            | Conteúdo                                                                                                                            |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `GPG_PRIVATE_KEY` | Bloco armoured completo da chave, **com** as linhas `-----BEGIN PGP PRIVATE KEY BLOCK-----` e `-----END PGP PRIVATE KEY BLOCK-----` |
-| `GPG_PASSPHRASE`  | Senha da chave (a chave `F2B0A3843C9FF986` tem senha)                                                                               |
+| `GPG_PASSPHRASE`  | Senha da chave privada exportada (a chave usada tem senha)                                                                          |
 
 Se algo faltar, esse passo do workflow falha com diagnóstico explícito
-(`::error::` legível na página da execução): chave incompleta, passphrase
-errada ou secret ausente.
+(`::error::` legível na página da execução): bloco que não importa, bloco sem
+chave secreta utilizável, passphrase errada ou secret ausente. O key ID **não**
+é fixo no workflow: ele é lido do keyring depois do import e sai no log como
+`Chave de assinatura: <ID>`, então trocar de chave GPG não exige editar
+`.github/workflows/publish.yml`.
 
 ### 5. Validação local sem sudo
 

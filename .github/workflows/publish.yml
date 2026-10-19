@@ -326,11 +326,20 @@ jobs:
           cp release/cronologia_*_amd64.deb apt/cronologia_amd64.deb
           # Falhas aqui viram ::error:: explícito (annotations são legíveis
           # na UI do Actions sem precisar abrir o log cru).
-          printf '%s\n' "$GPG_PRIVATE_KEY" | gpg --batch --import || true
-          if ! gpg --list-secret-keys F2B0A3843C9FF986 >/dev/null 2>&1; then
-            echo "::error::GPG_PRIVATE_KEY inválido ou incompleto: cole o bloco inteiro do arquivo, COM as linhas -----BEGIN PGP PRIVATE KEY BLOCK----- e -----END PGP PRIVATE KEY BLOCK----- (sem elas o gpg não reconhece o formato)."
+          # Import sem '|| true': sem chave no keyring nada mais adiante
+          # assina, e a falha de import tem mensagem própria, distinta da
+          # falha de passphrase. O ID NÃO é fixo de propósito — deriving do
+          # keyring aceita qualquer chave nova sem tocar neste arquivo.
+          if ! printf '%s\n' "$GPG_PRIVATE_KEY" | gpg --batch --import; then
+            echo "::error::GPG_PRIVATE_KEY não importou: cole o bloco armoured inteiro, COM as linhas -----BEGIN PGP PRIVATE KEY BLOCK----- e -----END PGP PRIVATE KEY BLOCK-----."
             exit 1
           fi
+          KEYID="$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^sec:/ {print $5; exit}')"
+          if [ -z "$KEYID" ]; then
+            echo "::error::O bloco importado não traz chave secreta utilizável (só pública, ou subchave sem material)."
+            exit 1
+          fi
+          echo "Chave de assinatura: $KEYID"
           if [ -n "${GPG_PASSPHRASE:-}" ]; then
             GPG_OPTS=(--batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE")
           else
@@ -340,7 +349,7 @@ jobs:
           # (ou secret GPG_PASSPHRASE ausente; no CI não há pinentry).
           echo preflight > apt/.sign-test
           if ! gpg "${GPG_OPTS[@]}" --clearsign -o apt/.sign-test.asc apt/.sign-test; then
-            echo "::error::GPG_PASSPHRASE incorreto (ou secret ausente) para a chave F2B0A3843C9FF986."
+            echo "::error::GPG_PASSPHRASE incorreto (ou secret ausente) para a chave $KEYID."
             exit 1
           fi
           rm -f apt/.sign-test apt/.sign-test.asc
