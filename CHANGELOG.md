@@ -209,16 +209,32 @@ error?: string }` aparecia em **cinco** arquivos como retorno de
 
 ### Cobertura de teste
 
-- Suíte de **780 para 935 testes**, com 17 arquivos novos ou reescritos. O
+- Suíte de **780 para 1.087 testes**, com 17 arquivos novos ou reescritos. O
   stand-in de KDF (`tests/helpers/kdf.ts`) veio porque o PIN de produção custa
   2,1 s por abertura e a suíte abre o cofre dezenas de vezes;
   `tests/main/vault-crypto.test.ts` desfaz o stand-in e compara a derivação do
   app com a da biblioteca, para a integração com `hash-wasm` continuar
   verificada.
-- Todos os arquivos criados ou tocados na 2.0 passam do piso de **95% por
-  arquivo** nas quatro métricas. O que ficou abaixo do piso
-  (`src/main/drive/providers/*` e `src/renderer/src/components/Select.tsx`) já
-  estava antes desta mudança e não foi tocado aqui.
+- **A cobertura de 95% por arquivo fecha nas quatro métricas, com 0 dos 81
+  arquivos de `src/` abaixo do piso** (99,23% de comandos, 98,67% de ramos,
+  99,45% de funções e 99,43% de linhas), e `npm run test:coverage` passa a
+  terminar com código 0. Oito arquivos estavam abaixo e subiram: o adaptador do
+  Dropbox, o fluxo OAuth do Google (quatro módulos), o servidor de callback
+  compartilhado, e `Select.tsx` e `SettingsModal.tsx` no renderer.
+- **O `getter operational` do Dropbox é relido a cada acesso, e o do Google
+  congela no import — a diferença é de projeto.** A App key do Dropbox pode vir
+  do override gravado no cofre e mudar com o app aberto; o par do Google é
+  chumbado no bundle no build, e mudá-lo exigiria reiniciar o app.
+  `tests/main/drive-provider-adapter.test.ts` fixa as duas metades, porque é
+  justamente um getter esquecido que congelaria a disponibilidade do provedor.
+- **`tests/main/google-rest.test.ts` grava o comportamento real do corpo
+  não-JSON**: a API devolvendo HTML de proxy não vira `invalidListResponse` (o
+  `parseJson` devolve o erro do parser), e o teste afirma isso como é. O que
+  importa é que a listagem **não** devolve `[]` em silêncio, que é como um
+  backup apagaria o acervo inteiro como órfão.
+- **O upload do Google Drive apaga o homônimo duplicado depois do PATCH, nunca
+  antes.** Apagar antes deixaria a conta sem backup nenhum se a gravação
+  falhasse; o teste fixa a ordem das chamadas, não só que houve um `DELETE`.
 
 ### Cobertura de teste (1.9.2)
 

@@ -1,109 +1,192 @@
-# Cronologia
+<div align="center">
 
-Aplicativo desktop (Electron + TypeScript + React) para anotar o progresso das suas leituras de
-**webtoons, manhwas, manhuas, mangás, livros e outros**: capa da obra, título, descrição, barra de
-progresso em capítulos e marcação de conclusão, com **backup manual no Dropbox ou Google
-Drive**.
+![Cronologia](docs/assets/banner.png)
 
-Feito para **Linux Mint 22.3 (Zena)** e distribuído como pacote **`.deb`**.
+**Gratuito · Código aberto · MIT** &nbsp;·&nbsp; Electron + React + TypeScript
 
----
+**Uma biblioteca para acompanhar o que você está lendo:** webtoons, manhwas,
+manhuas, mangás e livros com capa, progresso e status, tudo gravado **cifrado**
+no seu próprio disco, sem conta e sem servidor.
 
-## Recursos
+**Versão atual: 2.0.0 · Linux (amd64)**
 
-- **Cofre com três credenciais**: obras e capas são gravadas **cifradas** em disco
-  (AES-256-GCM com a chave do cofre). A chave é abrada por uma **senha mestra** de
-  24 caracteres, por um **PIN** de 8 dígitos no dia a dia, e por uma **frase de
-  recuperação** de 12+ palavras que não abre o cofre: ela só redefine o PIN
-  esquecido. Sem cofre aberto o acervo não existe para o app, e o auto-lock de 5
-  min de inatividade fecha a sessão. Ver [`docs/cofre.md`](docs/cofre.md).
-- **Zona de risco**: apagar a biblioteca, apagar o backup na nuvem e destruir o
-  cofre, cada uma em duas etapas com palavra digitada. Arquivos apagados são
-  sobrescritos antes, e destruir o cofre torna todo o acervo irrecuperável sem
-  precisar sobrescrever cada arquivo.
-- **Biblioteca em grade** com capa, título, tipo (webtoon/manhwa/manhua/mangá/livro/outro), status
-  (planejado, lendo, pausado, concluído, cancelado) e progresso.
-- **Capa da obra**: escolha uma imagem JPG/PNG/WebP do disco. A imagem é copiada para a
-  biblioteca local e servida pelo protocolo interno `cover://`.
-- **Título e descrição** livres, além de uma marcação opcional (`Cap. 45`, `Vol. 3`).
-- **Barra de progresso** no card com setas `↑` / `↓` (ajuste de 1 em 1) e botões de status
-  contextuais (**Concluir**, **Pausar**/**Retomar** e **Cancelar**), todos em uma única linha e
-  compactos (só ícone, com a ação no tooltip); no modal de edição, campo numérico direto,
-  `−10` / `+10`, **concluir** e **zerar**.
-- **Busca** por título ou descrição e **filtros** por status (Lendo, Planejados, Pausados,
-  Concluídos, Cancelados); o contador e o progresso médio do cabeçalho acompanham o que está
-  sendo exibido, e o bloco de estatísticas continua mostrando o total da biblioteca.
-- **Backup na nuvem**: Dropbox (`/Apps/Cronologia`) ou Google Drive (`appDataFolder`,
-  pasta oculta, disponível quando o build tem `GOOGLE_CLIENT_ID`). Login **OAuth + PKCE
-  direto no app**, sem servidor intermediário. Arquivos sempre **criptografados** (nomes
-  opacos + AES-256-GCM), com **Fazer backup agora**, **Restaurar** (pede a senha),
-  **Desconectar** e **Apagar backup**.
-- **Janela nativa sem barra de menus**: sem botões File/Edit/View no topo (menu da
-  aplicação removido por completo); decorações do gerenciador de janelas (encaixe em cantos
-  para dividir a tela, maximizar/fechar) e `F11` alterna tela cheia.
-- **Atribuições**: botão ao lado da pílula do Drive abre os créditos das dependências em
-  rolagem lenta e contínua (estilo pós-créditos de cinema), com pausar/continuar e
-  respeito a `prefers-reduced-motion`; detalhes em [`docs/atribuicoes.md`](docs/atribuicoes.md).
-- **Doações**: botão **Doar** no cabeçalho abre a página de apoio ao projeto, com link do
-  Mercado Pago (abre no navegador) e botão de copiar; detalhes em
-  [`docs/doacoes.md`](docs/doacoes.md).
-- **Idioma**: interface em **português (Brasil)**, **inglês**, **coreano** ou **chinês simplificado**,
-  escolhido em Configurações e
-  persistido; todo texto fixo mora em `src/messages/` (ver [`docs/messages.md`](docs/messages.md)).
-- Tema escuro com fundo preto (`#000`) e paleta sólida azul; ícones **Font Awesome**.
+[Baixar .deb](https://github.com/user-nome/cronologia/releases/latest/download/cronologia_amd64.deb)
+&nbsp;·&nbsp; [Site do projeto](https://cronologia-delirante.vercel.app)
+
+</div>
 
 ---
+
+## O que é o Cronologia
+
+O Cronologia é um aplicativo **feito para Linux** que organiza o seu acervo de
+leituras e vem em um único arquivo `.deb`, igual a qualquer programa que você
+instala pelo gerenciador do sistema. Ele foi feito para quem tem muitas obras
+paradas na lista e quer saber, num olhar, onde parou em cada uma.
+
+Ele **organiza** a sua biblioteca; não **lê**. O Cronologia não abre capítulos,
+não baixa nada e não substitui o seu leitor: ele guarda o que você leu até onde,
+com capa, tipo e status, para você voltar exatamente ali.
+
+A biblioteca é **local**. As obras e as capas são gravadas cifradas no seu
+próprio disco e não são enviadas para lugar nenhum, a não ser o backup opcional
+que **você** decide configurar. Não existe conta para criar nem servidor para
+invadir. Quem tem o aplicativo tem as chaves; quem não tem, não vê nada.
+
+### Suas leituras, em um lugar só
+
+Uma biblioteca com capa, título, tipo, status e progresso para cada obra. Nada sai
+da sua máquina e ninguém, nem nós, vemos o que está dentro.
+
+- **Biblioteca em grade.** Cada obra entra com capa, título, tipo (**webtoon**,
+  **manhwa**, **manhua**, **mangá**, **livro** ou outro), status e progresso. O
+  cabeçalho mostra o total e o quanto você já leu da coleção inteira.
+- **Capa da obra.** Escolha uma imagem JPG, PNG ou WebP do seu disco. A imagem é
+  copiada para a biblioteca local e passa a ser a capa daquela obra.
+- **Título, descrição e marcação livres.** O que você precisar escrever: o nome,
+  uma sinopse e, se quiser, um marcador como `Cap. 45` ou `Vol. 3`.
+- **Busca e filtros.** A lista filtra enquanto você digita, pelo título ou pela
+  descrição, e pelos chips de status (Lendo, Planejados, Pausados, Concluídos,
+  Cancelados).
+
+### Progresso que dá para usar no dia a dia
+
+A parte que você vai usar o dia inteiro, sem trocar de janela nem abrir menu.
+
+- **Ajuste de 1 em 1 no card.** As setas ↑ e ↓ somam ou tiram um capítulo, direto
+  no cartão. No modal da obra, o campo numérico e os botões `−10` / `+10` dão
+  passos maiores, e ainda há **concluir** e **zerar**.
+- **Status com um clique.** O card mostra só as ações que valem para a obra agora:
+  **Concluir**, **Pausar** ou **Retomar**, **Cancelar**. Uma obra concluída só
+  oferece **Reabrir**; uma cancelada, só **Retomar**.
+- **Progresso e status são independentes.** Marcar como concluída **não** apaga o
+  número que você anotou: o card passa a mostrar 100% e o valor continua lá. O
+  botão **Zerar** volta os dois.
+- **Janela nativa, sem barra de menus.** Sem File/Edit/View no topo, com as
+  decorações do seu gerenciador de janelas e `F11` para tela cheia.
+
+### Backup na nuvem, cifrado de ponta a ponta
+
+Para o dia em que o disco troca, o computador é formatado ou some. O backup é
+**opcional** e só existe se você configurar.
+
+- **Você escolhe o destino.** Dropbox (pasta `/Apps/Cronologia`) ou Google Drive
+  (a pasta oculta do app, que não aparece na interface do Google Drive).
+- **Login no navegador, sem senha para o app.** A conexão é OAuth direto no
+  aplicativo, com PKCE: o login acontece na página da nuvem e o app nunca recebe
+  senha sua.
+- **O que sobe já está cifrado.** Cada arquivo é criptografado com AES-256-GCM e
+  recebe um **nome opaco**, então nem olhando a pasta da nuvem dá para saber o que
+  é o quê. O backup sozinho não serve para nada sem a sua senha.
+- **Restaurar pede a senha.** O app baixa os arquivos, decifra localmente e
+  substitui a biblioteca. Sem a senha do backup, nem nós conseguimos abrir.
+- **Acontece quando você manda.** Não existe sincronização automática: o botão
+  **Fazer backup agora** grava o que existe naquele momento.
+
+### Proteção contra quem erra o PIN
+
+O PIN é o ponto mais fraco, porque são só 8 dígitos. Por isso o aplicativo torna
+cada tentativa errada cara e oferece formas de destruir tudo de vez.
+
+- **Acesso com PIN de 8 dígitos.** O uso do dia a dia é só o PIN. A senha mestra
+  de 24 caracteres é a alternativa, e a frase de recuperação que você escreveu na
+  criação serve **apenas para escolher um PIN novo**: ela não abre o cofre.
+- **Espera crescente e bloqueio automático.** Cada tentativa errada aumenta a
+  espera (10 s, 30 s, 1 min, 1 h e depois 24 h), e essa espera fica gravada no
+  cofre: fechar o aplicativo não zera nada. Além disso, o cofre **trava sozinho
+  após 5 minutos sem uso** e a chave some da memória.
+- **Zona de risco.** Apagar a biblioteca, apagar o backup na nuvem e destruir o
+  cofre são as três ferramentas irreversíveis, e todas exigem **duas etapas** com
+  uma palavra digitada. Arquivos apagados são **sobrescritos** antes de sumir, e
+  destruir o cofre torna todo o acervo irrecuperável de uma vez, sem precisar
+  percorrer arquivo por arquivo.
+
+## O que o Cronologia não faz
+
+Vale ser claro sobre os limites, porque um organizador de leituras que promete
+demais costuma entregar menos do que parece:
+
+- **Não é leitor.** Não abre capítulos, não baixa nada e não substitui o site ou o
+  aplicativo de onde você lê. Ele anota onde você parou.
+- **Não é nuvem.** Não existe servidor nosso recebendo ou sincronizando sua
+  biblioteca. O único tráfego possível é o do backup **que você configurou**.
+- **Não sincroniza sozinho.** O backup é manual: nada sai do seu disco sem você
+  pedir, e nada volta sem você restaurar.
+- **Não importa nem exporta** a biblioteca de outros aplicativos, e não
+  sincroniza entre computadores.
+- **Não pede cadastro, e-mail ou pagamento.** Não há conta para criar e nada para
+  assinar: o aplicativo é gratuito, de código aberto e não mostra anúncios.
+- **Não gera a sua frase de recuperação.** O aplicativo só conta as palavras. Quem
+  escreve é você, e ela precisa ficar guardada fora do computador.
+
+## Como funciona o acesso
+
+O cofre é criado uma vez só e, depois, é uma tela de PIN. O caminho tem três
+partes, e vale conhecê-las antes de começar:
+
+1. **Na criação** você escolhe uma senha mestra de exatamente 24 caracteres, um PIN
+   de 8 dígitos e escreve uma frase de recuperação com pelo menos 12 palavras. A
+   frase é sua e precisa ficar anotada no papel, longe do computador.
+2. **No dia a dia** você abre o cofre com o PIN. Como ele é o elo mais fraco, o
+   aplicativo leva alguns segundos para abrir: essa demora é o que torna um
+   ataque por tentativa e erro caro. A biblioteca só existe para o app enquanto o
+   cofre está aberto.
+3. **Se esquecer o PIN**, a frase de recuperação serve para definir um PIN novo.
+   Ela não abre o cofre. E se você perder a senha mestra e a frase ao mesmo tempo,
+   a biblioteca não pode ser aberta por ninguém, inclusive por nós, porque não
+   temos cópia nenhuma.
+
+## Onde os seus dados ficam guardados
+
+O acervo fica em `~/.local/share/cronologia/` (`library.enc` e `covers/*.enc`), e
+as **obras e capas são gravadas cifradas** com a chave do cofre. O idioma fica em
+`~/.config/cronologia/settings.json`.
+
+Os **segredos** (a senha mestra, o PIN, a frase de recuperação, os tokens da nuvem
+e a senha do backup) ficam em um cofre próprio, em
+`/var/lib/.cronologia/.vault/`, ou seja, **fora da sua pasta pessoal**. Isso é de
+propósito: ele não é apagado quando você limpa a pasta do usuário e não entra por
+acaso nos backups sincronizados da nuvem. A pasta é protegida pelo sistema e só o
+seu usuário consegue abrir.
+
+Na primeira vez, o Cronologia pode pedir a senha de administrador pelo **diálogo
+padrão do Linux** para criar essa pasta. A senha é digitada no sistema e **nunca
+passa pelo aplicativo**. Além disso, o `.deb` instala um perfil **AppArmor** que
+limita o app aos diretórios dele e do cofre, e **nega a leitura** de arquivos
+sensíveis do seu `home` (`.ssh`, `.gnupg`, `.aws`, `.netrc`, navegadores, o
+`keyring`…).
+
+O detalhamento de cada medida, incluindo as que **não** tomamos, está no
+[`SECURITY.md`](SECURITY.md) e no mapa por arquivo em
+[`docs/seguranca.md`](docs/seguranca.md).
 
 ## Instalação
 
-### Via repositório APT (recomendado: recebe `sudo apt upgrade`)
-
-O repositório é a própria GitHub Release do projeto (índices assinados como
-assets; nada de binário no git). Motivo da escolha, passo a passo da
-publicação e regras de manutenção: [`docs/distribuicao-apt.md`](docs/distribuicao-apt.md).
-
-Na primeira instalação:
-
-```bash
-curl -fsSL https://github.com/user-nome/cronologia/releases/latest/download/public.key \
-  | sudo gpg --dearmor --yes -o /usr/share/keyrings/cronologia.gpg
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cronologia.gpg] \
-https://github.com/user-nome/cronologia/releases/latest/download/ ./" \
-  | sudo tee /etc/apt/sources.list.d/cronologia.list
-sudo apt update && sudo apt install cronologia
-```
-
-### Download direto
-
-Baixe o `.deb` da [página de Releases](https://github.com/user-nome/cronologia/releases)
-(baixar direto:
-`https://github.com/user-nome/cronologia/releases/latest/download/cronologia_amd64.deb`)
+Baixe o `.deb` da [última versão](https://github.com/user-nome/cronologia/releases)
 e instale:
 
 ```bash
 sudo apt install ./cronologia_amd64.deb
 ```
 
-### Compilando localmente
+**Ou, pelo APT**, que é o caminho que recebe as atualizações futuras com um só
+`sudo apt upgrade`. Em um sistema Linux compatível com APT, rode uma vez:
 
 ```bash
-# gere o pacote (uma vez)
-npm install
-npm run dist
-
-# instale
-sudo apt install ./release/cronologia_*_amd64.deb
+curl -fsSL https://github.com/user-nome/cronologia/releases/latest/download/public.key | sudo gpg --dearmor --yes -o /usr/share/keyrings/cronologia.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cronologia.gpg] https://github.com/user-nome/cronologia/releases/latest/download ./" | sudo tee /etc/apt/sources.list.d/cronologia.list
+sudo apt update && sudo apt install cronologia
 ```
 
-O aplicativo aparece no menu do sistema como **Cronologia**.
+O repositório é **flat e vive na própria Release**: os índices assinados e o `.deb`
+com nome estável são anexados a cada versão pelo workflow do app, e o endereço
+`releases/latest/download/` redireciona sempre para a última; é isso que mantém o
+`sudo apt upgrade` funcionando. O passo a passo completo está em
+[`docs/distribuicao-apt.md`](docs/distribuicao-apt.md).
 
-- Executável: `/opt/Cronologia/cronologia` (alternativa
-  `/usr/bin/cronologia`)
-- Ícone instalado em `/usr/share/icons/hicolor/512x512/apps/cronologia.png`
-- Dados: obras e capas em `~/.local/share/cronologia/` (`library.enc`, `covers/*.enc`), **cifrados** com a chave do cofre;
-  configurações em `~/.config/cronologia/` (`settings.json`, só o idioma) e
-  cofre de segredos em `/var/lib/.cronologia/.vault/` (raiz `0711 root`, vault
-  `0700` do usuário; criado no `postinst` e reparado pelo PolicyKit)
+Na primeira vez o app abre o **diálogo padrão do sistema** para você digitar a senha
+de administrador: é o PolicyKit criando a pasta do cofre com as permissões certas.
+A senha nunca passa pelo app.
 
 ---
 
@@ -114,7 +197,7 @@ O aplicativo aparece no menu do sistema como **Cronologia**.
 O Cronologia (e a maioria dos aplicativos Electron) usa `/tmp` para sockets e
 arquivos temporários. Se essa pasta for excluída, o app pode falhar ao abrir ou
 parar de responder sem motivo aparente. Restaure o diretório com as permissões
-padrão do sistema e, em geral, o app volta ao normal:
+padrão do sistema:
 
 ```bash
 sudo mkdir -p /tmp
@@ -122,523 +205,130 @@ sudo chmod 1777 /tmp
 sudo chown root:root /tmp
 ```
 
-O `mkdir -p` recria a pasta se ela não existir mais; `chmod 1777` devolve o
-acesso temporário com bits de execução para todos (sticky bit, o padrão do
-Linux) e `chown root:root` devolve a posse ao sistema. O mesmo vale para
-qualquer outro aplicativo que passe a falhar depois que `/tmp` for apagada.
+O `mkdir -p` recria a pasta se ela não existir mais; `chmod 1777` devolve o acesso
+temporário com bits de execução para todos (sticky bit, o padrão do Linux) e
+`chown root:root` devolve a posse ao sistema. O mesmo vale para qualquer outro
+aplicativo que passe a falhar depois que `/tmp` for apagada.
+
+### O Google Drive aparece como indisponível
+
+O provedor só aparece no seletor quando o **build** traz a credencial dele embutida.
+Um build de desenvolvimento (`npm run dev` ou `npm ci` limpo) não traz, e o app
+diz isso no próprio seletor em vez de falhar na hora de conectar. O destino do
+backup, nesse caso, é o Dropbox. Detalhes em
+[`docs/backup-providers.md`](docs/backup-providers.md).
 
 ---
 
-## Comandos de desenvolvimento
+## Privacidade, em uma tela
 
-| Comando                   | O que faz                                                                        |
-| ------------------------- | -------------------------------------------------------------------------------- |
-| `npm run dev`             | Sobe o app em modo desenvolvimento (hot reload), com log do Chromium no terminal |
-| `npm run dev:inspect`     | Igual ao `dev`, com o V8 inspector do processo main na porta 5858                |
-| `npm run dev:inspect-brk` | Igual ao `dev:inspect`, mas pausa na primeira linha esperando o depurador        |
-| `npm run typecheck`       | `tsc --noEmit` nos projetos node, web, testes e E2E                              |
-| `npm run lint`            | ESLint rigoroso (type-aware) em todo o repositório                               |
-| `npm run lint:fix`        | ESLint com correção automática                                                   |
-| `npm run format`          | Formata tudo com Prettier                                                        |
-| `npm run format:check`    | Verifica a formatação (CI)                                                       |
-| `npm test`                | Roda a suíte Vitest (`tests/**/*.test.{ts,tsx}`)                                 |
-| `npm run test:coverage`   | A suíte com medição de cobertura (95% **por arquivo** nas 4 métricas)            |
-| `npm run test:e2e`        | E2E com Playwright: app compilado e payload do `.deb` (veja `docs/e2e.md`)       |
-| `npm run test:mutation`   | Varredura de mutação de `src/` (veja `docs/mutation.md`)                         |
-| `npm run security:audit`  | Auditoria de vulnerabilidades via OSV Scanner                                    |
-| `npm run check`           | `typecheck` + `lint` + `format:check` + auditoria                                |
-| `npm run clean`           | Apaga `out/` (build anterior)                                                    |
-| `npm run build`           | Limpa + compila main/preload/renderer                                            |
-| `npm run dist`            | Build + gera o `.deb` com electron-builder                                       |
+O aplicativo guarda apenas o que precisa para funcionar. A biblioteca e as capas
+são cifradas com AES-256-GCM; o idioma e as preferências ficam em um arquivo de
+configuração; e o cofre local guarda os tokens dos provedores conectados e a senha
+de criptografia do backup, sempre cifrados.
 
-O `test:e2e` e o `test:mutation` **não** entram no `check`: o primeiro abre
-janela de verdade e paga Argon2id de produção, e a segunda leva horas. Ambos
-rodam no CI (`quality.yml`), em jobs próprios.
+O Cronologia **não tem telemetria**: não há contagem de uso, nem relato de erro, nem
+identificador de máquina. O único tráfego possível é o do provedor de backup que
+**você configurou**, e o app só conversa com a nuvem depois que você aperta
+**Conectar**, autoriza no navegador da nuvem e define uma senha de backup.
 
-O `dev:inspect` não existe no app instalado: o fuse
-`enableNodeCliInspectArguments` está desligado, para que o usuário não abra um
-depurador no processo que tem a chave-mestra em memória. Detalhes de depuração
-em [`docs/testes.md`](docs/testes.md) § "Depuração".
+O [site do projeto](https://cronologia-delirante.vercel.app), por sua vez, é só
+divulgação: usa métricas agregadas de visita e um cookie que guarda o seu idioma.
+Leia a [Política de Privacidade](https://cronologia-delirante.vercel.app/privacidade)
+completa e os [Termos de Uso](https://cronologia-delirante.vercel.app/termos).
 
----
+## Contato
 
-## Qualidade de código
+Dúvidas sobre o aplicativo ou sobre privacidade:
+[chronos.biblioteca@proton.me](mailto:chronos.biblioteca@proton.me).
 
-O projeto roda com o máximo de rigor disponível:
+## Sobre as traduções
 
-**TypeScript (`tsconfig.base.json`)**
+O app está em português (Brasil), inglês, coreano, japonês e chinês simplificado. O
+português é o idioma canônico do app. Se algo estiver estranho, abra uma issue no
+repositório do projeto.
 
-```jsonc
-"strict": true,
-"module": "nodenext",                // ESM em src/ (src/package.json "type": "module")
-"allowImportingTsExtensions": true,  // noEmit: permite candidatos de paths com .ts/.tsx
-"noUncheckedIndexedAccess": true,   // acesso a índice vira T | undefined
-"exactOptionalPropertyTypes": true, // opcional ≠ undefined explícito
-"noImplicitReturns": true,
-"noImplicitOverride": true,
-"noUnusedLocals": true,
-"noUnusedParameters": true,
-"noFallthroughCasesInSwitch": true,
-"allowUnreachableCode": false,
-"verbatimModuleSyntax": true        // imports de tipo obrigatoriamente `import type`
-```
-
-**ESLint (`eslint.config.mjs`)**
-
-- `typescript-eslint` nos perfis **`strictTypeChecked`** + **`stylisticTypeChecked`** (analisa
-  tipos reais, não só sintaxe).
-- Regras extras sempre em **`error`**: `no-floating-promises`, `no-misused-promises`,
-  `no-unsafe-*` (assignment/argument/call/member-access/return), `no-unnecessary-condition`,
-  `strict-boolean-expressions` (sem coerção implícita: `if (str)` é proibido, use
-  `str === ''`), `explicit-function-return-type`, `explicit-member-accessibility`,
-  `require-await`, `switch-exhaustiveness-check`, `no-deprecated`,
-  `ban-ts-comment` + `prefer-ts-expect-error`, `consistent-type-imports`/`-exports`,
-  `only-throw-error` e a lista de armadilhas clássicas (`no-useless-return`,
-  `default-case`, `radix`, `no-path-concat`…).
-- **Fronteira de camada como regra** (`no-restricted-imports` por camada): cada
-  camada declara os aliases que pode importar, e `fs`, `electron` e
-  `child_process` são concessão nomeada — o `fs` é do processo main, o
-  `electron` só de `index.ts`/`protocols.ts`/`external.ts` (mais o preload), e o
-  `child_process` só de `vault/privilege.ts`. `CRONOLOGIA_VAR_LIB`,
-  `CRONOLOGIA_VAULT_DIR` e `ELECTRON_RENDERER_URL` só são lidos por
-  `vault/store.ts`, `vault/privilege.ts` e `main/protocols.ts`.
-- **Teto de tamanho** (`max-lines`, pulando linha em branco e comentário): 520 em
-  `src/`, 750 em `tests/`, `e2e/` e `tools/`.
-- `eslint-plugin-react-hooks` com `rules-of-hooks`, `exhaustive-deps` e as regras
-  de compilador que o `recommended-latest` não traz
-  (`exhaustive-effect-dependencies`, `memo-dependencies`,
-  `memoized-effect-dependencies`, `no-deriving-state-in-effects`, `invariant`,
-  `rule-suppression`), todas em `error`.
-- `eslint-config-prettier` desliga apenas o que conflita com a formatação.
-
-**Prettier (`.prettierrc.json`)**: 100 colunas, aspas simples, ponto e vírgula, vírgula final,
-2 espaços. Rode `npm run check` antes de commitar.
-
-**Três sinais de teste, três perguntas diferentes**:
-
-| Camada              | Pergunta                                                 | Onde              |
-| ------------------- | -------------------------------------------------------- | ----------------- |
-| Unitária/integrada  | "este módulo faz o que diz?"                             | `tests/**`        |
-| Ponta a ponta (E2E) | "o app de verdade funciona depois que tudo monta?"       | `e2e/**`          |
-| Mutação             | "se esta linha fizesse outra coisa, a suíte perceberia?" | `tools/mutation/` |
-
-Cobertura de linha é o piso, e ela é **por arquivo** (95% nas quatro métricas,
-`perFile: true`): o piso agregado perdoa o arquivo esquecido, e era isso que
-acontecia, com o entry do renderer em 0% e o scheme da SPA em 35% antes da
-varredura de baixo para cima. A mutação é o que diz se esse piso significa
-alguma coisa, e o E2E é o único lugar onde o bundle, o `cronologia://`, o IPC real
-e o Argon2id de produção aparecem juntos. Detalhes em
-[`docs/testes.md`](docs/testes.md), [`docs/e2e.md`](docs/e2e.md) e
-[`docs/mutation.md`](docs/mutation.md).
-
----
-
-## Imports e aliases
-
-Dentro de `src/` **não existe import relativo**: todo módulo é referenciado por um alias ESM
-`@zero/*`. O mapa é declarado uma única vez em `tsconfig.base.json` e espelhado nos três
-resolvers que o projeto usa (build, testes e Node puro):
-
-| Alias              | Alvo                     | Onde é resolvido                                        |
-| ------------------ | ------------------------ | ------------------------------------------------------- |
-| `@zero/types`      | `src/types/` (barrel)    | `electron.vite.config.mts`, `vitest.config.mts`, loader |
-| `@zero/types/*`    | `src/types/*`            | `tsconfig.base.json`                                    |
-| `@zero/messages`   | `src/messages/` (barrel) | `electron.vite.config.mts`, `vitest.config.mts`, loader |
-| `@zero/messages/*` | `src/messages/*`         | `tsconfig.base.json`                                    |
-| `@zero/main/*`     | `src/main/*`             | `electron.vite.config.mts`, `vitest.config.mts`, loader |
-| `@zero/preload/*`  | `src/preload/*`          | `electron.vite.config.mts`, `vitest.config.mts`, loader |
-| `@zero/renderer/*` | `src/renderer/src/*`     | `electron.vite.config.mts`, `vitest.config.mts`, loader |
-
-- **Build** (`npm run dev` / `npm run build`): electron-vite (Vite) resolve os aliases.
-- **Testes** (`npm test`): vitest resolve os mesmos aliases. `vitest.e2e.config.mts`
-  e `vitest.mutation.config.mts` importam o mapa de `vitest.config.mts` em vez de
-  redeclará-lo, então mudar um alias continua sendo uma mudança nos três arquivos
-  da tabela.
-- Com `module: nodenext`, os candidatos de `paths` em `tsconfig.base.json` declaram a extensão
-  (`.ts` / `.tsx` / `index.tsx`); `allowImportingTsExtensions: true` (que exige `noEmit`) é o
-  que permite isso sem erro de import.
-- **Node puro** (sem bundler): o loader `src/node.loader.ts` registra hooks de resolução com
-  `module.registerHooks()`: hooks **síncronos, na mesma thread** (estáveis desde o
-  Node 22.15/23.5). O caminho antigo, `module.register()` com hooks assíncronos em thread
-  separada (o antigo `--experimental-loader`), está **deprecado** desde o Node 25.9.
-
-```bash
-# roda um arquivo .ts direto, com os aliases @zero/* funcionando
-node --import ./src/node.loader.ts caminho/para/arquivo.ts
-```
-
-O loader só precisa dos aliases: o Node já remove as anotações de tipo dos `.ts` sozinho.
-`src/package.json` **e a raiz** declaram `"type": "module"`: o Node lê `src/` como ESM e o
-electron-vite emite `out/main/index.js` (ESM). O preload sai como **CommonJS**
-(`out/preload/index.cjs`), porque o Electron roda preload **sandboxed** como script simples, sem
-loader ESM; por isso `electron.vite.config.mts` fixa `format: 'cjs'` no build de `preload`.
-`preloadScript()` em `src/main/index.ts` resolve `index.cjs`, `index.mjs` ou `index.js` nessa
-ordem.
+Quer ajudar a melhorar a tradução? As mensagens do app moram em `src/messages/`, e
+as regras estão em [`docs/messages.md`](docs/messages.md).
 
 ---
 
 ## Arquitetura
 
-```mermaid
-flowchart TD
-    subgraph RENDERER["Renderer: React + Vite (src/renderer)"]
-        UI1["App.tsx: busca, filtros, estatísticas"]
-        UI2["WorkCard: capa, progresso, concluir/pausar/cancelar"]
-        UI3["WorkModal: formulário da obra"]
-        UI4["SettingsModal: credenciais e backup"]
-        UI5["AttributionsModal: créditos em loop"]
-        UI6["DonateModal: apoio via Mercado Pago"]
-        UI7["VaultModal: criar/abrir o cofre<br/>(senha mestra · PIN · frase)"]
-        BRIDGE["window.api (contextBridge)"]
-        UI1 --> UI2
-        UI1 --> UI3
-        UI1 --> UI4
-        UI1 --> UI5
-        UI1 --> UI6
-        UI1 --> UI7
-        UI2 --> BRIDGE
-        UI7 --> BRIDGE
-        UI3 --> BRIDGE
-        UI4 --> BRIDGE
-    end
+Camadas com fronteiras declaradas no ESLint: `src/main/` cuida do acervo, do
+cofre, do backup e do IPC; `src/preload/` é a única ponte (`window.api`); e
+`src/renderer/` é a interface React, sem acesso a disco, rede ou Node. Os contratos
+ficam em `src/types/`, as regras puras que os dois processos precisam concordar em
+`src/shared/` e todos os textos em `src/messages/`.
 
-    subgraph MAIN["Main: Electron (src/main)"]
-        IDX["index.ts: janela, IPC, ciclo de vida, F11"]
-        PRT["protocols.ts: cover:// (capas) e cronologia:// (SPA)"]
-        LIB["library.ts + store-crypto.ts:<br/>acervo cifrado"]
-        SET["settings.ts: App key, senha do backup e idioma"]
-        DRV["drive/: Dropbox + Google Drive, OAuth PKCE, backup (AES-256-GCM)"]
-    end
+Dentro de `src/` não existe import relativo: todo módulo é referenciado pelo alias
+ESM `@zero/*`, declarado uma vez em `tsconfig.base.json` e espelhado nos três
+resolvers do projeto (build, testes e Node puro). O diagrama das camadas, o fluxo do
+IPC e o ciclo de vida estão em [`docs/arquitetura.md`](docs/arquitetura.md).
 
-    subgraph SHARED["Regras compartilhadas (src/shared)"]
-        S1["policy: formato de cada credencial"]
-        S2["strength: régua que recusa o degenerado"]
-        S3["json/work: guarda do dado que vem de fora"]
-    end
+## Como protege
 
-    subgraph MSG["Mensagens (src/messages)"]
-        M1["pt-BR (canônico) · en · messages()"]
-    end
+| Medida             | Como o app trata                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------- |
+| Derivação da chave | Argon2id, custo por método de desbloqueio (o PIN é o mais caro), com salt por coframe       |
+| Cifragem           | AES-256-GCM com chave aleatória, HKDF para separar os usos, IV e salt de 128 bits           |
+| Chave do cofre     | Vive só na memória do processo principal e nunca sai por IPC                                |
+| Acervo em repouso  | `library.enc` e `covers/*.enc` gravados cifrados; sem cofre aberto não há biblioteca        |
+| Contra força bruta | Trava exponencial persistida em disco e auto-lock por ociosidade (5 min)                    |
+| Backup na nuvem    | Nomes opacos por HMAC e AES-256-GCM; sem a senha do backup, os blobs não dizem nada         |
+| Interface          | `contextIsolation`, `sandbox`, CSP, fuses do Electron e navegação presa à página do app     |
+| Sistema            | Perfil AppArmor no `.deb`: escrita só nos diretórios do app e do cofre, deny-list de chaves |
+| Arquivos apagados  | Sobrescrita com `fsync` antes do `unlink`, sem seguir symlink                               |
 
-    subgraph STORAGE["Persistência"]
-        LOKAL[("~/.local/share/cronologia/<br/>library.enc · covers/*.enc<br/>(cifrados)")]
-        CFG[("~/.config/cronologia/<br/>settings.json (só idioma)")]
-        VAULT[("/var/lib/.cronologia/<br/>.vault/ · vault.zkv")]
-        DRIVE[("Dropbox /Apps/Cronologia · Google Drive appDataFolder")]
-    end
+O mapa de cada medida por arquivo está em [`docs/seguranca.md`](docs/seguranca.md), e
+o texto normativo, com os riscos aceitos e o que está fora de escopo, no
+[`SECURITY.md`](SECURITY.md).
 
-    BRIDGE -->|"ipcRenderer.invoke"| IDX
-    IDX --> LIB --> LOKAL
-    IDX --> SET --> CFG
-    IDX --> SET --> VAULT
-    IDX --> DRV
-    DRV <-->|"HTTPS (fetch) · App folder + PKCE, sem secret"| DRIVE
-    IDX -.->|"cover://imagens-da-capa"| UI1
-    UI1 -.->|"useMessages() · i18n.tsx"| M1
-    IDX -.->|"currentMessages()"| M1
-```
+## Desenvolvimento
 
-### Estados de uma obra
+| Comando                 | O que faz                                                             |
+| ----------------------- | --------------------------------------------------------------------- |
+| `npm run dev`           | Sobe o app em desenvolvimento (hot reload)                            |
+| `npm run check`         | typecheck + lint + formatação + auditoria OSV                         |
+| `npm test`              | Suíte Vitest                                                          |
+| `npm run test:coverage` | A suíte com medição de cobertura (95% **por arquivo** nas 4 métricas) |
+| `npm run test:e2e`      | E2E (Playwright) sobre o app compilado e o payload do `.deb`          |
+| `npm run dist`          | Gera o `.deb` com electron-builder                                    |
 
-```mermaid
-stateDiagram-v2
-    [*] --> planejado
-    planejado --> concluido: "Concluir"
-    planejado --> pausado: "Pausar"
-    planejado --> cancelado: "Cancelar"
-    lendo --> concluido: "Concluir"
-    lendo --> pausado: "Pausar"
-    lendo --> cancelado: "Cancelar"
-    pausado --> lendo: "Retomar"
-    pausado --> concluido: "Concluir"
-    pausado --> cancelado: "Cancelar"
-    cancelado --> lendo: "Retomar"
-    concluido --> lendo: "Reabrir"
-```
-
-Os botões do card mostram as transições válidas para o status atual (uma obra `cancelada` só
-oferece **Retomar**; uma `concluída`, só **Reabrir**). No modal de edição, o Select de **Status**
-permite ir de qualquer estado para qualquer outro, e **Zerar** volta o progresso para 0 e o status
-para `planejado`. Mexer no progresso de uma obra `concluída` a devolve para `lendo`.
-
-Progresso e status são independentes: marcar `concluido` **não** altera o número salvo, o card
-apenas passa a exibir `100%` (use **Zerar** no modal para voltar a 0).
-
-### Fluxo do progresso (anotação contínua)
-
-```mermaid
-sequenceDiagram
-    actor U as Usuário
-    participant C as Card/Modal (UI)
-    participant A as App.tsx (estado)
-    participant M as Main (library.ts)
-    participant D as library.json
-
-    U->>C: setas ↑/↓ (+1/−1) no card · −10/+10 no modal
-    C->>A: onProgress(obra, valor)
-    A->>A: clamp >= 0 (sem limite superior) + atualiza a UI na hora
-    A->>M: save (debounce de 450 ms)
-    M->>D: escrita atômica (.tmp → rename)
-    M-->>A: lista atualizada de obras
-```
-
----
-
-## Estrutura do projeto
-
-```
-cronologia/
-├── build/
-│   ├── after-pack.cjs        # slim do pacote (locales/SwiftShader; nunca libffmpeg)
-│   ├── apparmor-profile      # perfil AppArmor real instalado no .deb
-│   ├── icon.png              # ícone 512×512 usado no .deb
-│   ├── make-icon.py          # gerador do ícone (PIL)
-│   ├── scripts/
-│   │   ├── after-install.sh   # postinst: dirs do cofre em /var/lib + ação do PolicyKit
-│   │   └── cronologia-setup   # helper root (pkexec) que só cria os dirs do cofre
-│   └── postrm                # after-remove: unload do perfil, alternatives, policy e purge
-├── docs/
-│   ├── visao-geral.md          # visão geral: o que é/não é, dependências, glossário
-│   ├── arquitetura.md          # camadas, aliases @zero/*, IPC e ciclo de vida
-│   ├── telas.md                # telas e componentes do renderer
-│   ├── dropbox.md              # guia do backup + diagramas
-│   ├── cofre.md                # cofre: três credenciais, container v2, cadeia, trava, sessão
-│   ├── credenciais.md          # segredos do app: o que é guardado, ciclo de vida e força
-│   ├── backup-providers.md     # provedores de nuvem (Dropbox · Google Drive)
-│   ├── distribuicao-apt.md     # distribuição: Release + repo APT flat assinado
-│   ├── build.md                # build, .deb, fuses e o gate de qualidade no CI
-│   ├── seguranca.md            # mapa de segurança (medida → arquivo)
-│   ├── messages.md             # i18n: bundles pt-BR/en/ko/zh-CN/ja e o que não se traduz
-│   ├── testes.md               # testes: como rodar, inventário, convenções, cobertura
-│   ├── e2e.md                  # testes ponta a ponta (app compilado + payload do .deb)
-│   ├── mutation.md             # testes de mutação: operadores, escopo e garantias
-│   ├── atribuicoes.md          # página de Atribuições (créditos em loop)
-│   ├── doacoes.md              # página de Doações (Mercado Pago)
-│   ├── api.md                  # referência da API interna
-│   └── openapi.yaml            # a mesma API em OpenAPI 3.1
-├── src/
-│   ├── main/                 # processo main (Electron)
-│   │   ├── index.ts          # janela, IPC, ciclo de vida e F11 em tela cheia
-│   │   ├── protocols.ts      # schemes cover:// (capas) e cronologia:// (SPA)
-│   │   ├── library.ts        # acervo cifrado + reset destrutivo
-│   │   ├── settings.ts       # App key, idioma e leitura/gravação no cofre
-│   │   ├── jsonfile.ts       # writeJsonAtomic (escrita atômica com mode)
-│   │   ├── paths.ts          # diretórios XDG do app (sem dependências de domínio)
-│   │   ├── external.ts       # openExternalSafe (só https:)
-│   │   ├── i18n.ts           # currentMessages() (idioma corrente no main)
-│   │   ├── vault/            # cofre de segredos (três credenciais, container, sessão)
-│   │   │   ├── crypto.ts     # Argon2id, AES-256-GCM, HKDF e perfis de custo por credencial
-│   │   │   ├── container.ts  # formato CHRONOS1 v2 (um embrulho por credencial)
-│   │   │   ├── store.ts      # caminho, leitura/gravação do container e guarda pós-destruição
-│   │   │   ├── wrapping.ts   # Strategy de embrulhar a chave por credencial
-│   │   │   ├── unlock.ts     # cadeia de desbloqueio (trava → formato → KDF → integridade)
-│   │   │   ├── auth.ts       # tentativas e projeção do estado para a interface
-│   │   │   ├── lockout.ts    # rampa de espera exponencial
-│   │   │   └── session.ts    # chave na memória, auto-lock e wipe
-│   │   └── drive/            # provedores de nuvem, OAuth PKCE, backup/restauração
-│   │       ├── index.ts      # barrel da API pública (authorize, backupNow…)
-│   │       ├── provider.ts   # contrato BackupProvider + catálogo de provedores
-│   │       ├── providers/    # Dropbox e Google Drive (appDataFolder)
-│   │       ├── oauth-flow.ts # PKCE + loopback compartilhados
-│   │       ├── constants.ts  # escopos, endpoints, loopback fixo
-│   │       ├── dropbox-credentials.ts # App key injetada no bundle main
-│   │       ├── state.ts      # sessão, App key e listener de status
-│   │       ├── oauth.ts      # autorização (PKCE sem secret) + refresh
-│   │       ├── rest.ts       # chamadas REST do Dropbox (pasta do app)
-│   │       ├── json.ts       # leitura tipada de corpos JSON (`parseJson`)
-│   │       ├── crypto.ts     # AES-256-GCM do backup
-│   │       └── backup.ts     # backup, restauração e desconexão
-│   ├── messages/             # textos do app (i18n): pt-BR (canônico) + en + ko + zh-CN + ja
-│   │   ├── index.ts          # LANGUAGES, LANGUAGE_LABELS, messages()
-│   │   ├── pt-BR.ts          # bundle canônico + tipo Messages
-│   │   ├── en.ts             # tradução tipada contra Messages
-│   │   ├── ko.ts             # tradução tipada contra Messages
-│   │   ├── zh-CN.ts          # tradução tipada contra Messages
-│   │   └── ja.ts             # tradução tipada contra Messages
-│   ├── shared/               # regras puras que renderer e main precisam concordar
-│   │   ├── policy.ts         # formato aceito de cada credencial
-│   │   ├── strength.ts       # régua de força (blocked = o que recusa)
-│   │   ├── strategy.ts       # Strategy: qual régua para cada tipo
-│   │   ├── format.ts         # normalização da frase (caixa vale) e contagem da trava
-│   │   ├── json.ts           # guarda de dado de fora (isRecord, field)
-│   │   └── work.ts           # validador de obra lida do disco ou da nuvem
-│   ├── preload/index.ts      # contextBridge (window.api)
-│   ├── renderer/             # React + Vite
-│   │   ├── index.html        # CSP com scheme cover:
-│   │   └── src/              # App, i18n.tsx (contexto de idioma), componentes, donations.ts, style/styles.css
-│   ├── types/                # tipos compartilhados main ↔ renderer (@zero/types)
-│   │   ├── index.ts          # barrel (arquivo index só como barrel)
-│   │   ├── work.ts           # Work, WorkType, WorkStatus
-│   │   ├── settings.ts       # AppSettings
-│   │   ├── drive.ts          # DriveStatus, BackupSummary e as formas cruas da nuvem
-│   │   ├── ipc.ts            # IpcFrameEvent (o que assertAppFrame consegue ver)
-│   │   ├── vault.ts          # UnlockKind, CreateVaultInput, VaultStatus, VaultResult
-│   │   └── api.ts            # ElectronApi (contrato do preload)
-│   ├── node.loader.ts        # hooks module.registerHooks() dos aliases @zero/*
-│   └── package.json          # "type": "module" (Node executa src/ direto)
-├── tests/
-│   ├── main/                 # boot, biblioteca, configurações, cofre e drive (<500 linhas cada)
-│   ├── renderer/             # App e componentes (jsdom)
-│   ├── preload/              # fachada window.api
-│   ├── shared/               # regras puras (formato, régua, normalização, guarda de JSON)
-│   ├── helpers/              # fixtures, sandbox, vault (openTestVault), drive (FakeDropbox), kdf
-│   ├── mocks/                # mock do electron para o Vitest
-│   ├── setup-env.ts          # sandbox HOME/XDG temporária por processo de teste
-│   ├── mock-kdf.ts           # Argon2id de mentira (o de produção custa 2,1 s por abertura)
-│   ├── setup.ts              # jest-dom, cleanup e restauração de mocks/timers
-│   └── tsconfig.json         # typecheck dos testes
-├── e2e/                      # Playwright: app compilado e payload do .deb (não importa src/)
-│   ├── support/              # env isolado, launch (bundled e packaged), seletores, fluxos
-│   ├── bundled.e2e.test.ts   # jornada completa contra out/
-│   ├── packaged.e2e.test.ts  # fumaça contra o payload extraído do .deb
-│   └── tsconfig.json         # typecheck dos fluxos
-├── tools/
-│   └── mutation/             # motor da varredura de mutação (operadores, grafo, matriz)
-├── .github/
-│   ├── workflows/            # CodeQL, qualidade (check/testes/E2E/mutação), publicação do .deb
-│   ├── ISSUE_TEMPLATE/       # formulários de bug e de funcionalidade
-│   ├── dependabot.yml        # deps e actions atualizadas semanalmente
-│   └── pull_request_template.md
-├── eslint.config.mjs
-├── .prettierrc.json
-├── tsconfig*.json
-├── vitest.config.mts         # suíte unitária (npm test)
-├── vitest.e2e.config.mts     # E2E (npm run test:e2e)
-├── vitest.mutation.config.mts# varredura de mutação (npm run test:mutation)
-└── electron.vite.config.mts
-```
-
----
-
-## Empacotamento (.deb)
-
-```mermaid
-flowchart LR
-    SRC["src/"] --> TSC["tsc --noEmit<br/>(strict)"]
-    SRC --> ESL["ESLint<br/>strictTypeChecked"]
-    SRC --> PRT["Prettier --check"]
-    TSC --> VITE["electron-vite build"]
-    ESL --> VITE
-    PRT --> VITE
-    VITE --> EB["electron-builder --linux deb"]
-    ICON["build/icon.png"] --> EB
-    EB --> DEB[("release/<br/>cronologia_<versão>_amd64.deb")]
-```
-
-Detalhes da configuração (campo `build` do `package.json`):
-
-- Alvo exclusivo `deb`, `executableName: cronologia`
-- `desktopName` + `syncDesktopName` para o `StartupWMClass` casar com a janela (associação
-  correta no menu/ALT+TAB do Mint)
-- Ícone empacotado em `usr/share/icons/hicolor/512x512/apps/`
-- `homepage` no `package.json` aponta para o repositório
-  (`https://github.com/user-nome/cronologia`): o alvo `deb` do
-  electron-builder exige uma URL no campo `Homepage:` do controle do pacote
-- `postinst` do electron-builder instala o perfil AppArmor real
-  (`build/apparmor-profile`, pulado onde a base é antiga) e cuida do `chrome-sandbox`;
-  o `postrm` (`deb.afterRemove`) descarrega o perfil e limpa o `update-alternatives`
-- Slim via `afterPack` (`build/after-pack.cjs`): remove do pacote locales não usados
-  (mantém `pt-BR`/`pt-PT`/`en-US`), SwiftShader e Vulkan (o app é DOM/CSS
-  estático, sem WebGL nem mídia), o que economiza ~5 MB no `.deb`, margem contra o
-  limite de 100 MiB por arquivo do GitHub. **Nunca** remove `libffmpeg.so`: o binário
-  do Electron declara `DT_NEEDED` nele e, sem o arquivo, o app morre no `exec`
-  (foi o que quebrou a v1.1.1)
-
----
-
-## Backup no Dropbox
-
-Fluxo resumido (passo a passo completo em [`docs/dropbox.md`](docs/dropbox.md)):
-
-1. ⚙ → crie o **cofre de segredos** (senha mestra + PIN + frase) e defina a **senha de criptografia do
-   backup** (obrigatória). A App key do Dropbox vem da variável `DROPBOX_APP_KEY`
-   injetada no bundle main durante o build; com PKCE ela é um identificador público,
-   e o acesso real fica no `refresh_token` guardado na sua máquina.
-2. **Conectar ao Dropbox** → janela do navegador → consentimento → tokens gravados no
-   cofre (`dropbox.tokens`; PKCE + callback fixo em `localhost:17431`, a URI
-   que o Dropbox exige pré-cadastrada). Sem cofre aberto o app pede para criar ou
-   desbloquear antes de continuar.
-3. **Fazer backup agora** → `library.json` + capas sobem **sempre criptografados**
-   (AES-256-GCM, nomes de arquivo opacos via HMAC) para a **pasta do app**
-   (`/Apps/Cronologia`). A pasta aparece na sua conta, mas só este app a acessa
-   via API, e mesmo bisbilhotando, só há blobs sem nome legível.
-4. **Restaurar** → pede a **senha de criptografia**, baixa o backup e substitui a biblioteca
-   local.
-
-```mermaid
-sequenceDiagram
-    actor U as Usuário
-    participant App as App Electron
-    participant G as Dropbox OAuth
-    participant D as Pasta do app (/Apps/)
-
-    U->>App: Configurações → Conectar ao Dropbox
-    App->>G: abre o navegador (PKCE + acesso offline)
-    G->>U: tela de consentimento (só a pasta do app)
-    U->>G: aprova
-    G-->>App: redirect http://localhost:17431/callback?code=...
-    App->>G: POST /oauth2/token (code + code_verifier, sem secret)
-    G-->>App: access_token (curto) + refresh_token (duradouro)
-    App->>App: grava dropbox.tokens no cofre (chave do cofre)
-
-    U->>App: Fazer backup agora
-    App->>App: criptografa library.json + capas (nomes opacos + AES-256-GCM)
-    App->>D: upload com overwrite
-    App->>D: apaga arquivos remotos órfãos
-    D-->>App: ok
-    App-->>U: "Backup concluído"
-
-    U->>App: Restaurar
-    App-->>U: pede a senha de criptografia
-    App->>D: baixa os arquivos e decifra
-    App-->>U: "Backup restaurado"
-```
-
----
-
-## Ícone
-
-`build/icon.png` (512×512, gerado por `build/make-icon.py`: livro aberto + barra de progresso
-sobre fundo azul sólido). É ele que vira o ícone do pacote `.deb` e do lançador de menu. Para
-regenerar:
-
-```bash
-python3 build/make-icon.py
-```
-
----
+O `test:e2e` e o `test:mutation` **não** entram no `check`: o primeiro abre janela de
+verdade e paga Argon2id de produção, e o segundo leva horas. As demais tarefas estão
+em [`CONTRIBUTING.md`](CONTRIBUTING.md) e [`AGENTS.md`](AGENTS.md).
 
 ## Documentação
 
-Guias e referências (tudo em pt-BR):
+Guias e referências, tudo em pt-BR:
 
-| Documento                                              | Conteúdo                                                                              |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| [`docs/visao-geral.md`](docs/visao-geral.md)           | Visão geral: o que o app é (e o que não é), dependências e glossário                  |
-| [`docs/arquitetura.md`](docs/arquitetura.md)           | Arquitetura: camadas, aliases `@zero/*`, fluxo de IPC e ciclo de vida                 |
-| [`docs/telas.md`](docs/telas.md)                       | Telas e componentes do renderer, com os fluxos de navegação                           |
-| [`docs/dropbox.md`](docs/dropbox.md)                   | Guia do backup: OAuth PKCE, App folder, troubleshooting                               |
-| [`docs/cofre.md`](docs/cofre.md)                       | Cofre: três credenciais, container v2, cadeia de abertura, trava, sessão e destruição |
-| [`docs/credenciais.md`](docs/credenciais.md)           | Segredos do app: o que é guardado, o ciclo de vida e a força de cada credencial       |
-| [`docs/backup-providers.md`](docs/backup-providers.md) | Provedores de backup: contrato, catálogo e Google Drive oculto                        |
-| [`docs/distribuicao-apt.md`](docs/distribuicao-apt.md) | Distribuição: Release, repo APT flat assinado e fluxo de release                      |
-| [`docs/build.md`](docs/build.md)                       | Build e pacote: comandos, `.deb`, fuses e gate de qualidade no CI                     |
-| [`docs/seguranca.md`](docs/seguranca.md)               | Mapa de segurança: onde vive cada medida e o que não enfraquecer                      |
-| [`docs/atribuicoes.md`](docs/atribuicoes.md)           | Página de Atribuições: créditos em loop e licenças                                    |
-| [`docs/doacoes.md`](docs/doacoes.md)                   | Página de Doações: Mercado Pago                                                       |
-| [`docs/messages.md`](docs/messages.md)                 | i18n: bundles de mensagens (pt-BR/en/ko/zh-CN/ja) e regras de tradução                |
-| [`docs/api.md`](docs/api.md)                           | Referência da API interna (`window.api` + canais IPC)                                 |
-| [`docs/testes.md`](docs/testes.md)                     | Testes: como rodar, inventário, convenções e cobertura                                |
-| [`docs/e2e.md`](docs/e2e.md)                           | Testes ponta a ponta: app compilado e payload do `.deb` (Playwright)                  |
-| [`docs/mutation.md`](docs/mutation.md)                 | Testes de mutação: operadores, escopo, garantias e score                              |
-| [`docs/openapi.yaml`](docs/openapi.yaml)               | Mesma API em OpenAPI 3.1 (abre em Swagger UI/Redoc)                                   |
-| [`CHANGELOG.md`](CHANGELOG.md)                         | Histórico de mudanças por versão                                                      |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md)                   | Como contribuir (ambiente, scripts, convenções)                                       |
-| [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)             | Código de conduta da comunidade                                                       |
-| [`SECURITY.md`](SECURITY.md)                           | Política de segurança e como reportar falhas                                          |
-
----
+| Documento                                              | Conteúdo                                                                           |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| [`docs/visao-geral.md`](docs/visao-geral.md)           | Visão geral: o que o app é (e o que não é), dependências e glossário               |
+| [`docs/arquitetura.md`](docs/arquitetura.md)           | Arquitetura: camadas, aliases `@zero/*`, fluxo de IPC e ciclo de vida              |
+| [`docs/telas.md`](docs/telas.md)                       | Telas e componentes do renderer, com os fluxos de navegação                        |
+| [`docs/cofre.md`](docs/cofre.md)                       | Cofre: três credenciais, container, cadeia de abertura, trava, sessão e destruição |
+| [`docs/credenciais.md`](docs/credenciais.md)           | Segredos do app: o que é guardado, o ciclo de vida e a força de cada credencial    |
+| [`docs/dropbox.md`](docs/dropbox.md)                   | Guia do backup: OAuth PKCE, pasta do app e recuperação de problemas                |
+| [`docs/backup-providers.md`](docs/backup-providers.md) | Provedores de backup: contrato, catálogo e Google Drive oculto                     |
+| [`docs/distribuicao-apt.md`](docs/distribuicao-apt.md) | Distribuição: Release, repo APT flat assinado e fluxo de release                   |
+| [`docs/build.md`](docs/build.md)                       | Build e pacote: comandos, `.deb`, fuses e gate de qualidade no CI                  |
+| [`docs/seguranca.md`](docs/seguranca.md)               | Mapa de segurança: onde vive cada medida e o que não enfraquecer                   |
+| [`docs/messages.md`](docs/messages.md)                 | i18n: bundles de mensagens (pt-BR/en/ko/zh-CN/ja) e regras de tradução             |
+| [`docs/testes.md`](docs/testes.md)                     | Testes: como rodar, inventário, convenções e cobertura                             |
+| [`docs/e2e.md`](docs/e2e.md)                           | Testes ponta a ponta: app compilado e payload do `.deb` (Playwright)               |
+| [`docs/mutation.md`](docs/mutation.md)                 | Testes de mutação: operadores, escopo, garantias e score                           |
+| [`docs/atribuicoes.md`](docs/atribuicoes.md)           | Página de Atribuições: créditos em loop e licenças                                 |
+| [`docs/doacoes.md`](docs/doacoes.md)                   | Página de Doações: Mercado Pago                                                    |
+| [`docs/api.md`](docs/api.md)                           | Referência da API interna (`window.api` + canais IPC)                              |
+| [`docs/openapi.yaml`](docs/openapi.yaml)               | Mesma API em OpenAPI 3.1 (abre em Swagger UI/Redoc)                                |
+| [`CHANGELOG.md`](CHANGELOG.md)                         | Histórico de mudanças por versão                                                   |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md)                   | Como contribuir (ambiente, scripts, convenções)                                    |
+| [`SECURITY.md`](SECURITY.md)                           | Política de segurança e como reportar falhas                                       |
 
 ## Licença
 
-[MIT](LICENSE); o texto integral está em [`LICENSE`](LICENSE).
+MIT. Ver [`LICENSE`](LICENSE) e
+[`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt) para os componentes
+distribuídos.

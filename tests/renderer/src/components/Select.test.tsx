@@ -171,6 +171,85 @@ describe('Select', () => {
   });
 });
 
+describe('Select desabilitado', () => {
+  it('não abre o menu nem navega quando desabilitado', () => {
+    const { container } = render(
+      <Select value="a" options={OPTIONS} onChange={() => undefined} disabled />,
+    );
+    const element = root(container);
+    fireEvent.keyDown(element, { key: 'ArrowDown' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    fireEvent.keyDown(element, { key: 'ArrowUp' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    fireEvent.keyDown(element, { key: 'Enter' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('ignora teclas desconhecidas quando desabilitado', () => {
+    const { container } = render(
+      <Select value="a" options={OPTIONS} onChange={() => undefined} disabled />,
+    );
+    const element = root(container);
+    fireEvent.keyDown(element, { key: 'a' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    fireEvent.keyDown(element, { key: ' ' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('trigger button é desabilitado e não abre menu ao clicar', async () => {
+    const user = userEvent.setup();
+    render(<Select value="a" options={OPTIONS} onChange={() => undefined} disabled />);
+    const trigger = screen.getByRole('button');
+    expect(trigger).toBeDisabled();
+    await user.click(trigger);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('o gatilho desabilitado existe para o Tab chegar nele, mas não aciona nada', () => {
+    // O botão fica no DOM (e por isso alcançável pelo Tab) em vez de sumir: quem
+    // usa só teclado precisa encontrar o campo para saber que ele está ocupado.
+    // O `onClick` ainda passa pelo mesmo `toggle`, que é quem recusa.
+    const onChange = vi.fn<(value: 'a' | 'b' | 'c') => void>();
+    const { container } = render(
+      <Select value="a" options={OPTIONS} onChange={onChange} disabled />,
+    );
+    const trigger = root(container).querySelector('button');
+    if (trigger === null) throw new Error('gatilho não encontrado.');
+
+    // `fireEvent` ignora o `disabled` do botão de propósito: é assim que se
+    // prova que a trava está no `toggle`, e não só no atributo HTML.
+    fireEvent.click(trigger);
+    fireEvent.click(trigger);
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('Escape fecha o menu mesmo com o controle já desabilitado', () => {
+    // O dono pode desabilitar o Select com o menu aberto (outra ação entrou em
+    // andamento). O `Escape` precisa continuar sendo a saída, senão o teclado
+    // fica preso num menu que não dá para escolher e nem para fechar.
+    const onChange = vi.fn<(value: 'a' | 'b' | 'c') => void>();
+    const { rerender, container } = render(
+      <Select value="a" options={OPTIONS} onChange={onChange} />,
+    );
+    fireEvent.keyDown(root(container), { key: 'ArrowDown' });
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+
+    rerender(<Select value="a" options={OPTIONS} onChange={onChange} disabled />);
+    fireEvent.keyDown(root(container), { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('Tab com o controle desabilitado não sai de lugar nenhum', () => {
+    const { container } = render(
+      <Select value="a" options={OPTIONS} onChange={() => undefined} disabled />,
+    );
+    fireEvent.keyDown(root(container), { key: 'Tab' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+});
+
 describe('Select pesquisável', () => {
   const GENRES: SelectOption<string>[] = [
     { value: '', label: 'Nenhuma' },

@@ -5,6 +5,7 @@ import {
   googleClientSecret,
   hasGoogleCredentials,
 } from '@zero/main/drive/providers/google';
+import { googleFlow } from '@zero/main/drive/providers/google/oauth';
 import { dropboxAppKey } from '@zero/main/drive/providers/dropbox/credentials';
 import { state } from '@zero/main/drive/state';
 import { messages } from '@zero/messages';
@@ -101,6 +102,20 @@ describe('catálogo de provedores de backup', () => {
     expect(hasGoogleCredentials()).toBe(false);
   });
 
+  it('googleClientSecret usa fallback quando a variável não está definida', () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
+    // Deleta explicitamente para testar o fallback `?? ''`
+    delete process.env.GOOGLE_CLIENT_SECRET;
+    expect(googleClientSecret()).toBe('');
+  });
+
+  it('dropboxAppKey usa fallback quando a variável não está definida', () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
+    // Deleta explicitamente para testar o fallback `?? ''`
+    delete process.env.DROPBOX_APP_KEY;
+    expect(dropboxAppKey()).toBe('');
+  });
+
   it('grava o backup do Google Drive em pasta oculta (appDataFolder)', () => {
     const info = getProvider('google-drive').describe(m);
     expect(info.storageHidden).toBe(true);
@@ -129,5 +144,50 @@ describe('catálogo de provedores de backup', () => {
     const provider = currentProvider();
     expect(getProvider(provider.id)).toBe(provider);
     expect(provider.describe(m)).toEqual(getProvider('google-drive').describe(m));
+  });
+
+  it('o getter operational do Dropbox reflete a App key do build', () => {
+    // Sem chave: operational é false
+    vi.stubEnv('DROPBOX_APP_KEY', '');
+    expect(getProvider('dropbox').operational).toBe(false);
+
+    // Com chave: operational é true
+    vi.stubEnv('DROPBOX_APP_KEY', DROPBOX_KEY);
+    expect(getProvider('dropbox').operational).toBe(true);
+  });
+
+  it('o getter operational e o campo operational do describe concordam', () => {
+    vi.stubEnv('DROPBOX_APP_KEY', DROPBOX_KEY);
+    const provider = getProvider('dropbox');
+    expect(provider.operational).toBe(provider.describe(m).operational);
+
+    vi.stubEnv('DROPBOX_APP_KEY', '');
+    expect(provider.operational).toBe(provider.describe(m).operational);
+  });
+
+  it('googleDriveProvider.describe reflete operational=true com credencial', () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
+    const info = getProvider('google-drive').describe(m);
+    expect(info.operational).toBe(true);
+    expect(info.unavailableReason).toBeNull();
+    expect(info.storageHidden).toBe(true);
+  });
+
+  it('googleDriveProvider.describe reflete operational=false sem credencial', () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', '');
+    const info = getProvider('google-drive').describe(m);
+    expect(info.operational).toBe(false);
+    expect(info.unavailableReason).toBe(m.providers.googleNoCredentials);
+    expect(info.storageHidden).toBe(true);
+  });
+});
+
+describe('googleFlow.renewError', () => {
+  it('retorna mensagem de falha de renovação com nome do provedor', () => {
+    const errorMsg = googleFlow.renewError();
+    expect(errorMsg).toContain('Google Drive');
+    // A mensagem real vem do bundle de mensagens
+    expect(typeof errorMsg).toBe('string');
+    expect(errorMsg.length).toBeGreaterThan(0);
   });
 });

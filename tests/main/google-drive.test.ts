@@ -484,3 +484,308 @@ describe('token: renovar e reusar', () => {
     );
   });
 });
+
+describe('rest.ts: errorBody e authorizedFetch', () => {
+  beforeEach(async () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
+    vi.stubEnv('GOOGLE_CLIENT_SECRET', SEGREDO);
+    state.provider = 'google-drive';
+    await resetDrive();
+    fakeSession();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    state.provider = 'dropbox';
+  });
+
+  it('errorBody trunca corpo longo', async () => {
+    const longBody = 'x'.repeat(250);
+    stubFetch(() => new Response(longBody, { status: 400 }));
+
+    await expect(listAppFiles()).rejects.toThrow(
+      currentMessages().driveErrors.providerHttp('Google Drive', 400, `${longBody.slice(0, 200)}…`),
+    );
+  });
+
+  it('errorBody retorna vazio quando text() falha', async () => {
+    const badResponse = new Response('ok', { status: 400 });
+    // Corpo já consumido derruba `text()`; o status ainda é o que importa.
+    badResponse.text = () => Promise.reject(new Error('stream error'));
+    stubFetch(() => badResponse);
+
+    await expect(listAppFiles()).rejects.toThrow(
+      currentMessages().driveErrors.providerHttp('Google Drive', 400, ''),
+    );
+  });
+
+  it('authorizedFetch renova token e repete no 401', async () => {
+    let primeira = true;
+    const calls = stubFetch((call) => {
+      if (call.url === GOOGLE_TOKEN_ENDPOINT) {
+        return json({ access_token: 'token-renovado', expires_in: 900 });
+      }
+      if (primeira) {
+        primeira = false;
+        return json({ error: 'invalidCredentials' }, 401);
+      }
+      return json({ files: [] });
+    });
+
+    await expect(listAppFiles()).resolves.toEqual([]);
+    expect(calls.filter((call) => call.url.startsWith(`${DRIVE}/files?`))).toHaveLength(2);
+    expect(state.tokens?.accessToken).toBe('token-renovado');
+  });
+
+  it('listAppFiles detecta loop de paginação', async () => {
+    let pagina = 0;
+    stubFetch(() => {
+      pagina += 1;
+      if (pagina === 1) {
+        return json({ files: [driveFile({ id: 'a', name: 'a' })], nextPageToken: 'cursor-loop' });
+      }
+      if (pagina === 2) {
+        return json({ files: [driveFile({ id: 'b', name: 'b' })], nextPageToken: 'cursor-loop' });
+      }
+      return json({ files: [] });
+    });
+
+    await expect(listAppFiles()).rejects.toThrow(
+      currentMessages().driveErrors.invalidListResponse('Google Drive'),
+    );
+  });
+
+  it('listAppFiles valida nextPageToken não string', async () => {
+    stubFetch(() => json({ files: [driveFile()], nextPageToken: 123 }));
+
+    await expect(listAppFiles()).rejects.toThrow(
+      currentMessages().driveErrors.invalidListResponse('Google Drive'),
+    );
+  });
+});
+
+describe('toRemoteFile: validação de cada campo', () => {
+  beforeEach(async () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
+    vi.stubEnv('GOOGLE_CLIENT_SECRET', SEGREDO);
+    state.provider = 'google-drive';
+    await resetDrive();
+    fakeSession();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    state.provider = 'dropbox';
+  });
+
+  it('falha quando entry não é objeto', async () => {
+    stubFetch(() => json({ files: ['not-an-object'] }));
+
+    await expect(listAppFiles()).rejects.toThrow(
+      currentMessages().driveErrors.invalidListResponse('Google Drive'),
+    );
+  });
+
+  it('falha quando id não é string válida', async () => {
+    stubFetch(() => json({ files: [{ ...driveFile(), id: '' }] }));
+
+    await expect(listAppFiles()).rejects.toThrow(
+      currentMessages().driveErrors.invalidListResponse('Google Drive'),
+    );
+  });
+
+  it('falha quando name não é string válida', async () => {
+    stubFetch(() => json({ files: [{ ...driveFile(), name: '' }] }));
+
+    await expect(listAppFiles()).rejects.toThrow(
+      currentMessages().driveErrors.invalidListResponse('Google Drive'),
+    );
+  });
+
+  it('falha quando modifiedTime não é data válida', async () => {
+    stubFetch(() => json({ files: [{ ...driveFile(), modifiedTime: 'invalid-date' }] }));
+
+    await expect(listAppFiles()).rejects.toThrow(
+      currentMessages().driveErrors.invalidListResponse('Google Drive'),
+    );
+  });
+
+  it('falha quando size não é número válido', async () => {
+    stubFetch(() => json({ files: [{ ...driveFile(), size: 'not-a-number' }] }));
+
+    await expect(listAppFiles()).rejects.toThrow(
+      currentMessages().driveErrors.invalidListResponse('Google Drive'),
+    );
+  });
+});
+
+describe('uploadFile e downloadFile: erro handling', () => {
+  beforeEach(async () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
+    vi.stubEnv('GOOGLE_CLIENT_SECRET', SEGREDO);
+    state.provider = 'google-drive';
+    await resetDrive();
+    fakeSession();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    state.provider = 'dropbox';
+  });
+
+  it('uploadFile traduz erro da API', async () => {
+    stubFetch((call) => {
+      if (call.url.startsWith(`${DRIVE}/files?`)) {
+        return json({ files: [] });
+      }
+      return json({ error: { message: 'storageQuotaExceeded' } }, 403);
+    });
+
+    await expect(uploadFile('test.enc', Buffer.from('data'))).rejects.toThrow(
+      currentMessages().driveErrors.providerHttp('Google Drive', 403, ''),
+    );
+  });
+
+  it('downloadFile traduz erro da API', async () => {
+    stubFetch(() => json({ error: { message: 'notFound' } }, 404));
+
+    await expect(downloadFile('id')).rejects.toThrow(
+      currentMessages().driveErrors.providerHttp('Google Drive', 404, ''),
+    );
+  });
+
+  it('deleteFile traduz erro que não é 404', async () => {
+    stubFetch(() => json({ error: { message: 'rateLimitExceeded' } }, 429));
+
+    await expect(deleteFile('id')).rejects.toThrow(
+      currentMessages().driveErrors.providerHttp('Google Drive', 429, ''),
+    );
+  });
+});
+
+describe('session.ts: rollback e error handling', () => {
+  beforeEach(async () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
+    vi.stubEnv('GOOGLE_CLIENT_SECRET', SEGREDO);
+    state.provider = 'google-drive';
+    await resetDrive();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    state.provider = 'dropbox';
+  });
+
+  it('googleAuthorize faz rollback quando persistState falha', async () => {
+    lockVault(); // garante cofre fechado para persistState falhar
+    vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
+    stubFetch((call) => {
+      if (call.url === GOOGLE_TOKEN_ENDPOINT) {
+        return json({
+          access_token: 'token-google',
+          refresh_token: 'refresh-google',
+          expires_in: 3600,
+          scope:
+            'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email',
+        });
+      }
+      if (call.url === GOOGLE_USERINFO_ENDPOINT) return json({ email: 'leitor@gmail.com' });
+      return json({ error: 'rota' }, 500);
+    });
+
+    const { shell } = await import('../mocks/electron.ts');
+    shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
+      const params = new URL(url).searchParams;
+      const redirect = params.get('redirect_uri');
+      if (redirect !== null) {
+        const request = http.get(
+          `${redirect}?code=codigo-valido&state=${params.get('state') ?? ''}`,
+          { agent: false },
+          (res) => res.resume(),
+        );
+        request.on('error', () => undefined);
+      }
+      return Promise.resolve();
+    });
+
+    const result = await googleAuthorize();
+
+    expect(result).toEqual({ ok: false, error: currentMessages().vault.errors.vaultLocked });
+    expect(state.tokens).toBeNull();
+  });
+
+  it('googleAuthorize captura erro genérico e seta lastError', async () => {
+    fakeSession();
+    vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
+    stubFetch((call) => {
+      if (call.url === GOOGLE_TOKEN_ENDPOINT) {
+        throw new Error('network boom');
+      }
+      return json({}, 500);
+    });
+
+    const { shell } = await import('../mocks/electron.ts');
+    shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
+      const params = new URL(url).searchParams;
+      const redirect = params.get('redirect_uri');
+      if (redirect !== null) {
+        const request = http.get(
+          `${redirect}?code=codigo-valido&state=${params.get('state') ?? ''}`,
+          { agent: false },
+          (res) => res.resume(),
+        );
+        request.on('error', () => undefined);
+      }
+      return Promise.resolve();
+    });
+
+    const result = await googleAuthorize();
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('network boom');
+  });
+
+  it('googleAuthorize faz rollback dos tokens quando persistState falha', async () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
+    vi.stubEnv('GOOGLE_CLIENT_SECRET', SEGREDO);
+    state.provider = 'google-drive';
+    await resetDrive();
+    // Não chama fakeSession: estado limpo
+    // Cofre fechado faz persistState falhar
+    lockVault();
+
+    stubFetch((call) => {
+      if (call.url === GOOGLE_TOKEN_ENDPOINT) {
+        return json({
+          access_token: 'token-google',
+          refresh_token: 'refresh-google',
+          expires_in: 3600,
+          scope:
+            'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email',
+        });
+      }
+      if (call.url === GOOGLE_USERINFO_ENDPOINT) return json({ email: 'leitor@gmail.com' });
+      return json({ error: 'rota' }, 500);
+    });
+
+    const { shell } = await import('../mocks/electron.ts');
+    shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
+      const params = new URL(url).searchParams;
+      const redirect = params.get('redirect_uri');
+      if (redirect !== null) {
+        const request = http.get(
+          `${redirect}?code=codigo-valido&state=${params.get('state') ?? ''}`,
+          { agent: false },
+          (res) => res.resume(),
+        );
+        request.on('error', () => undefined);
+      }
+      return Promise.resolve();
+    });
+
+    const result = await googleAuthorize();
+
+    expect(result).toEqual({ ok: false, error: currentMessages().vault.errors.vaultLocked });
+    expect(state.tokens).toBeNull();
+  });
+});

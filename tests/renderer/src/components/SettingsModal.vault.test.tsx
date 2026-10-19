@@ -112,6 +112,134 @@ describe('SettingsModal: botões da badge do cofre', () => {
     await waitFor(() => expect(mock.vaultLock).toHaveBeenCalledTimes(1));
     expect(await screen.findByText('Cofre fechado')).toBeInTheDocument();
   });
+
+  it('abre modal de troca de senha mestra quando clica no botão', async () => {
+    setup(ABERTO);
+    await screen.findByText('Cofre aberto');
+
+    await userEvent.setup().click(screen.getByRole('button', { name: m.auth.changeMasterTitle }));
+    // O modal abre com o mesmo título, mas usamos o role heading para distinguir
+    expect(
+      await screen.findByRole('heading', { name: m.auth.changeMasterTitle }),
+    ).toBeInTheDocument();
+  });
+
+  it('abre modal de troca de PIN quando clica no botão', async () => {
+    setup(ABERTO);
+    await screen.findByText('Cofre aberto');
+
+    await userEvent.setup().click(screen.getByRole('button', { name: m.auth.changePinTitle }));
+    expect(await screen.findByRole('heading', { name: m.auth.changePinTitle })).toBeInTheDocument();
+  });
+});
+
+describe('SettingsModal: a troca de credencial abre, valida e recarrega o badge', () => {
+  /** Preenche os três campos do `CredentialModal` e confirma. */
+  async function trocarCredencial(atual: string, nova: string): Promise<void> {
+    const user = userEvent.setup();
+    const modal = vaultModal(m.auth.changeMasterTitle);
+    await user.type(within(modal).getByLabelText(m.auth.changeMasterCurrent), atual);
+    await user.type(within(modal).getByLabelText(m.auth.changeMasterNew), nova);
+    await user.type(within(modal).getByLabelText(m.auth.changeMasterConfirm), nova);
+    await user.click(within(modal).getByRole('button', { name: m.auth.changeAction }));
+  }
+
+  const MASTER_VALIDA = 'Zq4#nW8c!Yv2@Tg7&Sh1$Fj5';
+
+  it('fecha o modal e relê o estado do cofre depois de uma troca bem-sucedida', async () => {
+    const { mock } = setup(ABERTO);
+    await screen.findByText('Cofre aberto');
+    const antes = mock.vaultStatus.mock.calls.length;
+
+    await userEvent.click(screen.getByRole('button', { name: m.auth.changeMasterTitle }));
+    await trocarCredencial('Zq4#nW8c!Yv2@Tg7&Sh1$Fj5', 'Vb3&xR9#tK2@pM5*nD7$wC4z');
+
+    expect(mock.vaultChangeMaster).toHaveBeenCalledWith({
+      currentPassword: 'Zq4#nW8c!Yv2@Tg7&Sh1$Fj5',
+      newPassword: 'Vb3&xR9#tK2@pM5*nD7$wC4z',
+    });
+    // A badge reflecte o cofre de novo: a troca só reescreve um embrulho, e o
+    // app precisa reler o estado para não mostrar "cofre fechado" por engano.
+    await waitFor(() => expect(mock.vaultStatus.mock.calls.length).toBeGreaterThan(antes));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('heading', { name: m.auth.changeMasterTitle }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(await screen.findByText('Cofre aberto')).toBeInTheDocument();
+  });
+
+  it('a troca do PIN manda o canal de PIN, não o da senha mestra', async () => {
+    const { mock } = setup(ABERTO);
+    await screen.findByText('Cofre aberto');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: m.auth.changePinTitle }));
+    const modal = vaultModal(m.auth.changePinTitle);
+    // PIN com dígitos não sequenciais: o sequencial é bloqueado pela régua de
+    // força, e o que este teste verifica é o canal, não a validação.
+    await user.type(within(modal).getByLabelText(m.auth.changePinCurrent), '90716328');
+    await user.type(within(modal).getByLabelText(m.auth.changePinNew), '28471935');
+    await user.type(within(modal).getByLabelText(m.auth.changePinConfirm), '28471935');
+    await user.click(within(modal).getByRole('button', { name: m.auth.changeAction }));
+
+    expect(mock.vaultChangePin).toHaveBeenCalledWith({
+      currentPin: '90716328',
+      newPin: '28471935',
+    });
+    // Trocar PIN não é trocar senha mestra: mandar o canal errado deixaria a
+    // credencial que o usuário está usando intacta sem avisar.
+    expect(mock.vaultChangeMaster).not.toHaveBeenCalled();
+  });
+
+  it('erro do backend fica no modal, que não fecha', async () => {
+    const { mock } = setup(ABERTO);
+    await screen.findByText('Cofre aberto');
+    mock.vaultChangeMaster.mockResolvedValueOnce({
+      ok: false,
+      code: 'vaultWrongMaster',
+      retryInMs: 0,
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: m.auth.changeMasterTitle }));
+    await trocarCredencial('Zq4#nW8c!Yv2@Tg7&Sh1$Fj5', MASTER_VALIDA);
+
+    expect(await screen.findByText(m.vault.errors.vaultWrongMaster)).toBeInTheDocument();
+    // A troca falhou, então o modal continua aberto para o usuário corrigir.
+    expect(screen.getByRole('heading', { name: m.auth.changeMasterTitle })).toBeInTheDocument();
+  });
+
+  it('confirmar sem preencher não chama o main', async () => {
+    const { mock } = setup(ABERTO);
+    await screen.findByText('Cofre aberto');
+
+    await userEvent.click(screen.getByRole('button', { name: m.auth.changeMasterTitle }));
+    const modal = vaultModal(m.auth.changeMasterTitle);
+    // Com os campos vazios o botão está desligado: gastar um Argon2id para
+    // recusa de validação seria o pior jeito de errar.
+    expect(within(modal).getByRole('button', { name: m.auth.changeAction })).toBeDisabled();
+    expect(mock.vaultChangeMaster).not.toHaveBeenCalled();
+  });
+
+  it('Cancelar fecha o modal sem tocar no cofre', async () => {
+    const { mock } = setup(ABERTO);
+    await screen.findByText('Cofre aberto');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: m.auth.changeMasterTitle }));
+    await user.click(
+      within(vaultModal(m.auth.changeMasterTitle)).getByRole('button', { name: /^Cancelar$/ }),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('heading', { name: m.auth.changeMasterTitle }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(mock.vaultChangeMaster).not.toHaveBeenCalled();
+    // O cofre segue aberto: cancelar uma troca não tranca nada.
+    expect(await screen.findByText('Cofre aberto')).toBeInTheDocument();
+  });
 });
 
 describe('SettingsModal: ação adiada até o cofre abrir', () => {
