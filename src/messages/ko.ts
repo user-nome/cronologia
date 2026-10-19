@@ -375,7 +375,8 @@ export const ko: Messages = {
     createTitle: '금고 만들기',
     createSubtitle:
       '마스터 비밀번호는 정확히 **24자**이며 모든 것을 감싸는 키입니다. ' +
-      '앱은 이 키로 라이브러리와 비밀을 암호화해 `/var/lib/.cronologia/.vault/`에 보관합니다.',
+      '앱은 이 키로 라이브러리를 암호화해 `~/.local/share/cronologia/`에, ' +
+      '비밀은 `/var/lib/.cronologia/.vault/`에 보관합니다.',
     masterLabel: '마스터 비밀번호 (24자)',
     masterPlaceholder: '예: Kf7#mQ2!vZ9@pL4$xR8!nW3&',
     masterConfirmLabel: '마스터 비밀번호 다시 입력',

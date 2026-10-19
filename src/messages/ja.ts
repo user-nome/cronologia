@@ -388,8 +388,8 @@ export const ja: Messages = {
     createTitle: '金庫を作成',
     createSubtitle:
       'マスターパスワードはちょうど **24 文字**で、すべてを包む鍵です。' +
-      'アプリはこれを使ってライブラリと秘密情報を暗号化し、' +
-      '`/var/lib/.cronologia/.vault/` に保管します。',
+      'アプリはこれを使ってライブラリを暗号化し、`~/.local/share/cronologia/` に、' +
+      '秘密情報を `/var/lib/.cronologia/.vault/` に保管します。',
     masterLabel: 'マスターパスワード(24 文字)',
     masterPlaceholder: '例: Kf7#mQ2!vZ9@pL4$xR8!nW3&',
     masterConfirmLabel: 'マスターパスワードをもう一度',

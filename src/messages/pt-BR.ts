@@ -390,7 +390,8 @@ export const ptBR = {
     createTitle: 'Criar o cofre',
     createSubtitle:
       'A senha mestra tem exatamente **24 caracteres** e é a chave que embrulha tudo. ' +
-      'O app guarda a biblioteca e os segredos cifrados com ela, em `/var/lib/.cronologia/.vault/`.',
+      'O app guarda a biblioteca cifrada com a chave do cofre, em ' +
+      '`~/.local/share/cronologia/`, e os segredos em `/var/lib/.cronologia/.vault/`.',
     masterLabel: 'Senha mestra (24 caracteres)',
     masterPlaceholder: 'Ex.: Kf7#mQ2!vZ9@pL4$xR8!nW3&',
     masterConfirmLabel: 'Repita a senha mestra',

@@ -381,7 +381,8 @@ export const en: Messages = {
     createTitle: 'Create the vault',
     createSubtitle:
       'The master password is exactly **24 characters** and is the key that wraps everything. ' +
-      'The app keeps the library and the secrets encrypted with it, in `/var/lib/.cronologia/.vault/`.',
+      'The app keeps the library encrypted with it in `~/.local/share/cronologia/`, ' +
+      'and the secrets in `/var/lib/.cronologia/.vault/`.',
     masterLabel: 'Master password (24 characters)',
     masterPlaceholder: 'e.g. Kf7#mQ2!vZ9@pL4$xR8!nW3&',
     masterConfirmLabel: 'Repeat the master password',

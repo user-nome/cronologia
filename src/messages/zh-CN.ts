@@ -352,7 +352,8 @@ export const zhCN: Messages = {
     createTitle: '创建密码库',
     createSubtitle:
       '主密码正好 **24 个字符**，它是包裹一切的密钥。' +
-      '应用用它加密书库和机密，保存在 `/var/lib/.cronologia/.vault/`。',
+      '应用用它加密书库，保存在 `~/.local/share/cronologia/`，' +
+      '机密保存在 `/var/lib/.cronologia/.vault/`。',
     masterLabel: '主密码（24 个字符）',
     masterPlaceholder: '例如：Kf7#mQ2!vZ9@pL4$xR8!nW3&',
     masterConfirmLabel: '再次输入主密码',
