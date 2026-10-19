@@ -1,49 +1,22 @@
 name: Qualidade
 
-# Gate de qualidade do dia a dia. O `publish.yml` continua sendo o gate da
-# release (é ele que compara a versão e publica o `.deb`), e ele carrega o seu
-# próprio `npm run check` + `npm test` porque precisa ser autossuficiente para
-# os gatilhos de reserva (tag `v*`, Release criada na UI). A sobreposição com o
-# `qualidade` deste arquivo é de propósito: este aqui cobre pull request e
-# push, que o `publish.yml` não vê.
+# Gate de qualidade do dia a dia (push na main e pull request). O `publish.yml`
+# continua sendo o gate da release e carrega o seu próprio `npm run check` +
+# `npm test`, porque precisa ser autossuficiente para os gatilhos de reserva
+# (tag `v*`, Release criada na UI) que este arquivo não vê.
 #
-# Gatilhos:
-# - push na `main`: a série de commits é conferida enquanto ela cresce;
-# - pull_request: é a verificação que precisa estar verde para o merge;
-# - workflow_dispatch: para rodar na mão quando um passo local ficou duvidoso.
+# Gatilhos: push na main, pull_request e workflow_dispatch (para rodar na mão
+# quando um passo local ficou duvidoso).
 #
-# A porta de cobertura mora em `vitest.config.mts` (`thresholds`, com
-# `perFile: true` em 95%): assim o número é o mesmo para quem roda localmente e
-# para o CI, e `npm run test:coverage` sozinho já reprova abaixo da meta, no
-# arquivo que falhou e não só no agregado.
+# A porta de cobertura mora em `vitest.config.mts` (`thresholds`, `perFile`), não
+# aqui, para o número ser o mesmo localmente e no CI.
 #
-# "Testes E2E" sobe o app compilado e o payload do `.deb` de verdade
-# (`docs/e2e.md`): compila com `dist:dir`, roda sob `xvfb` e instala o pacote
-# para conferir que ele resolve as dependências. É o único job que junta bundle,
-# IPC real e React montado.
+# "Testes E2E" sobe o app compilado e o payload do `.deb` (`docs/e2e.md`);
+# "Testes de mutação" só por disparo manual, porque a varredura leva horas
+# (`docs/mutation.md`).
 #
-# "Testes de mutação" roda em outro ritmo, porque a varredura completa leva
-# horas e o número que ela mede só muda quando alguém escreve teste novo: ela
-# dispara uma vez por mês no agendamento e no disparo manual, e **não** em pull
-# request nem em push. Reprova abaixo do piso (ajustável pelo disparo manual),
-# então a queda real aparece como build vermelho sem virar trava de branch.
-#
-# Imagem fixada em `ubuntu-24.04` em todos os jobs, como no `publish.yml`. Não é
-# preciosismo: `ubuntu-latest` é etiqueta móvel e o GitHub está migrando o
-# `latest` do Ubuntu 24.04 para o 26.04 entre outubro e novembro de 2026
-# (actions/runner-images#14748). O job de E2E instala dependências pelo nome do
-# pacote (`libgtk-3-0t64`, `libasound2t64`, `libatk1.0-0t64`, `fakeroot`) e
-# instala o `.deb` de verdade, então trocar de imagem no meio quebraria o gate
-# sem que ninguém tivesse tocado em nada. A escolha de imagem é do repositório e
-# vale igual para o `.deb` que o usuário instala e para os testes que o
-# verificam; subir para a 26.04 é decisão consciente, e não efeito colateral de
-# uma etiqueta.
-#
-# Actions fixadas por SHA completo (com a tag na comentário) para não depender
-# de segurança da tag movível; o Dependabot (`github-actions`) atualiza os
-# pins. Todas declararam `using: node24`: o Node 20 foi descontinuado e saiu
-# dos runners em 23/09/2026, então action em Node 20 não roda mais — o runner a
-# força para Node 24 e avisa a cada execução.
+# Imagem `ubuntu-24.04` fixada e actions fixadas por SHA em Node 24: o porquê de
+# cada escolha está em `docs/build.md`.
 
 on:
   push:
@@ -65,9 +38,8 @@ on:
 permissions:
   contents: read
 
-# Push seguido de outro push na mesma branch: cancela a corrida velha, que já
-# não interessa. Pull request nunca é cancelado, para o status não ficar
-# indefinido enquanto o autor corrige.
+# Push seguido de outro cancela a corrida velha; PR nunca é cancelado, para o
+# status não ficar indefinido enquanto o autor corrige.
 concurrency:
   group: qualidade-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'push' }}
@@ -89,16 +61,14 @@ jobs:
       - name: OSV Scanner (binário fora do git; versão fixada)
         run: |
           set -euo pipefail
-          # bin/osv-scanner é gitignored: a pasta não existe no checkout do CI
-          # e o curl falharia com exit 23 (não consegue criar o arquivo).
+          # bin/ é gitignored: sem o mkdir o curl falha com exit 23.
           mkdir -p bin
           curl -fsSL -o bin/osv-scanner \
             https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64
           chmod +x bin/osv-scanner
           bin/osv-scanner --version
 
-      # O typecheck inclui `e2e/tsconfig.json`: os fluxos E2E são TypeScript
-      # tipado contra o mesmo `tsconfig.base.json` do resto do repo.
+      # O typecheck inclui `e2e/tsconfig.json`.
       - name: Typecheck + lint + formato + auditoria OSV
         run: npm run check
 
@@ -115,9 +85,8 @@ jobs:
 
       - run: npm ci
 
-      # `json-summary` entra como reporter extra (o `text` e o `html` já são o
-      # padrão do `vitest.config.mts`): é dele que sai a tabela do resumo da
-      # execução, com o mesmo número que o gate de 50% aplicou.
+      # Reporter extra (o `vitest.config.mts` já traz `text` e `html`): é do
+      # `json-summary` que sai o resumo na página da execução.
       - name: Testes com cobertura
         run: npm run test:coverage -- --coverage.reporter=json-summary
 
@@ -156,10 +125,8 @@ jobs:
 
   e2e:
     name: Testes E2E
-    # Sobe o app de verdade, então não cabe no "Verificar qualidade" (estático)
-    # nem no "Testes e cobertura" (jsdom): é o único job que junta bundle
-    # compilado, `cronologia://`, IPC real, Argon2id real e React montado. Roda
-    # em push e pull request porque é o que pega a quebra de integração.
+    # Único job que junta bundle compilado, `cronologia://`, IPC real, Argon2id
+    # real e React montado: é o que pega a quebra de integração.
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -172,9 +139,9 @@ jobs:
 
       - run: npm ci
 
-      # O Electron abre uma janela: precisa de display (Xvfb) e das bibliotecas
-      # gráficas. `libgtk-3-0t64` e `libatspi2.0-0t64` respondem pelos nomes
-      # antigos por `Provides`, que é o que o `.deb` declara.
+      # O Electron abre uma janela: precisa de display (Xvfb) e das gráficas.
+      # Os `t64` respondem pelos nomes antigos por `Provides`, que é o que o
+      # `.deb` declara.
       - name: Dependências de janela
         run: |
           set -euo pipefail
@@ -185,21 +152,16 @@ jobs:
             libxfixes3 libxrandr2 libxkbcommon0 libgtk-3-0t64 libxss1 \
             libxtst6 libatspi2.0-0t64 libuuid1 xdg-utils fakeroot
 
-      # Um build serve aos dois alvos: `out/` para o compilado e `release/`
-      # (`.deb` e árvore descompactada) para o empacotado. O `--publish never`
-      # já vem no script `dist:dir` do package.json: sem ele o electron-builder
-      # detecta o CI, tentaria publicar sozinho ("Implicit publishing") e
-      # morreria sem GH_TOKEN.
+      # Um build serve aos dois alvos: `out/` (compilado) e `release/` (`.deb`).
+      # O `--publish never` já vem no script `dist:dir` do package.json.
       - name: Compila o app e o pacote
         run: npm run dist:dir
 
       - name: E2E do app compilado e do payload do .deb
         run: xvfb-run -a npm run test:e2e
 
-      # O E2E roda sobre o payload extraído do `.deb`: o perfil AppArmor do
-      # pacote nega a porta TCP do CDP (ver `docs/e2e.md`). Aqui o pacote é
-      # instalado de verdade, para conferir que resolve as dependências e deixa
-      # o binário e o `cronologia-setup` no lugar.
+      # Instalação real: o E2E roda sobre o payload extraído porque o AppArmor
+      # do pacote nega a porta TCP do CDP (`docs/e2e.md`).
       - name: Instalação real do .deb
         run: |
           set -euo pipefail
@@ -209,28 +171,17 @@ jobs:
 
   mutacao:
     name: Testes de mutação
-    # A varredura completa leva horas, e o que ela mede muda devagar: só quando
-    # alguém escreve teste novo. Então ela **não** roda em pull request e nem em
-    # push: roda uma vez por mês no agendamento e no disparo manual, que é a
-    # válvula de escape quando se quer remediar um arquivo específico sem
-    # esperar o mês.
-    #
-    # Este `if` é do job, e não do `on:` do workflow, porque "Verificar
-    # qualidade" e "Testes e cobertura" continuam no ritmo normal de push e PR.
-    # Job pulado aparece como *Skipped* na aba de checks, o que é o esperado
-    # aqui: não é status check obrigatório.
+    # Só por disparo manual (e agendamento): a varredura leva horas e o número
+    # só muda quando alguém escreve teste novo. O `if` é do job, para não
+    # repuxar o ritmo dos outros; pulado aparece como *Skipped* e não é status
+    # check obrigatório.
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
-    # Grupo próprio, e não o do workflow: lá, todo push cancela a execução
-    # anterior, o que mataria uma varredura de horas no meio sem que ninguém
-    # tenha tocado em nada.
+    # Grupo próprio: o do workflow cancelaria a varredura no meio.
     concurrency:
       group: mutacao-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: ${{ github.event_name == 'push' }}
-    # O runner aborta cada mutante sozinho (240 s por padrão, `--timeout`).
-    # O teto abaixo é só para o job não ficar pendurado se algo travar fora do
-    # plano, e fica abaixo do limite de 6 h do runner hospedado, com folga para
-    # não morrer exatamente na borda.
+    # Teto só para o job não ficar pendurado; abaixo do limite de 6 h do runner.
     timeout-minutes: 330
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -244,25 +195,20 @@ jobs:
 
       - name: Varredura de mutação
         env:
-          # Piso provisório de 55%: a varredura completa de `src/` ainda não foi
-          # medida (ver `docs/mutation.md` § "No CI"), então o primeiro disparo
-          # manual mede o número real e o piso deve ser ajustado para ficar bem
-          # abaixo dele. A folga é de propósito: o score depende da máquina,
-          # porque mutante que estoura os 240 s vira `timeout` e sai do
-          # denominador, e o runner do CI tem menos núcleo que a máquina onde a
-          # varredura foi escrita.
+          # Piso provisório até a primeira varredura completa de `src/` medir o
+          # número real (`docs/mutation.md` § "No CI"); o score também depende
+          # da máquina, porque mutante que estoura o `--timeout` sai do
+          # denominador.
           MIN_SCORE: ${{ inputs.min_score || '55' }}
           MUTATION_FILE: ${{ inputs.mutation_file }}
         run: |
           set -euo pipefail
           args=(--min-score "$MIN_SCORE")
           if [ -n "${MUTATION_FILE:-}" ]; then
-            # O `--file` se repete: um passo por arquivo, senão o runner
-            # interpretaria a lista inteira como um caminho só.
+            # Um `--file` por arquivo, senão a lista inteira vira um caminho só.
             IFS=',' read -ra arquivos <<< "$MUTATION_FILE"
             for arquivo in "${arquivos[@]}"; do
-              # O input vem de digitação: tira o espaço em volta de cada item,
-              # senão ` src/main/a.ts` vira um caminho que não existe.
+              # Input vem de digitação: tira o espaço em volta de cada item.
               limpo="${arquivo#"${arquivo%%[![:space:]]*}"}"
               limpo="${limpo%"${limpo##*[![:space:]]}"}"
               [ -n "$limpo" ] && args+=(--file "$limpo")
@@ -280,9 +226,8 @@ jobs:
             if (!fs.existsSync(file)) process.exit(0);
             const results = JSON.parse(fs.readFileSync(file, "utf8")).results ?? [];
             const count = (status) => results.filter((r) => r.status === status).length;
-            // `timeout` e `compileError` ficam fora do denominador, que é como
-            // o runner calcula o score (ver `mutationScore` em
-            // `tools/mutation/run.ts`).
+            // `timeout` e `compileError` ficam fora do denominador: é assim que o
+            // runner calcula o score (`mutationScore`, tools/mutation/run.ts).
             const scored = count("killed") + count("survived");
             const score = scored === 0 ? 0 : (count("killed") / scored) * 100;
             const rows = [

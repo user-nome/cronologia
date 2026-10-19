@@ -1,35 +1,19 @@
 name: Publicar .deb
 
-# Publica o .deb na GitHub Release correspondente e, junto, o repositório
-# APT flat (índices assinados + alias estável do .deb) como assets da mesma
-# Release, base: .../releases/latest/download/ (suite ./).
-# Gatilhos:
-# - push na main: lê package.json → se ainda não existir Release para
-#   v<versão>, publica automaticamente (é assim que a versão nova sai);
-# - tag v* enviada manualmente (ex.: git push origin v1.0.3), ou
-# - Release criada na UI do GitHub, ou
-# - execução manual na UI (workflow_dispatch; também serve para reanexar
-#   assets de uma Release que falhou no meio).
-# Sem loop: pushes de tag/Release feitos com o GITHUB_TOKEN desta execução
-# não disparam novos runs, e a tag só é criada antes do upload dos assets.
-# `concurrency` serializa as publicações para duas corridas na main não
-# publicarem a mesma versão duas vezes.
-# Actions fixadas por SHA completo (com a tag na comentário) para não depender
-# da segurança da tag movível; o Dependabot (`github-actions`) atualiza os pins.
-# Todas declararam `using: node24`: o Node 20 foi descontinuado e saiu dos
-# runners em 23/09/2026, então action em Node 20 não roda mais — o runner a força
-# para Node 24 e avisa a cada execução. `actions/checkout` foi do v4 para o v7
-# por causa disso.
+# Publica o .deb na GitHub Release correspondente e, junto, o repositório APT
+# flat (índices assinados + alias estável) como assets da mesma Release, base:
+# .../releases/latest/download/ (suite ./).
 #
-# Imagem fixada em `ubuntu-24.04` nos três jobs. `ubuntu-latest` é etiqueta móvel
-# e o GitHub está migrando o `latest` do Ubuntu 24.04 para o 26.04 entre outubro
-# e novembro de 2026 (actions/runner-images#14748); aqui isso derrubaria o
-# empacotamento, porque o build do `.deb` resolve dependência pelo nome do
-# pacote (`fakeroot`, `dpkg-dev`, `apt-utils`, `gnupg`).
-# Gate de qualidade: o job "Verificar qualidade" (npm run check + npm test)
-# roda em paralelo ao "Verificar versão" e o "Gerar e publicar" só começa se
-# os dois passarem; falha de tipo, lint, formato, auditoria OSV ou teste
-# interrompe a publicação.
+# Gatilhos: push na main (nova versão sai sozinha), tag `v*`, Release criada na
+# UI e `workflow_dispatch` (para reanexar assets de uma Release que falhou).
+# Sem loop: o GITHUB_TOKEN desta execução não dispara novos runs.
+#
+# Gate: "Verificar versão" e "Verificar qualidade" rodam em paralelo, e o
+# "Gerar e publicar" só começa se os dois passarem.
+#
+# Imagem `ubuntu-24.04` fixada e actions fixadas por SHA (com a tag na
+# comentário, atualizadas pelo Dependabot) em Node 24: o porquê de cada escolha
+# está em `docs/build.md`.
 on:
   push:
     branches:
@@ -50,12 +34,8 @@ concurrency:
 # secrets não pode ser usado em `if:`; copia para env (padrão do GitHub).
 env:
   VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
-  # Impressão digital da chave que assina o repo APT. Fonte única: ao trocar a
-  # chave, atualize este valor e os secrets `GPG_PRIVATE_KEY` e
-  # `GPG_PASSPHRASE`. Ela é conferida em três lugares (checagem da chave,
-  # `--local-user` nas assinaturas e mensagem de erro), então escrevê-la à mão
-  # nos três pontos era um convite para a metade ficar na chave antiga.
-  # Ver docs/distribuicao-apt.md.
+  # Impressão digital da chave que assina o repo APT: troque aqui e nos dois
+  # secrets ao renovar. Procedimento e troubleshooting em docs/distribuicao-apt.md.
   GPG_FINGERPRINT: 25300DF604649306F87CDF777DC37BA3C21FFA81
 
 jobs:
@@ -86,16 +66,13 @@ jobs:
           TAG="v$VERSION"
           PUBLICAR=true
 
-          # Ref explícita (tag manual, Release da UI ou dispatch numa tag)
-          # manda mais que o package.json.
+          # Ref explícita (tag, Release da UI, dispatch) manda mais que o
+          # package.json.
           if [ "$REF_TYPE" = "tag" ]; then
             TAG="$REF_NAME"
           elif [ "$EVENT_NAME" = "release" ] && [ -n "$RELEASE_TAG" ]; then
             TAG="$RELEASE_TAG"
           fi
-
-          echo "package.json: $VERSION"
-          echo "Tag da Release: $TAG"
 
           if [ "$TAG" != "v$VERSION" ]; then
             echo "::warning::Tag $TAG não confere com v$VERSION do package.json."
@@ -104,9 +81,8 @@ jobs:
             echo "::warning::CHANGELOG.md não tem a entrada '## [$VERSION]'."
           fi
 
-          # Push na main: só interessa publicar se ainda não houver Release.
-          # (Se a tag existe mas a Release não, publica mesmo assim: é o
-          # caso de um run anterior que morreu antes do upload.)
+          # Push na main só publica se ainda não houver Release; se a tag existe
+          # mas a Release não, é um run anterior que morreu antes do upload.
           if [ "$EVENT_NAME" = "push" ] && [ "$REF_TYPE" = "branch" ]; then
             CODE="$(curl -sS -o /dev/null -w '%{http_code}' \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
@@ -122,7 +98,6 @@ jobs:
 
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "publicar=$PUBLICAR" >> "$GITHUB_OUTPUT"
-          echo "Resultado: tag=$TAG publicar=$PUBLICAR"
 
   qualidade:
     name: Verificar qualidade
@@ -140,8 +115,7 @@ jobs:
       - name: OSV Scanner (binário fora do git; versão fixada)
         run: |
           set -euo pipefail
-          # bin/osv-scanner é gitignored: a pasta não existe no checkout do CI
-          # e o curl falharia com exit 23 (não consegue criar o arquivo).
+          # bin/ é gitignored: sem o mkdir o curl falha com exit 23.
           mkdir -p bin
           curl -fsSL -o bin/osv-scanner \
             https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64
@@ -175,20 +149,11 @@ jobs:
 
       - run: npm ci
 
-      # Credenciais OAuth dos clientes Desktop (Dropbox e Google Drive).
-      #
-      # `loadEnv` do electron-vite (`electron.vite.config.mts`) substitui
-      # `process.env.DROPBOX_APP_KEY`, `GOOGLE_CLIENT_ID` e
-      # `GOOGLE_CLIENT_SECRET` no bundle do processo main, então o que está aqui
-      # é o que entra no `.deb`. Os valores nunca vão para o código-fonte: nem
-      # literal no repositório, nem `.env` no runner (o `env:` do step é o
-      # equivalente do `.env` local, e o job não escreve arquivo nenhum).
-      #
-      # Secrets e variables do Actions chegam com o mesmo nome. Estas chaves
-      # identificam o aplicativo e não são segredos de servidor (clientes
-      # Desktop permitem extraí-las do binário), então **Variables** é o lugar
-      # certo; `secrets.*` continua sendo aceito para quem já configurou lá. O
-      # passo de build escolhe o que estiver preenchido.
+      # Credenciais OAuth dos clientes Desktop (Dropbox e Google Drive). O
+      # `loadEnv` do electron-vite (`electron.vite.config.mts`) substitui as três
+      # variáveis no bundle do main, então é isto que entra no `.deb`. Secrets e
+      # Variables chegam com o mesmo nome (o secret vence) e são identificadores
+      # públicos, então **Variables** é o lugar certo. Tabela em docs/build.md.
       - name: Juntar as credenciais OAuth (Secrets ou Variables)
         id: oauth
         env:
@@ -200,8 +165,6 @@ jobs:
           VAR_GOOGLE_CLIENT_SECRET: ${{ vars.GOOGLE_CLIENT_SECRET }}
         run: |
           set -euo pipefail
-          # Secret tem precedência sobre Variable (mesmo valor em uso hoje, mas
-          # a ordem deixa o secret ganhar se alguém declarar os dois).
           pick() { if [ -n "${1:-}" ]; then printf '%s' "$1"; else printf '%s' "${2:-}"; fi; }
           {
             echo "dropbox_app_key=$(pick "$SEC_DROPBOX_APP_KEY" "$VAR_DROPBOX_APP_KEY")"
@@ -209,9 +172,6 @@ jobs:
             echo "google_client_secret=$(pick "$SEC_GOOGLE_CLIENT_SECRET" "$VAR_GOOGLE_CLIENT_SECRET")"
           } >> "$GITHUB_OUTPUT"
 
-          # Falha aqui, e não no app: sem DROPBOX_APP_KEY o binário sai com o
-          # provedor desabilitado e ninguém descobre até alguém instalar e
-          # tentar conectar. A mensagem diz onde cadastrar.
           if [ -z "$(pick "$SEC_DROPBOX_APP_KEY" "$VAR_DROPBOX_APP_KEY")" ]; then
             echo "::error::DROPBOX_APP_KEY ausente. Cadastre em Settings → Secrets and variables → Actions (aba Secrets ou Variables, escopo Repository) no repo user-nome/cronologia."
             exit 1
@@ -220,16 +180,15 @@ jobs:
             echo "::error::GOOGLE_CLIENT_ID ausente. Sem ele o Google Drive é desabilitado no .deb. Cadastre em Settings → Secrets and variables → Actions, ou remova o provider de docs/backup-providers.md se a integração for desativada."
             exit 1
           fi
-          # O secret do Google é opcional para o cliente Desktop (PKCE não
-          # precisa dele), então ausente não quebra: o build segue sem ele.
+          # O secret do Google é opcional: o cliente Desktop funciona só com o
+          # client_id (PKCE não precisa dele).
           if [ -z "$(pick "$SEC_GOOGLE_CLIENT_SECRET" "$VAR_GOOGLE_CLIENT_SECRET")" ]; then
             echo "::notice::GOOGLE_CLIENT_SECRET ausente; o Google Drive usará só o client_id (aceito para o cliente Desktop)."
           fi
-          echo "::notice::Credenciais OAuth prontas (App key do Dropbox e client_id do Google Drive)."
 
       - name: Gerar .deb (compila e empacota; o upload é no step seguinte)
-        # --publish never: sem isso, o electron-builder tenta publicar
-        # sozinho por causa da tag ("Implicit publishing") e falha sem token.
+        # --publish never: sem isso o electron-builder tenta publicar sozinho
+        # ("Implicit publishing") e morre sem token.
         env:
           DROPBOX_APP_KEY: ${{ steps.oauth.outputs.dropbox_app_key }}
           GOOGLE_CLIENT_ID: ${{ steps.oauth.outputs.google_client_id }}
@@ -246,9 +205,8 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ steps.oauth.outputs.google_client_secret }}
         run: |
           set -euo pipefail
-          # O `define` do electron-vite substitui o literal no bundle. Se o
-          # valor não estiver lá, o `.deb` sai com o provedor desabilitado e a
-          # falha só aparece na máquina de quem instalou: o teste é o `.deb`.
+          # O `define` substitui o literal no bundle: sem a chave lá, o `.deb`
+          # sai com o provedor desabilitado e a falha só aparece em quem instala.
           MAIN="$(ls out/main/index.js)"
           falha=0
           conferir() {
@@ -264,19 +222,13 @@ jobs:
           conferir DROPBOX_APP_KEY "$DROPBOX_APP_KEY"
           conferir GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"
           conferir GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"
-          # O mesmo arquivo tem de estar no payload do .deb: empacotar antes de
-          # compilar (ou com `afterPack` apagando) é justamente o que faria a
-          # chave sumir entre o build e o artefato.
-          # O glob pega só um arquivo (o mais recente): em `release/` pode
-          # sobrar `.deb` de uma versão anterior, e um `ls` com dois caminhos
-          # quebraria o passo inteiro.
+          # O glob pega só o `.deb` mais recente: em `release/` pode sobrar um de
+          # versão anterior, e o `ls` com dois caminhos quebraria o passo.
           DEB="$(ls -t release/cronologia_*_amd64.deb | head -n 1)"
           PAYLOAD="$(mktemp -d)"
           dpkg-deb -x "$DEB" "$PAYLOAD"
-          # O app vai empacotado em `app.asar`, então a conferência desce um
-          # nível: o caminho solto `out/main/index.js` não existe no `.deb`.
-          # `asar extract` (e não `extract-file`) porque este último escreve o
-          # arquivo no diretório atual, e o passo não deve depender do `cwd`.
+          # O app vai em `app.asar`, então a conferência desce um nível. `asar
+          # extract` e não `extract-file`: este escreve no diretório atual.
           ASAR="$(find "$PAYLOAD" -name 'app.asar' -print -quit)"
           if [ -z "$ASAR" ]; then
             echo "::error::app.asar não está no payload de $(basename "$DEB")."
@@ -306,8 +258,7 @@ jobs:
             echo "::error::Tag vazia: o job 'Verificar versão' não rodou?"
             exit 1
           fi
-          # Identidade do autor: sem user.name/user.email no runner o
-          # `git tag -a` aborta com "Please tell me who you are".
+          # Sem user.name/user.email no runner, o `git tag -a` aborta.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
@@ -341,28 +292,17 @@ jobs:
           # Alias estável SEM versão: o APT resolve Filename relativo à base
           # .../releases/latest/download/, que só redireciona nomes exatos.
           cp release/cronologia_*_amd64.deb apt/cronologia_amd64.deb
-          # Falhas aqui viram ::error:: explícito (annotations são legíveis
-          # na UI do Actions sem precisar abrir o log cru).
           printf '%s\n' "$GPG_PRIVATE_KEY" | gpg --batch --import || true
-          # A chave tem de ser exatamente a de `GPG_FINGERPRINT` (uid
-          # chronos.biblioteca@proton.me). Conferir pela impressão digital e
-          # não pelo uid pega o caso real de rotação: o secret novo e o valor
-          # antigo no env não podem combinar em silêncio.
+          # Conferir pela impressão digital e não pelo uid pega o caso real de
+          # rotação: secret novo e valor antigo no env não combinam em silêncio.
           if ! gpg --list-secret-keys "$GPG_FINGERPRINT" >/dev/null 2>&1; then
             echo "::error::GPG_PRIVATE_KEY não contém a chave $GPG_FINGERPRINT: cole o bloco armoured inteiro, COM as linhas -----BEGIN PGP PRIVATE KEY BLOCK----- e -----END PGP PRIVATE KEY BLOCK----- (sem elas o gpg não reconhece o formato). Se a chave foi renovada, troque também GPG_FINGERPRINT no topo deste arquivo."
             exit 1
           fi
-          echo "Chave de assinatura: $GPG_FINGERPRINT"
-
-          # A frase entra por `--passphrase-file` num arquivo temporário, e
-          # não por `--passphrase`: o outro caminho põe a frase no argv do
-          # processo, legível por qualquer outro usuário da máquina. O `mktemp`
-          # cria com 600 e o arquivo é apagado no fim, inclusive quando o passo
-          # falha.
-          #
-          # `--pinentry-mode loopback` é obrigatório: sem ele o agente do gpg
-          # tenta pinentry, o runner não tem terminal e a assinatura morre com
-          # `Inappropriate ioctl for device`.
+          # A frase entra por `--passphrase-file` num temporário, e não por
+          # `--passphrase`: em argv ela fica legível no `ps` do runner. E o
+          # `--pinentry-mode loopback` é obrigatório: sem terminal, pinentry
+          # morre com `Inappropriate ioctl for device`.
           if [ -z "${GPG_PASSPHRASE:-}" ]; then
             echo "::error::Secret GPG_PASSPHRASE ausente em Settings → Secrets → Actions (repo user-nome/cronologia). A chave $GPG_FINGERPRINT tem frase, então o CI não consegue desbloquear sem ela: o agente do gpg cairia em pinentry e o runner não tem terminal."
             exit 1
@@ -373,23 +313,18 @@ jobs:
           printf '%s' "$GPG_PASSPHRASE" > "$PHRASE_FILE"
           GPG_OPTS=(--batch --yes --pinentry-mode loopback --passphrase-file "$PHRASE_FILE")
 
-          # Teste de assinatura antes de gerar qualquer coisa, para falhar com
-          # uma mensagem que aponta a causa em vez de dizer só que "não
-          # assinou".
+          # Teste de assinatura antes de gerar nada: falha aqui diz a causa, e
+          # não só que "não assinou".
           echo preflight > apt/.sign-test
           if ! gpg "${GPG_OPTS[@]}" --local-user "$GPG_FINGERPRINT" --clearsign \
             -o apt/.sign-test.asc apt/.sign-test 2>apt/.sign-test.err; then
-            # Diagnóstico: o erro do gpg vem inteiro, sem cortar em uma linha —
-            # é a única linha que diz se a frase não confere (Bad passphrase),
-            # se o agente caiu em pinentry (Inappropriate ioctl for device) ou
-            # se é outra coisa. Comprimento e sha256 dos secrets recebidos
-            # permitem comparar com os arquivos locais; o sha256 da string
-            # vazia (e3b0c44298fc1c14...) quer dizer secret cadastrado vazio.
+            # O erro do gpg vem inteiro: é ele que distingue Bad passphrase de
+            # pinentry (Inappropriate ioctl). O sha256 da string vazia
+            # (e3b0c442...) no log quer dizer secret cadastrado vazio.
             cat apt/.sign-test.err
             echo "GPG_PASSPHRASE recebido: ${#GPG_PASSPHRASE} caracteres, sha256 $(printf '%s' "$GPG_PASSPHRASE" | sha256sum | cut -c1-16)"
             echo "GPG_PRIVATE_KEY recebido: ${#GPG_PRIVATE_KEY} caracteres, sha256 $(printf '%s' "$GPG_PRIVATE_KEY" | sha256sum | cut -c1-16)"
-            # Espaço, ENTER ou espaço no fim é o erro mais comum quando a
-            # pessoa jura que a frase está certa.
+            # Espaço/ENTER no fim do valor colado é o erro mais comum aqui.
             APARADO="${GPG_PASSPHRASE#"${GPG_PASSPHRASE%%[![:space:]]*}"}"
             APARADO="${APARADO%"${APARADO##*[![:space:]]}"}"
             if [ "$APARADO" != "$GPG_PASSPHRASE" ]; then
@@ -407,8 +342,8 @@ jobs:
           grep -qx 'Filename: cronologia_amd64.deb' Packages
           gzip -9nc Packages > Packages.gz
           rm Packages.raw
-          # Release é gerado FORA da árvore e só então movido para dentro,
-          # senão ele hash a si mesmo (arquivo meio escrito) e ao .raw.
+          # Gerado FORA da árvore e só depois movido: dentro dela o apt-ftparchive
+          # hasharia o arquivo meio escrito.
           apt-ftparchive release \
             -o APT::FTPArchive::Release::Origin=Cronologia \
             -o APT::FTPArchive::Release::Label=Cronologia \
@@ -419,15 +354,13 @@ jobs:
             -o APT::FTPArchive::Release::Description="Cronologia" \
             . > ../Release.tmp
           mv ../Release.tmp Release
-          # `--local-user` nas três operações: o runner é limpo, mas fixar a chave deixa
-          # a assinatura atrelada à impressão digital do topo do arquivo, e não
-          # a "a primeira chave que o gpg achar". O mesmo vale para o `export`:
-          # sem o argumento, `gpg --armor --export` despeja o keyring inteiro no
-          # public.key.
+          # `--local-user` nas três: a assinatura fica atrelada à impressão
+          # digital do topo, e não "à primeira chave que o gpg achar". O mesmo
+          # vale no `export`: sem o argumento ele despeja o keyring inteiro.
           gpg "${GPG_OPTS[@]}" --local-user "$GPG_FINGERPRINT" --clearsign -o InRelease Release
           gpg "${GPG_OPTS[@]}" --local-user "$GPG_FINGERPRINT" -abs -o Release.gpg Release
           gpg --armor --export "$GPG_FINGERPRINT" > public.key
-          echo "Repo APT flat gerado (chave $GPG_FINGERPRINT):" && ls -l
+          ls -l
 
       - name: Anexar repo APT à Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
