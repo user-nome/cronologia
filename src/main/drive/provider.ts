@@ -66,3 +66,16 @@ export function getProvider(id: BackupProviderId): BackupProvider {
 export function currentProvider(): BackupProvider {
   return REGISTRY[state.provider];
 }
+
+/**
+ * Autoriza o **provedor escolhido**, não um provedor fixo.
+ *
+ * É o que o IPC `drive:auth` chama. Cada sessão é gravada na entrada do cofre do
+ * provedor ativo (`persistState` olha `state.provider`), então autorizar o
+ * Dropbox com o Google Drive selecionado abriria a tela de login do Dropbox e
+ * ainda escreveria o token dele na vaga do Drive. Delegar ao catálogo tira o
+ * caminho de segunda mão: `switchProvider` escolhe, e aqui só se conecta.
+ */
+export function authorize(): Promise<AuthorizeResult> {
+  return currentProvider().authorize();
+}

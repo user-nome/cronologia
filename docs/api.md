@@ -35,7 +35,7 @@ níveis (método → canal → origem dos dados):
 | `settings.set(cfg)`         | `settings:set`        | segredos no cofre e `settings.json` (0600)    |
 | `drive.status()`            | `drive:status`        | estado em memória (+ tokens no cofre)         |
 | `drive.providers()`         | `drive:providers`     | catálogo `BackupProvider` (Dropbox, Google)   |
-| `drive.auth()`              | `drive:auth`          | OAuth PKCE + loopback `localhost:17431`       |
+| `drive.auth()`              | `drive:auth`          | OAuth PKCE do **provedor escolhido**          |
 | `drive.backup()`            | `drive:backup`        | criptografa e envia à pasta do app            |
 | `drive.restore(senha)`      | `drive:restore`       | baixa, decifra e substitui a biblioteca       |
 | `drive.backupInfo()`        | `drive:backup-info`   | metadados do `library.json` remoto            |
@@ -216,15 +216,28 @@ interface DriveStatus {
 
 ### `drive.auth() → Promise<{ ok: boolean; error?: string }>`
 
+Autoriza o **provedor escolhido** no seletor acima do botão (o mesmo destino que
+`drive.setProvider()` gravou), nunca um provedor fixo: com o Google Drive
+selecionado, o navegador abre o consentimento do Google. Cada sessão recusa fora
+do destino ativo, porque é na vaga dele no cofre que o token é gravado.
+
 Abre o navegador (PKCE, sem `app secret`, com `token_access_type=offline`) e escuta o
-callback num servidor loopback de **porta fixa** (`localhost:17431`; o Dropbox exige a
-URI de redirect pré-cadastrada no App Console, então a porta não pode ser sorteada;
-se estiver ocupada, cai para uma livre e o Dropbox recusa com `redirect_uri_mismatch`).
-Troca o código por tokens e grava `dropbox.tokens` no cofre (exige cofre
-aberto: sem ele a tela abre a criação/desbloqueio antes). Falhas típicas:
+callback num servidor loopback de **porta fixa** no Dropbox
+(`localhost:17431`; o Dropbox exige a URI de redirect pré-cadastrada no App Console,
+então a porta não pode ser sorteada; se estiver ocupada, cai para uma livre e o
+Dropbox recusa com `redirect_uri_mismatch`) e em **porta efêmera** no Google Drive,
+que aceita loopback em qualquer porta para cliente Desktop.
+Troca o código por tokens e grava `dropbox.tokens` ou `google-drive.tokens` no cofre
+(exige cofre aberto: sem ele a tela abre a criação/desbloqueio antes). Quando o
+consentimento é **aprovado**, o app abre também a página de termos do projeto
+(`https://cronologia-delirante.vercel.app/termos`, `TERMS_URL` em
+`drive/constants.ts`) numa aba nova: a aba do callback é a do `localhost`, então é
+o app que leva a pessoa ao texto — e nunca numa recusa ou num callback de outra
+origem. Falhas típicas:
 `access_denied` (usuário recusou), `Tempo esgotado aguardando autorização.`,
 `Falha ao obter tokens (HTTP).`. Sem App key (a embutida estando vazia e sem
-`settings.driveClientId` no cofre), recusa antes de abrir o navegador.
+`settings.driveClientId` no cofre) ou sem o par do Google Drive no build, recusa
+antes de abrir o navegador, com o mesmo motivo que a interface mostra.
 
 ### `drive.backup() → Promise<{ ok: boolean; error?: string; summary?: BackupSummary }>`
 

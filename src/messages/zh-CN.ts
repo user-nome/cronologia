@@ -201,7 +201,7 @@ export const zhCN: Messages = {
     text2:
       '不管愿不愿意，我穷得叮当响，而云备份依赖Dropbox：在应用通过正式审核之前，连接满50个账号后，它只有2周时间获批，否则就不再接受新用户。您的捐赠有助于让应用（和我的耐心）继续运转。',
     text3:
-      '说实话，这个项目起初只是我个人的追更记录。因为您，和我一样的资深御宅族，懂得看着喜爱的平台倒闭、阅读进度全部丢失是什么滋味。',
+      '说实话，这个项目起初只是我个人的追更记录。因为您，和我一样的强迫症御宅族，懂得看着喜爱的平台倒闭、阅读进度全部丢失是什么滋味。',
     text4:
       '但如果奇迹发生、本项目真的收到捐赠，我会尽力把它做到最完善，让我们能安心睡觉，不用担心一觉醒来发现阅读器里的历史记录没了。',
     openTitle: '在浏览器中打开捐赠页面',
@@ -246,6 +246,8 @@ export const zhCN: Messages = {
     invalidManifest: '备份清单无效。',
     syncInProgress: '同步已在进行中。',
     connectFirst: (provider: string): string => `请先连接${provider}账号。`,
+    providerNotSelected: (provider: string): string =>
+      `${provider}未被选为备份目的地。请连接所选目的地。`,
     emptyLibrary: '没有可备份的本地书库。请至少添加一部作品。',
     noBackupFound: (provider: string): string => `在${provider}的应用文件夹中没有找到备份。`,
     invalidLibrary: '备份无效（library.json已损坏）。',

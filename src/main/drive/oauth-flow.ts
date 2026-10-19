@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import http from 'http';
 import { URLSearchParams } from 'url';
 import type { AuthorizationCode, BackupProviderId, TokenGrant, TokenResponse } from '@zero/types';
-import { providerLabel } from '@zero/main/drive/constants';
+import { providerLabel, TERMS_URL } from '@zero/main/drive/constants';
 import { parseJson } from '@zero/main/drive/json';
 import { openExternalSafe } from '@zero/main/external';
 import { currentMessages } from '@zero/main/i18n';
@@ -10,6 +10,10 @@ import { currentMessages } from '@zero/main/i18n';
 /**
  * O pedaço de OAuth que é o mesmo em qualquer nuvem: PKCE, servidor local de
  * callback, troca do código por tokens e renovação. Só isso.
+ *
+ * Também é onde a autorização aprovada leva a pessoa aos Termos de Uso
+ * (`TERMS_URL`): a aba do callback é a do `localhost`, então é daqui que o texto
+ * sai para o navegador.
  *
  * Endpoints, parâmetros extras e a leitura de "de quem é a conta" são descritos
  * pelo `OAuthFlow`, e cada provedor continua tendo o seu módulo cuidando da
@@ -182,7 +186,15 @@ async function openBrowser(
   if (timer !== undefined) clearTimeout(timer);
   if (server.listening) shutdown(server);
 
-  if (outcome.code !== null && outcome.code !== '') return { code: outcome.code, redirectUri };
+  if (outcome.code !== null && outcome.code !== '') {
+    // Consentimento aprovado: os termos de uso abrem numa aba nova. A aba do
+    // callback continua sendo a do `localhost` (é onde o `code` chega ao
+    // processo), então é o app que leva a pessoa ao texto — e só quando o
+    // consentimento mesmo deu certo, nunca numa recusa ou num callback de outra
+    // origem.
+    openExternalSafe(TERMS_URL);
+    return { code: outcome.code, redirectUri };
+  }
   throw new Error(outcome.error ?? currentMessages().driveErrors.authCancelled);
 }
 

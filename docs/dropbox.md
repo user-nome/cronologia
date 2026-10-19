@@ -99,6 +99,9 @@ contas, é só pedir a produção, bem mais simples que a verificação do Googl
    - O navegador padrão abre a página de consentimento do Dropbox.
    - Após aprovar, o Dropbox redireciona para `http://localhost:17431/callback?code=...`.
    - O app captura o código, troca pelos tokens (PKCE) e mostra o status **Conectado**.
+   - Aprovado o consentimento, o app abre também a página de
+     [Termos de Uso](https://cronologia-delirante.vercel.app/termos) numa aba nova: a
+     aba do callback é a do `localhost`, então é o app que leva a pessoa ao texto.
 4. Os tokens são gravados no **cofre de segredos** (`dropbox.tokens`; ver
    [`cofre.md`](cofre.md)): sem cofre aberto a conexão nem começa (as
    Configurações pedem para criar/desbloquear primeiro). O `refresh_token` do

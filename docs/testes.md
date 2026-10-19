@@ -12,7 +12,7 @@ Três camadas, com três SIGNais diferentes. Esta doc é da primeira:
 
 Suíte em Vitest com ambiente `jsdom` único (`vitest.config.mts`): o renderer e
 também o processo main rodam em `jsdom`, com o `electron` trocado pelo stub de
-`tests/mocks/electron.ts`. São **69 arquivos** e **1.087 testes**; a duração gira
+`tests/mocks/electron.ts`. São **69 arquivos** e **1.093 testes**; a duração gira
 em torno de 3 minutos porque os testes de backup cifram de verdade com scrypt
 `N=2^17` (~128 MiB por derivação), enquanto o Argon2id do cofre roda com o KDF
 barato dos testes (16 MiB).
@@ -173,15 +173,15 @@ de DOM em `tests/setup.ts`: `setupFiles` roda para ele também.
 
 `vitest.config.mts` mede `src/**/*.{ts,tsx}` com o provedor v8 (relatórios em
 texto e HTML em `coverage/`) e exige **95% por arquivo** (`perFile: true`) de
-linhas, instruções, funções e ramos. Estado medido na 2.0.0 (**1.087 testes em
+linhas, instruções, funções e ramos. Estado medido na 2.1.1 (**1.093 testes em
 69 arquivos**, 81 arquivos de `src/` medidos):
 
 | Métrica    | Global | Pior arquivo                   |
 | ---------- | ------ | ------------------------------ |
-| Statements | 99,23% | 95,71% (`main/index.ts`)       |
+| Statements | 99,30% | 96,00% (`main/cleanup.ts`)     |
 | Branches   | 98,67% | 95,00% (`vault/unlock.ts`)     |
-| Functions  | 99,45% | 95,23% (`drive/oauth-flow.ts`) |
-| Lines      | 99,43% | 95,45% (`main/cleanup.ts`)     |
+| Functions  | 99,56% | 95,23% (`drive/oauth-flow.ts`) |
+| Lines      | 99,51% | 95,45% (`main/cleanup.ts`)     |
 
 **Nenhum arquivo fica abaixo de 95% em nenhuma das quatro métricas**, e
 `npm run test:coverage` termina com código 0. O piso subiu de 50% agregado

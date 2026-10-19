@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import http from 'http';
 import { shell } from '../mocks/electron.ts';
 import { currentMessages } from '@zero/main/i18n';
+import { TERMS_URL } from '@zero/main/drive/constants';
 import {
   GOOGLE_SCOPE_VERSION,
   GOOGLE_TOKEN_ENDPOINT,
@@ -20,7 +21,7 @@ import {
 } from '@zero/main/drive/providers/google/session';
 import { state } from '@zero/main/drive/state';
 import { lockVault } from '@zero/main/vault';
-import { bodyText, headerOf, json, resetDrive, stubFetch } from '../helpers/drive.ts';
+import { bodyText, headerOf, json, resetDriveComGoogle, stubFetch } from '../helpers/drive.ts';
 import type { FetchCall } from '../helpers/drive.ts';
 
 /**
@@ -98,8 +99,7 @@ function stubDrive(
 beforeEach(async () => {
   vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
   vi.stubEnv('GOOGLE_CLIENT_SECRET', SEGREDO);
-  state.provider = 'google-drive';
-  await resetDrive();
+  await resetDriveComGoogle();
   fakeSession();
 });
 
@@ -349,8 +349,11 @@ describe('authorize: a query do Google e a sessão', () => {
     const result = await googleAuthorize();
 
     expect(result).toEqual({ ok: true });
-    const auth = new URL(shell.openExternal.mock.calls.at(-1)?.[0] ?? '');
+    // A **primeira** aba é o consentimento; a segunda, os termos de uso (que
+    // abrem depois da aprovação).
+    const auth = new URL(shell.openExternal.mock.calls[0]?.[0] ?? '');
     expect(auth.origin + auth.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth');
+    expect(shell.openExternal.mock.calls.at(-1)?.[0]).toBe(TERMS_URL);
     expect(auth.searchParams.get('access_type')).toBe('offline');
     expect(auth.searchParams.get('prompt')).toBe('consent');
     expect(auth.searchParams.get('code_challenge_method')).toBe('S256');
@@ -366,6 +369,24 @@ describe('authorize: a query do Google e a sessão', () => {
     expect(corpo.get('client_secret')).toBe(SEGREDO);
     expect(corpo.get('code_verifier')).not.toBe('');
     expect(state.tokens?.accountEmail).toBe('leitor@gmail.com');
+  });
+
+  it('recusa fora do destino escolhido, sem abrir o navegador', async () => {
+    // Com o Dropbox escolhido, autorizar aqui abriria o consentimento do Google e
+    // gravaria o token dele na vaga do Dropbox (`persistState` segue o destino
+    // ativo, não o provedor que respondeu).
+    state.provider = 'dropbox';
+    const antes = state.tokens;
+
+    const result = await googleAuthorize();
+
+    expect(result).toEqual({
+      ok: false,
+      error: currentMessages().driveErrors.providerNotSelected('Google Drive'),
+    });
+    expect(state.lastError).toBe(result.error);
+    expect(shell.openExternal).not.toHaveBeenCalled();
+    expect(state.tokens).toBe(antes);
   });
 
   it('recusa sem credencial antes de abrir o navegador', async () => {
@@ -489,8 +510,7 @@ describe('rest.ts: errorBody e authorizedFetch', () => {
   beforeEach(async () => {
     vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
     vi.stubEnv('GOOGLE_CLIENT_SECRET', SEGREDO);
-    state.provider = 'google-drive';
-    await resetDrive();
+    await resetDriveComGoogle();
     fakeSession();
   });
 
@@ -568,8 +588,7 @@ describe('toRemoteFile: validação de cada campo', () => {
   beforeEach(async () => {
     vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
     vi.stubEnv('GOOGLE_CLIENT_SECRET', SEGREDO);
-    state.provider = 'google-drive';
-    await resetDrive();
+    await resetDriveComGoogle();
     fakeSession();
   });
 
@@ -623,8 +642,7 @@ describe('uploadFile e downloadFile: erro handling', () => {
   beforeEach(async () => {
     vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
     vi.stubEnv('GOOGLE_CLIENT_SECRET', SEGREDO);
-    state.provider = 'google-drive';
-    await resetDrive();
+    await resetDriveComGoogle();
     fakeSession();
   });
 
@@ -667,8 +685,7 @@ describe('session.ts: rollback e error handling', () => {
   beforeEach(async () => {
     vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
     vi.stubEnv('GOOGLE_CLIENT_SECRET', SEGREDO);
-    state.provider = 'google-drive';
-    await resetDrive();
+    await resetDriveComGoogle();
   });
 
   afterEach(() => {
@@ -748,8 +765,7 @@ describe('session.ts: rollback e error handling', () => {
   it('googleAuthorize faz rollback dos tokens quando persistState falha', async () => {
     vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
     vi.stubEnv('GOOGLE_CLIENT_SECRET', SEGREDO);
-    state.provider = 'google-drive';
-    await resetDrive();
+    await resetDriveComGoogle();
     // Não chama fakeSession: estado limpo
     // Cofre fechado faz persistState falhar
     lockVault();

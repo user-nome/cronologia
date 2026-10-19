@@ -4,6 +4,39 @@ Todos os lançamentos seguem [versionamento semântico](https://semver.org/lang/
 (`MAJOR.MINOR.PATCH`) e o formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 em português do Brasil.
 
+## [2.1.1]
+
+### Corrigido
+
+- **Escolher o Google Drive e clicar em Conectar abria o consentimento do
+  Dropbox.** O handler de `drive:auth` chamava a sessão do Dropbox direto (vinda do
+  barrel `drive/index.ts`), não o provedor escolhido: o botão dizia "Conectar ao
+  Google Drive", o navegador abria o login do Dropbox, e se a pessoa completasse, o
+  token do Dropbox era gravado na vaga do Drive no cofre, porque `persistState`
+  escreve na entrada do destino **ativo** — o serviço ficava trocado na tela e no
+  segredo. Agora `authorize()` vive em `drive/provider.ts` e delega a
+  `currentProvider()`, e cada sessão recusa fora do destino escolhido
+  (`m.driveErrors.providerNotSelected`, nos cinco idiomas). O teste `drive:auth
+conecta o destino escolhido, não o Dropbox fixo` segura a delegação pelo IPC, e
+  cada sessão tem teste para a guarda — que fecha o buraco de mutação de trocar o
+  `provider.id` no meio do fluxo.
+
+### Mudado
+
+- **Aprovado o consentimento de um provedor, o app abre os Termos de Uso** numa aba
+  nova (`TERMS_URL`, em `drive/constants.ts`, apontando para a página pública da
+  landing page). A aba do callback é a do `localhost`, então é o app que leva a
+  pessoa ao texto — e só quando a autorização deu certo de verdade: recusa e
+  callback de outra origem (`state` diferente) não abrem nada. O `redirect_uri`
+  continua sendo o loopback, que é o que entrega o `code` ao processo (e o Google
+  só aceita loopback para cliente Desktop).
+
+### Documentação
+
+- **O texto da página de doação mudou "otaku inveterado" para "otaku compulsivo"**
+  no pt-BR canônico, com a tradução equivalente nos outros quatro idiomas (en, ko,
+  zh-CN, ja).
+
 ## [2.0.0]
 
 ### Mudado

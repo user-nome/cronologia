@@ -218,7 +218,7 @@ export const en: Messages = {
       'Your donation helps keep the app (and my patience) up.',
     text3:
       'The truth is this project is personal, for me to track my own readings. Because you, ' +
-      'a hardened otaku like me, know what it is to watch your favorite platform go down ' +
+      'a compulsive otaku like me, know what it is to watch your favorite platform go down ' +
       'the drain and lose every bit of your reading progress.',
     text4:
       'But if by some miracle this project ever receives donations, I will do my best to ' +
@@ -268,6 +268,8 @@ export const en: Messages = {
     invalidManifest: 'Invalid backup manifest.',
     syncInProgress: 'Sync already in progress.',
     connectFirst: (provider: string): string => `Connect the ${provider} account first.`,
+    providerNotSelected: (provider: string): string =>
+      `${provider} is not selected as the backup destination. Connect the selected destination.`,
     emptyLibrary: 'No local library to back up. Add at least one work.',
     noBackupFound: (provider: string): string =>
       `No backup found in the app folder on ${provider}.`,

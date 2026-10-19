@@ -31,7 +31,17 @@ export function missingScopes(granted: string | undefined): string[] {
   return flowMissingScopes(dropboxFlow, granted);
 }
 
+/** Recusa fora do destino escolhido, sem abrir o navegador. */
+function notSelected(): AuthorizeResult {
+  const error = currentMessages().driveErrors.providerNotSelected(providerLabel('dropbox'));
+  setError(error);
+  return { ok: false, error };
+}
+
 export async function authorize(): Promise<AuthorizeResult> {
+  // Guarda do destino: `persistState` grava na vaga do provedor **ativo**, então
+  // autorizar fora dele deixaria o token do Dropbox no lugar do Google Drive.
+  if (state.provider !== 'dropbox') return notSelected();
   const key = appKey();
   if (key === '') {
     const error = currentMessages().driveErrors.configureAppKey;

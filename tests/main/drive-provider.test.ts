@@ -127,6 +127,9 @@ describe('catálogo de provedores de backup', () => {
 
   it('recusa autorizar sem credencial, com o mesmo motivo da interface', async () => {
     vi.stubEnv('GOOGLE_CLIENT_ID', '');
+    // O Google Drive precisa estar escolhido: a sessão é gravada na vaga do
+    // destino ativo, então autorizar fora dele nem chega a olhar a credencial.
+    state.provider = 'google-drive';
     // A interface diz "não traz credencial"; a autorização precisa recusar com a
     // mesma frase, senão o usuário recebe um erro de OAuth para um build que nem
     // tenta sair no navegador.

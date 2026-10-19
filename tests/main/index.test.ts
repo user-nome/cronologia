@@ -49,7 +49,12 @@ function invokeAsync<T>(channel: string, ...args: unknown[]): Promise<T> {
   return invoke(channel, ...args) as Promise<T>;
 }
 
-async function negarOAuthDropbox(): Promise<URL> {
+/**
+ * Roda o OAuth até o fim recusando o consentimento e devolve a URL aberta.
+ *
+ * Serve para qualquer provedor: o que interessa aqui é a URL que o main montou.
+ */
+async function negarOAuth(): Promise<URL> {
   shell.openExternal.mockImplementationOnce((url: string): Promise<void> => {
     const params = new URL(url).searchParams;
     const redirect = params.get('redirect_uri');
@@ -400,7 +405,7 @@ describe('handlers de configurações e Drive', () => {
       driveClientId: 'id-do-teste',
       drivePassphrase: '',
     });
-    const opened = await negarOAuthDropbox();
+    const opened = await negarOAuth();
     expect(opened.searchParams.get('client_id')).toBe('id-do-teste');
     expect(opened.searchParams.get('redirect_uri')).toMatch(/^http:\/\/localhost:\d+\/callback$/u);
     expect(opened.searchParams.has('client_secret')).toBe(false);
@@ -414,8 +419,30 @@ describe('handlers de configurações e Drive', () => {
       driveClientId: '',
       drivePassphrase: '',
     });
-    const opened = await negarOAuthDropbox();
+    const opened = await negarOAuth();
     expect(opened.searchParams.get('client_id')).toBe('chave-do-build');
+  });
+
+  it('drive:auth conecta o destino escolhido, não o Dropbox fixo', async () => {
+    // Regressão: o handler chamava a sessão do Dropbox direto, então escolher o
+    // Google Drive e clicar em Conectar abria o consentimento do Dropbox — e, se a
+    // pessoa completasse, o token do Dropbox era gravado na vaga do Drive, porque
+    // `persistState` escreve na entrada do destino ativo.
+    const CHAVE = '123.apps.googleusercontent.com';
+    vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
+    vi.stubEnv('GOOGLE_CLIENT_SECRET', 'GOCSPX-segredo-de-teste');
+    expect(invoke('drive:set-provider', 'google-drive')).toEqual({ ok: true });
+    try {
+      const opened = await negarOAuth();
+
+      expect(opened.origin + opened.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth');
+      expect(opened.searchParams.get('client_id')).toBe(CHAVE);
+      expect(opened.searchParams.get('access_type')).toBe('offline');
+    } finally {
+      // A escolha é global: voltar ao Dropbox não deixa vazar para os testes de
+      // backup e restauração que vem a seguir.
+      invoke('drive:set-provider', 'dropbox');
+    }
   });
 
   it('drive:disconnect limpa a sessão e avisa a janela', () => {

@@ -466,13 +466,17 @@ paths:
   /drive/auth:
     post:
       tags: [drive]
-      summary: Conectar conta Dropbox (OAuth PKCE)
+      summary: Conectar conta do provedor escolhido (OAuth PKCE)
       description: >
-        Abre o navegador (loopback fixo localhost:17431, sem app secret), troca
-        o código por tokens (`token_access_type=offline`) e persiste no cofre
-        (`dropbox.tokens`; exige cofre aberto). Se a porta fixa estiver
-        ocupada, o app sorteia uma porta livre e o Dropbox recusa o
-        `redirect_uri` com `tokenFailed`.
+        Autoriza o destino selecionado em Configurações (`drive:setProvider`), não um
+        provedor fixo, e cada sessão recusa fora do destino ativo — o token é gravado
+        na vaga dele no cofre. Abre o navegador (PKCE, sem app secret) e troca o código
+        por tokens (`token_access_type=offline` no Dropbox, `access_type=offline` +
+        `prompt=consent` no Google Drive), persistindo no cofre (`dropbox.tokens` ou
+        `google-drive.tokens`; exige cofre aberto). O Dropbox usa loopback de porta fixa
+        (localhost:17431) porque a URI de redirect é pré-cadastrada, e o Google Drive
+        sorteia uma porta livre. Consentimento aprovado abre também a página de
+        termos (`https://cronologia-delirante.vercel.app/termos`) numa aba nova.
       x-ipc-channel: drive:auth
       responses:
         '200':

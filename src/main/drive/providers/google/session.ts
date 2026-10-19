@@ -43,15 +43,24 @@ function toTokens(raw: TokenGrant): Tokens {
   };
 }
 
+/** Recusa fora do destino escolhido, sem abrir o navegador. */
+function notSelected(): AuthorizeResult {
+  const error = currentMessages().driveErrors.providerNotSelected(providerLabel('google-drive'));
+  setError(error);
+  return { ok: false, error };
+}
+
 /**
  * Conecta a conta do Google Drive.
  *
- * Recusa fora do lugar certo duas vezes: sem credencial no build não há o que
- * autorizar, e sem cofre aberto a sessão não tem onde ser gravada (ela vive no
+ * Recusa fora do lugar certo três vezes: sem credencial no build não há o que
+ * autorizar, sem cofre aberto a sessão não tem onde ser gravada (ela vive no
  * cofre, então uma conexão só em memória voltaria como "desconectada" na próxima
- * abertura, que é pior do que não conectar).
+ * abertura, que é pior do que não conectar) e fora do destino escolhido o token
+ * iria para a vaga do outro provedor no cofre.
  */
 export async function googleAuthorize(): Promise<AuthorizeResult> {
+  if (state.provider !== 'google-drive') return notSelected();
   const clientId = googleClientId();
   if (clientId === '') {
     const error = currentMessages().providers.googleNoCredentials;

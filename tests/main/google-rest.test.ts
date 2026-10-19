@@ -16,7 +16,7 @@ import { GOOGLE_SCOPE_VERSION } from '@zero/main/drive/providers/google/constant
 import { state } from '@zero/main/drive/state';
 import { lockVault } from '@zero/main/vault';
 import { currentMessages } from '@zero/main/i18n';
-import { json, resetDrive, stubFetch } from '../helpers/drive.ts';
+import { json, resetDriveComGoogle, stubFetch } from '../helpers/drive.ts';
 import { openTestVault } from '../helpers/vault.ts';
 
 /**
@@ -61,8 +61,7 @@ function driveFile(overrides: Record<string, unknown> = {}): Record<string, unkn
 beforeEach(async () => {
   vi.stubEnv('GOOGLE_CLIENT_ID', CHAVE);
   vi.stubEnv('GOOGLE_CLIENT_SECRET', SEGREDO);
-  state.provider = 'google-drive';
-  await resetDrive();
+  await resetDriveComGoogle();
   fakeSession();
 });
 

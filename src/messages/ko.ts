@@ -212,7 +212,7 @@ export const ko: Messages = {
       '신규 가입을 받지 못합니다. 여러분의 후원이 앱(과 제 인내심)을 유지하는 데 도움이 ' +
       '됩니다.',
     text3:
-      '사실 이 프로젝트는 제 읽기를 기록하기 위한 개인 프로젝트입니다. 저처럼 단련된 ' +
+      '사실 이 프로젝트는 제 읽기를 기록하기 위한 개인 프로젝트입니다. 저처럼 강박적인 ' +
       '오타쿠라면 아실 겁니다, 좋아하던 플랫폼이 망해서 읽기 기록을 몽땅 날려버리는 게 ' +
       '어떤 기분인지.',
     text4:
@@ -260,6 +260,8 @@ export const ko: Messages = {
     invalidManifest: '백업 매니페스트가 유효하지 않습니다.',
     syncInProgress: '동기화가 이미 진행 중입니다.',
     connectFirst: (provider: string): string => `먼저 ${provider} 계정을 연결하세요.`,
+    providerNotSelected: (provider: string): string =>
+      `${provider}은(는) 백업 대상으로 선택되지 않았습니다. 선택한 대상을 연결하세요.`,
     emptyLibrary: '백업할 로컬 라이브러리가 없습니다. 작품을 하나 이상 추가하세요.',
     noBackupFound: (provider: string): string =>
       `${provider}의 앱 폴더에서 백업을 찾을 수 없습니다.`,

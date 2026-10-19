@@ -17,6 +17,19 @@ export const PROVIDER_LABELS: Record<BackupProviderId, string> = {
   'google-drive': 'Google Drive',
 };
 
+/**
+ * Página de termos de uso do projeto, na landing page.
+ *
+ * Abre no navegador logo depois de o consentimento voltar aprovado: é onde a
+ * pessoa está de fato (a aba do callback é a do `localhost`) e é o texto que
+ * acompanha a concessão da conta. Mora aqui porque é do fluxo compartilhado, não
+ * de um provedor: os dois abrem a mesma página.
+ *
+ * É URL de marca, não texto de interface, então fica fora dos bundles de idioma
+ * (`docs/messages.md`).
+ */
+export const TERMS_URL = 'https://cronologia-delirante.vercel.app/termos';
+
 /** Rótulo da marca de um provedor. */
 export function providerLabel(id: BackupProviderId): string {
   return PROVIDER_LABELS[id];

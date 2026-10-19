@@ -18,6 +18,12 @@ neste build. Só provedores operantes aparecem no seletor. A escolha do usuário
 separadas do cofre (`dropbox.tokens` e `google-drive.tokens`). Trocar de destino
 não desconecta o outro.
 
+O botão **Conectar** segue o destino escolhido: `drive:auth` autoriza
+`currentProvider()`, e cada sessão recusa fora do destino ativo — a gravação do
+token usa a vaga do destino ativo (`persistState`), então uma sessão autorizada
+por engano acabaria no segredo do outro serviço. É o que o teste
+`drive:auth conecta o destino escolhido, não o Dropbox fixo` segura.
+
 ## Google Drive
 
 O adaptador usa Drive API v3 exclusivamente com o escopo `drive.appdata`, além
@@ -50,6 +56,8 @@ Console conforme as regras vigentes do Google.
 
 - OAuth Authorization Code com PKCE S256, servidor loopback em porta efêmera,
   `access_type=offline` e `prompt=consent`.
+- Consentimento aprovado abre a página de termos do projeto numa aba nova
+  (`TERMS_URL`, em `drive/constants.ts`); a aba do callback é a do `localhost`.
 - Tokens armazenados apenas no cofre, separados por provedor; o access token é
   renovado perto da expiração e após um 401, com uma única repetição da chamada.
 - Listagem percorre `nextPageToken` até o fim e valida a resposta fail-closed.

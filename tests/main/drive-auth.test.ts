@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DriveStatus } from '@zero/types';
 import { authorize, disconnect, getStatus, initDrive, onStatus } from '@zero/main/drive';
 import { DROPBOX_SCOPE_VERSION } from '@zero/main/drive/providers/dropbox/constants';
+import { dropboxProvider } from '@zero/main/drive/providers/dropbox/provider';
 import { currentMessages } from '@zero/main/i18n';
+import { TERMS_URL } from '@zero/main/drive/constants';
 import { setError, toMessage } from '@zero/main/drive/state';
 import { saveSettings } from '@zero/main/settings';
 import { lockVault, setSecret, unlockVault } from '@zero/main/vault';
@@ -104,6 +106,30 @@ describe('authorize', { timeout: 60_000 }, () => {
     expect(shell.openExternal).not.toHaveBeenCalled();
   });
 
+  it('o adaptador do Dropbox recusa fora do destino escolhido, sem abrir o navegador', async () => {
+    // Com o Google Drive escolhido, a sessão do Dropbox não pode abrir a tela de
+    // login dele: `persistState` grava na vaga do destino **ativo**, então o token
+    // do Dropbox acabaria no lugar do Drive. (Quem chama a sessão do Dropbox
+    // direto é o adaptador; o `drive:auth` da tela nem chega aqui, porque
+    // `authorize` segue o destino escolhido.)
+    saveSettings({
+      driveClientId: APP_KEY,
+      drivePassphrase: 'frase',
+      backupProvider: 'google-drive',
+      language: 'pt-BR',
+    });
+    initDrive();
+
+    const result = await dropboxProvider.authorize();
+
+    expect(result).toEqual({
+      ok: false,
+      error: currentMessages().driveErrors.providerNotSelected('Dropbox'),
+    });
+    expect(getStatus().lastError).toBe(result.error);
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
   it('abre o OAuth com PKCE, offline e redirect fixo', async () => {
     saveSettings({
       driveClientId: APP_KEY,
@@ -146,7 +172,9 @@ describe('authorize', { timeout: 60_000 }, () => {
     expect(status.connected).toBe(true);
     expect(status.accountEmail).toBe('leitor@example.com');
     expect(status.lastError).toBeNull();
-    expect(shell.openExternal).toHaveBeenCalledTimes(1);
+    // Duas abas depois da aprovação: o consentimento e os termos de uso.
+    expect(shell.openExternal).toHaveBeenCalledTimes(2);
+    expect(shell.openExternal.mock.calls.at(-1)?.[0]).toBe(TERMS_URL);
   });
 
   it('propaga o erro quando o usuário recusa a autorização', async () => {

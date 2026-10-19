@@ -220,7 +220,7 @@ export const ja: Messages = {
       'あなたの寄付がアプリ（と忍耐）を継続させます。',
     text3:
       '正直なところ、このプロジェクトは私自身の読書管理のための個人的なものです。' +
-      'あなたも筋金入りのオタクなら、好きなプラットフォームが突然消えて、' +
+      'あなたも強迫的なオタクなら、好きなプラットフォームが突然消えて、' +
       '読みかけの物語の進捗を全部失う怖さがわかるはずです。',
     text4:
       'それでも万が一このプロジェクトに寄付が集まるなら、より完全なものになるよう ' +
@@ -269,6 +269,8 @@ export const ja: Messages = {
     invalidManifest: 'バックアップのマニフェストが無効です。',
     syncInProgress: '同期がすでに進行中です。',
     connectFirst: (provider: string): string => `先に ${provider} アカウントを接続してください。`,
+    providerNotSelected: (provider: string): string =>
+      `${provider} はバックアップ先として選択されていません。選択中のバックアップ先を接続してください。`,
     emptyLibrary:
       'バックアップ対象のローカルライブラリがありません。少なくとも 1 件追加してください。',
     noBackupFound: (provider: string): string =>

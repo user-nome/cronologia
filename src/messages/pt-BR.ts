@@ -225,7 +225,7 @@ export const ptBR = {
       'aceitar gente nova. Sua doação ajuda a manter o app (e a minha paciência) no ar.',
     text3:
       'A verdade é que esse projeto é pessoal, para eu acompanhar minhas leituras. Porque ' +
-      'você, um otaku inveterado como eu, sabe o que é ver sua plataforma favorita ir ' +
+      'você, um otaku compulsivo como eu, sabe o que é ver sua plataforma favorita ir ' +
       'de Vasco e perder todo o progresso das suas leituras.',
     text4:
       'Mas se por algum milagre esse projeto vier a receber doações, vou fazer o meu melhor ' +
@@ -274,6 +274,8 @@ export const ptBR = {
     invalidManifest: 'Manifesto do backup inválido.',
     syncInProgress: 'Sincronização já em andamento.',
     connectFirst: (provider: string): string => `Conecte a conta ${provider} primeiro.`,
+    providerNotSelected: (provider: string): string =>
+      `${provider} não está escolhido como destino do backup. Conecte o destino selecionado.`,
     emptyLibrary: 'Nenhuma biblioteca local para backup. Adicione ao menos uma obra.',
     noBackupFound: (provider: string): string =>
       `Nenhum backup encontrado na pasta do app no ${provider}.`,

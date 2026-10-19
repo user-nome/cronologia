@@ -4,6 +4,7 @@ import type { RequestListener, Server } from 'http';
 import type { OAuthFlow } from '@zero/main/drive/oauth-flow';
 import { requestAuthorizationCode } from '@zero/main/drive/oauth-flow';
 import { currentMessages } from '@zero/main/i18n';
+import { TERMS_URL } from '@zero/main/drive/constants';
 import { shell } from '../mocks/electron.ts';
 import { resetDrive } from '../helpers/drive.ts';
 
@@ -19,6 +20,10 @@ import { resetDrive } from '../helpers/drive.ts';
  * - um `address()` que não seja um objeto (pipe de socket) não vira
  *   `localhost:undefined` na URI de redirecionamento, que o provedor recusaria
  *   sem explicar por quê.
+ *
+ * E uma quarta, que é comportamento visível: os termos de uso só abrem depois
+ * de um consentimento **aprovado** (nunca numa recusa ou num callback de outra
+ * origem).
  *
  * As três se provam pelo mesmo caminho: o teste **dirige** o handler do
  * callback, que é a parte que o navegador exercise de verdade.
@@ -217,7 +222,9 @@ describe('o temporizador do timeout não sobrevive ao fim do fluxo', () => {
 
       // Sem o `clearTimeout`, cada conexão deixaria um timer de 5 s segurando
       // o processo do Electron depois de a janela já ter fechado o navegador.
-      expect(shell.openExternal).toHaveBeenCalledTimes(1);
+      // São duas abas: o consentimento e, depois dele, os termos.
+      expect(shell.openExternal).toHaveBeenCalledTimes(2);
+      expect(shell.openExternal.mock.calls.at(-1)?.[0]).toBe(TERMS_URL);
     } finally {
       capturado.encerrar();
     }
@@ -233,6 +240,63 @@ describe('o temporizador do timeout não sobrevive ao fim do fluxo', () => {
 
       // Recusa é o mesmo fim de fluxo: o timer não pode ficar pendurado.
       await expect(pendente).rejects.toThrow(currentMessages().driveErrors.csrfRejected);
+    } finally {
+      capturado.encerrar();
+    }
+  });
+});
+
+describe('os termos de uso abrem só depois do consentimento aprovado', () => {
+  it('abre a página de termos quando o callback devolve o código', async () => {
+    const capturado = capturarCreateServer();
+    try {
+      const pendente = requestAuthorizationCode(FLOW, 'client-id');
+      const auth = await urlAberta();
+      // A aba do callback é a do `localhost`: é o app que leva a pessoa ao texto.
+      expect(auth.searchParams.get('redirect_uri')).toMatch(/^http:\/\/localhost:\d+\/callback$/u);
+
+      chamarHandler(
+        capturado.handler(),
+        `/callback?code=codigo&state=${auth.searchParams.get('state') ?? ''}`,
+      );
+      await expect(pendente).resolves.toMatchObject({ code: 'codigo' });
+
+      expect(shell.openExternal).toHaveBeenCalledWith(TERMS_URL);
+    } finally {
+      capturado.encerrar();
+    }
+  });
+
+  it('não abre quando o consentimento vem recusado', async () => {
+    const capturado = capturarCreateServer();
+    try {
+      const pendente = requestAuthorizationCode(FLOW, 'client-id');
+      const auth = await urlAberta();
+
+      chamarHandler(
+        capturado.handler(),
+        `/callback?error=access_denied&state=${auth.searchParams.get('state') ?? ''}`,
+      );
+
+      await expect(pendente).rejects.toThrow('access_denied');
+      // Só o consentimento foi aberto: nada de mandar a pessoa ler os termos de
+      // uma autorização que ela não deu.
+      expect(shell.openExternal).toHaveBeenCalledTimes(1);
+    } finally {
+      capturado.encerrar();
+    }
+  });
+
+  it('não abre quando o callback traz state de outra origem', async () => {
+    const capturado = capturarCreateServer();
+    try {
+      const pendente = requestAuthorizationCode(FLOW, 'client-id');
+      await urlAberta();
+
+      chamarHandler(capturado.handler(), '/callback?code=codigo&state=outra-origem');
+
+      await expect(pendente).rejects.toThrow(currentMessages().driveErrors.csrfRejected);
+      expect(shell.openExternal).toHaveBeenCalledTimes(1);
     } finally {
       capturado.encerrar();
     }

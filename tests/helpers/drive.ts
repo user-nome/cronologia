@@ -2,6 +2,7 @@ import http from 'http';
 import path from 'path';
 import { vi } from 'vitest';
 import { authorize, initDrive } from '@zero/main/drive';
+import { switchProvider } from '@zero/main/drive/state';
 import { saveSettings } from '@zero/main/settings';
 import { shell } from '../mocks/electron.ts';
 import { resetSandbox, sandboxPath } from './sandbox.ts';
@@ -259,6 +260,20 @@ export async function resetDrive(): Promise<void> {
   vi.clearAllMocks();
   await openTestVault();
   initDrive();
+}
+
+/**
+ * Sandbox novo **com o Google Drive já escolhido como destino**.
+ *
+ * A escolha vem depois do `resetDrive` de propósito: o reset relê
+ * `settings.json` (sandbox novo ⇒ Dropbox), então escolher o destino antes dele
+ * seria desfeito. É a ordem real da tela, e é o que a sessão do Google exige
+ * para existir — `googleAuthorize` recusa fora do destino escolhido.
+ */
+export async function resetDriveComGoogle(): Promise<void> {
+  await resetDrive();
+  const trocou = switchProvider('google-drive');
+  if (!trocou.ok) throw new Error(`Falha ao escolher o destino: ${trocou.error ?? 'desconhecida'}`);
 }
 
 /** Faz o fluxo OAuth real do módulo completar contra o callback local. */
