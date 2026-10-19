@@ -28,12 +28,22 @@ name: Qualidade
 # request nem em push. Reprova abaixo do piso (ajustável pelo disparo manual),
 # então a queda real aparece como build vermelho sem virar trava de branch.
 #
-# `ubuntu-latest` em todos os jobs, como no `publish.yml`: a escolha de imagem é
-# do repositório e vale igual para o `.deb` que o usuário instala e para os
-# testes que o verificam.
+# Imagem fixada em `ubuntu-24.04` em todos os jobs, como no `publish.yml`. Não é
+# preciosismo: `ubuntu-latest` é etiqueta móvel e o GitHub está migrando o
+# `latest` do Ubuntu 24.04 para o 26.04 entre outubro e novembro de 2026
+# (actions/runner-images#14748). O job de E2E instala dependências pelo nome do
+# pacote (`libgtk-3-0t64`, `libasound2t64`, `libatk1.0-0t64`, `fakeroot`) e
+# instala o `.deb` de verdade, então trocar de imagem no meio quebraria o gate
+# sem que ninguém tivesse tocado em nada. A escolha de imagem é do repositório e
+# vale igual para o `.deb` que o usuário instala e para os testes que o
+# verificam; subir para a 26.04 é decisão consciente, e não efeito colateral de
+# uma etiqueta.
 #
 # Actions fixadas por SHA completo (com a tag na comentário) para não depender
-# de segurança da tag movível; o Dependabot (`github-actions`) atualiza os pins.
+# de segurança da tag movível; o Dependabot (`github-actions`) atualiza os
+# pins. Todas declararam `using: node24`: o Node 20 foi descontinuado e saiu
+# dos runners em 23/09/2026, então action em Node 20 não roda mais — o runner a
+# força para Node 24 e avisa a cada execução.
 
 on:
   push:
@@ -65,9 +75,9 @@ concurrency:
 jobs:
   qualidade:
     name: Verificar qualidade
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -94,9 +104,9 @@ jobs:
 
   cobertura:
     name: Testes e cobertura
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -150,10 +160,10 @@ jobs:
     # nem no "Testes e cobertura" (jsdom): é o único job que junta bundle
     # compilado, `cronologia://`, IPC real, Argon2id real e React montado. Roda
     # em push e pull request porque é o que pega a quebra de integração.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -210,7 +220,7 @@ jobs:
     # Job pulado aparece como *Skipped* na aba de checks, o que é o esperado
     # aqui: não é status check obrigatório.
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Grupo próprio, e não o do workflow: lá, todo push cancela a execução
     # anterior, o que mataria uma varredura de horas no meio sem que ninguém
     # tenha tocado em nada.
@@ -223,7 +233,7 @@ jobs:
     # não morrer exatamente na borda.
     timeout-minutes: 330
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:

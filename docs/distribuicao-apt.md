@@ -147,14 +147,35 @@ Biblioteca:
 | Secret            | Conteúdo                                                                                                                            |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `GPG_PRIVATE_KEY` | Bloco armoured completo da chave, **com** as linhas `-----BEGIN PGP PRIVATE KEY BLOCK-----` e `-----END PGP PRIVATE KEY BLOCK-----` |
-| `GPG_PASSPHRASE`  | Senha da chave privada exportada (a chave usada tem senha)                                                                          |
+| `GPG_PASSPHRASE`  | Frase da chave privada exportada; só é necessária se a chave tiver frase                                                            |
+
+A chave de assinatura é a impressão digital `GPG_FINGERPRINT`, declarada no
+topo de `.github/workflows/publish.yml` (no `env:` do workflow, junto do
+`VERCEL_DEPLOY_HOOK_URL`). Ela é a fonte única: ao renovar a chave, troque o
+valor **e** os dois secrets, porque o passo confere a impressão digital já no
+import e usa `--local-user` nas três operações — inclusive no
+`gpg --armor --export "$GPG_FINGERPRINT" > public.key`, que sem o argumento
+despejaria o keyring inteiro no arquivo.
 
 Se algo faltar, esse passo do workflow falha com diagnóstico explícito
-(`::error::` legível na página da execução): bloco que não importa, bloco sem
-chave secreta utilizável, passphrase errada ou secret ausente. O key ID **não**
-é fixo no workflow: ele é lido do keyring depois do import e sai no log como
-`Chave de assinatura: <ID>`, então trocar de chave GPG não exige editar
-`.github/workflows/publish.yml`.
+(`::error::` legível na página da execução). O caso que mais confunde é o
+**"Bad passphrase"**: o gpg responde exatamente isso em três situações sem
+relação entre si (frase errada, chave protegida com o comando sem frase, e
+chave **sem** proteção com frase qualquer no comando). Por isso o passo não
+confia na mensagem: ele tenta assinar **com** a frase e, se falhar, tenta
+**sem** ela, e quem diz a causa é o par de resultados —
+
+| Com a frase | Sem a frase | O que o passo aponta                                         |
+| ----------- | ----------- | ------------------------------------------------------------ |
+| assina      | —           | segue, com a frase                                           |
+| falha       | assina      | a chave não tem frase; `GPG_PASSPHRASE` foi ignorado         |
+| falha       | falha       | secret ausente, ou frase errada (ou com espaço/ENTER no fim) |
+
+No último caso o log traz o comprimento e o `sha256` (16 caracteres) de cada
+secret recebido, para comparar com os arquivos locais — o `sha256` da string
+vazia (`e3b0c44298fc1c14…`) quer dizer secret cadastrado vazio. A frase nunca
+aparece no log nem no `argv`: entra por `--passphrase-file` num arquivo
+temporário com `600`, apagado com `shred` inclusive quando o passo falha.
 
 ### 5. Validação local sem sudo
 

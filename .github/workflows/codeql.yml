@@ -5,7 +5,14 @@ name: CodeQL
 # Ressalva: code scanning é gratuito em repositório público; em privado
 # exige GitHub Advanced Security.
 # Actions fixadas por SHA completo (com a tag na comentário); o Dependabot
-# (`github-actions`) atualiza os pins.
+# (`github-actions`) atualiza os pins. Todas em Node 24 (`using: node24`), o
+# runtime que sobrou nos runners depois da descontinuação do Node 20
+# (23/09/2026).
+#
+# Imagem fixada em `ubuntu-24.04`, como nos outros workflows: `ubuntu-latest`
+# migra do Ubuntu 24.04 para o 26.04 entre outubro e novembro de 2026
+# (actions/runner-images#14748) e a análise estática não deve depender do dia em
+# que o label virou.
 on:
   push:
     branches: [main]
@@ -20,13 +27,13 @@ permissions:
 jobs:
   analyze:
     name: Analisar (javascript-typescript)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       security-events: write
       actions: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:

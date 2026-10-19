@@ -112,6 +112,41 @@ error?: string }` aparecia em **cinco** arquivos como retorno de
 
 ### Mudado (CI)
 
+- **Os workflows não dependem mais do `ubuntu-latest`.** Os quatro passaram a
+  `ubuntu-24.04` fixado: em outubro de 2026 o `latest` do GitHub começa a
+  apontar para o Ubuntu 26.04 (actions/runner-images#14748), e o job de E2E
+  instala dependências pelo nome do pacote Ubuntu (`libgtk-3-0t64`,
+  `libatk1.0-0t64`, `fakeroot`) e instala o `.deb` de verdade. Trocar de imagem
+  no meio mudaria o ambiente de build sem decisão nenhuma. Como sair do 24.04
+  está em `docs/build.md`.
+- **`actions/checkout` foi do v4 para o v7** nos quatro workflows. O v4
+  declara `using: node20`, e o Node 20 saiu dos runners em 23/09/2026: o runner
+  passa a forçar Node 24 e a avisar a cada execução. As outras actions
+  (`setup-node`, `upload-artifact`, `codeql-action`, `github-script`,
+  `action-gh-release`) já estavam em Node 24.
+- **A assinatura do repo APT confere a impressão digital da chave.**
+  `GPG_FINGERPRINT` (`env:` do `publish.yml`) é a fonte única, usada no import,
+  no `--local-user` das duas assinaturas e no `gpg --armor --export
+"$GPG_FINGERPRINT" > public.key` — que, sem o argumento, despejava o keyring
+  inteiro no arquivo. Antes o key ID era derivado do keyring a cada run, então
+  um secret novo combinado com o valor antigo passava em silêncio.
+- **O "Bad passphrase" do gpg deixou de ser um beco sem saída.** O gpg responde
+  exatamente isso em três casos sem relação entre si (frase errada, chave
+  protegida com o comando sem frase, e chave **sem** proteção com frase
+  qualquer), então a mensagem não diagnosticava nada e o passo só dizia
+  "GPG_PASSPHRASE incorreto (ou secret ausente)". Agora ele tenta assinar **com**
+  a frase e, se falhar, **sem** ela: o par de resultados separa secret ausente,
+  frase errada (com aviso próprio para espaço/ENTER no fim) e chave sem frase.
+  Na falha saem também o comprimento e o `sha256` de cada secret recebido, para
+  comparar com os arquivos locais.
+- **A frase da chave sai do `argv` do processo.** Entrou por
+  `--passphrase-file` num temporário com `600`, apagado com `shred` inclusive
+  quando o passo falha; com `--passphrase`, ela ficava legível no `ps` do
+  runner durante a assinatura.
+- **Novo passo "Conferir que as credenciais entraram no bundle do main"**: depois
+  de empacotar, ele abre o `.deb`, extrai o `app.asar` e confirma que a App key
+  está dentro do artefato. É o teste que pega nome de variável errado, empacotar
+  antes de compilar e `afterPack` apagando o `out/`.
 - **As chaves OAuth do `.deb` saem de Secrets **e** Variables.** O
   `publish.yml` lê `secrets.*` e `vars.*` com o mesmo nome
   (`DROPBOX_APP_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`; o secret
@@ -119,10 +154,6 @@ error?: string }` aparecia em **cinco** arquivos como retorno de
   identificadores públicos, não segredos de servidor, e **Variables** é o lugar
   semântico certo. Os valores continuam indo só no `env:` do passo de build, sem
   arquivo `.env` no runner e sem literal no repositório.
-- **Novo passo "Conferir que as credenciais entraram no bundle do main"**: depois
-  de empacotar, ele abre o `.deb`, extrai o `app.asar` e confirma que a App key
-  está dentro do artefato. É o teste que pega nome de variável errado, empacotar
-  antes de compilar e `afterPack` apagando o `out/`.
 
 ### Mudado
 

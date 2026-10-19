@@ -240,6 +240,28 @@ Release criada na UI, que o `quality.yml` não vê.
 Detalhe dos fluxos E2E e da varredura: [`e2e.md`](e2e.md) e
 [`mutation.md`](mutation.md).
 
+## Imagem do runner e runtime das actions
+
+Os quatro workflows rodam em `ubuntu-24.04` **fixado**, nunca em
+`ubuntu-latest`. O `latest` é etiqueta móvel: em outubro de 2026 o GitHub
+começou a apontá-lo para o Ubuntu 26.04
+([actions/runner-images#14748](https://github.com/actions/runner-images/issues/14748)),
+e a troca sozinha mudaria o ambiente de build — o `.deb` que o usuário instala
+e os testes que o verificam — sem nenhuma decisão nossa. O job de E2E é o mais
+sensível: ele instala dependências de janela pelo nome do pacote Ubuntu
+(`libgtk-3-0t64`, `libatk1.0-0t64`, `libasound2t64`, `fakeroot`) e instala o
+`.deb` de verdade, então um nome de pacote que mudou derrubaria o gate sem que
+ninguém tivesse tocado em nada.
+
+Para sair do 24.04: troque para `ubuntu-26.04` nos quatro arquivos, suba um job
+que só instala as dependências do E2E, e só depois mova os outros. Subir sem
+esse teste é trocar um `.deb` validado por um `.deb` não validado.
+
+Todas as actions estão fixadas por SHA **e** em Node 24 (`using: node24`): o
+Node 20 foi descontinuado e saiu dos runners em 23/09/2026, então uma action em
+Node 20 não roda mais — o runner a força para Node 24 e avisa a cada execução.
+O Dependabot (`github-actions`) atualiza os pins.
+
 ## Fluxo do `publish.yml`
 
 ```mermaid
@@ -269,14 +291,15 @@ apareceria na máquina de quem instalou.
 Onde cadastrar, em **Settings → Secrets and variables → Actions** (escopo
 _Repository_):
 
-| Variável                 | Aba        | Obrigatória                                  |
-| ------------------------ | ---------- | -------------------------------------------- |
-| `DROPBOX_APP_KEY`        | Variables¹ | Sim: sem ela o Dropbox sai desabilitado      |
-| `GOOGLE_CLIENT_ID`       | Variables¹ | Sim: sem ela o Google Drive sai desabilitado |
-| `GOOGLE_CLIENT_SECRET`   | Variables¹ | Não: o cliente Desktop funciona só com o ID  |
-| `GPG_PRIVATE_KEY`        | Secrets    | Sim: assina o repo APT                       |
-| `GPG_PASSPHRASE`         | Secrets    | Só se a chave PGP tiver senha                |
-| `VERCEL_DEPLOY_HOOK_URL` | Secrets    | Não: sem hook a Release funciona igual       |
+| Variável                 | Aba         | Obrigatória                                                                                                |
+| ------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------- |
+| `DROPBOX_APP_KEY`        | Variables¹  | Sim: sem ela o Dropbox sai desabilitado                                                                    |
+| `GOOGLE_CLIENT_ID`       | Variables¹  | Sim: sem ela o Google Drive sai desabilitado                                                               |
+| `GOOGLE_CLIENT_SECRET`   | Variables¹  | Não: o cliente Desktop funciona só com o ID                                                                |
+| `GPG_PRIVATE_KEY`        | Secrets     | Sim: assina o repo APT                                                                                     |
+| `GPG_FINGERPRINT`        | no workflow | Não é secret: impressão digital da chave, no `env:` do `publish.yml`; confere o que `GPG_PRIVATE_KEY` traz |
+| `GPG_PASSPHRASE`         | Secrets     | Só se a chave PGP tiver senha                                                                              |
+| `VERCEL_DEPLOY_HOOK_URL` | Secrets     | Não: sem hook a Release funciona igual                                                                     |
 
 ¹ O workflow lê `secrets.*` **e** `vars.*` com o mesmo nome, e o secret vence se
 os dois existirem. `Variables` é o lugar certo para as três chaves OAuth porque

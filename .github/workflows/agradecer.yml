@@ -4,6 +4,11 @@ name: Agradecer contribuições
 # Usa pull_request_target porque PRs de fork só têm token de leitura no
 # evento pull_request; como não há checkout nem execução de código do fork,
 # só a chamada de API, é seguro.
+# Imagem fixada em `ubuntu-24.04`, como nos outros workflows: `ubuntu-latest`
+# migra do Ubuntu 24.04 para o 26.04 entre outubro e novembro de 2026
+# (actions/runner-images#14748). O `actions/github-script` usado abaixo já roda
+# em Node 24 (`using: node24`), o runtime que sobrou nos runners depois da
+# descontinuação do Node 20 (23/09/2026).
 on:
   pull_request_target:
     types: [closed]
@@ -17,7 +22,7 @@ jobs:
     if: >-
       github.event.pull_request.merged == true &&
       github.event.pull_request.user.type != 'Bot'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Comentar agradecimento
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
