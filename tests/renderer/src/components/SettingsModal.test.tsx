@@ -156,6 +156,27 @@ describe('SettingsModal: carregamento', () => {
     expect(screen.queryByRole('button', { name: /Conectar ao Dropbox/ })).toBeNull();
   });
 
+  it('mudar o idioma pelo seletor atualiza o estado interno', async () => {
+    setup();
+    await screen.findByText('Desconectado');
+    await userEvent.click(screen.getByRole('button', { name: 'Português (Brasil)' }));
+    await userEvent.click(await screen.findByRole('option', { name: /English/ }));
+    // O estado interno de settings.language deve ter mudado para 'en'
+    expect(screen.getByRole('button', { name: /English/ })).toBeInTheDocument();
+  });
+
+  it('mudar o provedor pelo seletor chama switchProvider', async () => {
+    const { mock } = setup({ providers: AMBOS_OPERANTES });
+    await screen.findByText('Provedores de backup');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dropbox' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Google Drive' }));
+
+    await waitFor(() => {
+      expect(mock.driveSetProvider).toHaveBeenCalledWith('google-drive');
+    });
+  });
+
   it('conectar depois de trocar manda o provedor escolhido para o main', async () => {
     // O `drive.auth` do main autoriza o provedor **ativo**, e ele só muda se o
     // `setProvider` tiver sido aplicado. Trocar o rótulo do botão sem trocar o
@@ -188,6 +209,39 @@ describe('SettingsModal: carregamento', () => {
     expect(screen.getByText(m.settings.noOperationalProvider)).toBeInTheDocument();
     // E o motivo de cada provedor continua na lista, com o texto do main.
     expect(screen.getByText(m.providers.googleNoCredentials)).toBeInTheDocument();
+  });
+
+  it('troca recusada pelo main avisa e não troca o rótulo na tela', async () => {
+    // O `setProvider` devolve `ok: false` quando o destino não pode ser salvo
+    // (cofre trancando no meio, por exemplo). A tela não pode fingir que trocou:
+    // se ela mudasse o rótulo, o próximo `Conectar` pediria consentimento da
+    // conta errada, porque o `auth` segue o provedor **ativo** do main.
+    const { mock, notify } = setup({ providers: AMBOS_OPERANTES });
+    await screen.findByText('Provedores de backup');
+    mock.driveSetProvider.mockResolvedValueOnce({ ok: false, error: 'cofre trancado' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dropbox' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Google Drive' }));
+
+    await waitFor(() => expect(notify).toHaveBeenCalled());
+    expect(notify).toHaveBeenCalledWith('cofre trancado', 'error');
+    // O rótulo do gatilho continua no provedor que o main realmente tem.
+    expect(screen.getByRole('button', { name: 'Dropbox' })).toBeInTheDocument();
+  });
+
+  it('troca recusada sem motivo no resultado usa a mensagem padrão', async () => {
+    // `setProvider` pode devolver `ok: false` sem `error`; a tela não pode
+    // mostrar `undefined` como se fosse a explicação da falha.
+    const { mock, notify } = setup({ providers: AMBOS_OPERANTES });
+    await screen.findByText('Provedores de backup');
+    mock.driveSetProvider.mockResolvedValueOnce({ ok: false });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dropbox' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Google Drive' }));
+
+    await waitFor(() =>
+      expect(notify).toHaveBeenCalledWith(m.settings.providerSwitchFailed, 'error'),
+    );
   });
 
   it('mostra o estado vazio quando não há conexão nem backup', async () => {
@@ -247,6 +301,70 @@ describe('SettingsModal: carregamento', () => {
     expect(mock.driveOnStatus).toHaveBeenCalledTimes(1);
     view.unmount();
     expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SettingsModal: run error handling branches', () => {
+  it('trata erro que não é Error instance (string)', async () => {
+    const { mock } = setup({ status: CONNECTED });
+    mock.driveBackup.mockRejectedValueOnce('token revogado');
+    await screen.findByText('Conectado');
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /Fazer backup agora/ }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Fazer backup agora/ })).toBeEnabled(),
+    );
+  });
+
+  it('trata erro genérico sem prefixo IPC', async () => {
+    const { mock } = setup({ status: CONNECTED });
+    mock.driveBackup.mockRejectedValueOnce(new Error('chave da API ausente'));
+    await screen.findByText('Conectado');
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /Fazer backup agora/ }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Fazer backup agora/ })).toBeEnabled(),
+    );
+  });
+
+  it('garante que setBusy é chamado no finally mesmo com erro', async () => {
+    const { mock } = setup({ status: CONNECTED });
+    mock.driveBackup.mockRejectedValueOnce(new Error('falha de rede'));
+    await screen.findByText('Conectado');
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /Fazer backup agora/ }));
+    // O botão deve voltar a ficar habilitado (o finally liberou o busy)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Fazer backup agora/ })).toBeEnabled(),
+    );
+  });
+});
+
+describe('SettingsModal: restore recarrega a página', () => {
+  it('chama window.location.reload após restauração bem-sucedida', async () => {
+    const { mock, notify } = setup({ status: CONNECTED, backupInfo: SUMMARY });
+    mock.driveRestore.mockResolvedValueOnce({ ok: true, works: 7 });
+    await screen.findByText('Conectado');
+
+    const reload = vi.fn();
+    let spied = false;
+    try {
+      vi.spyOn(window.location, 'reload').mockImplementation(reload);
+      spied = true;
+    } catch {
+      // jsdom pode bloquear o spy
+    }
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Restaurar$/ }));
+    const dialog = await screen.findByText('Senha do backup');
+    const modal = dialog.closest<HTMLElement>('.modal');
+    if (modal === null) throw new Error('Modal de senha do backup ausente.');
+    await user.type(within(modal).getByPlaceholderText('Senha usada no backup'), 'frase-secreta');
+    await user.click(within(modal).getByRole('button', { name: /^Restaurar$/ }));
+
+    await waitFor(() => expect(notify).toHaveBeenCalledWith('Backup restaurado com 7 obra(s).'));
+    if (spied) expect(reload).toHaveBeenCalledTimes(1);
   });
 });
 

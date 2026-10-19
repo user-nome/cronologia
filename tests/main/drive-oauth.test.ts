@@ -25,6 +25,9 @@ import {
   stubFetch,
 } from '../helpers/drive.ts';
 import { shell } from '../mocks/electron.ts';
+import { httpError } from '@zero/main/drive/oauth-flow';
+import type { OAuthFlow } from '@zero/main/drive/oauth-flow';
+import { googleFlow } from '@zero/main/drive/providers/google/oauth';
 
 vi.mock('@zero/main/drive/providers/dropbox/constants', async (importOriginal) => {
   const actual =
@@ -555,5 +558,40 @@ describe('renovação e leitura do token', () => {
     expect(await accessToken()).toBe('token-renovado');
     expect(chamadas).toHaveLength(1);
     expect(chamadas[0]?.url).toBe(TOKEN_ENDPOINT);
+  });
+});
+
+/**
+ * `OAuthFlow` mínimo do Dropbox, montado à mão.
+ *
+ * O fluxo real (`providers/dropbox/oauth.ts`) carrega timeout, porta fixa e
+ * parâmetros de token; aqui só interessa um objeto que satisfaça o contrato,
+ * porque o que se testa é a formatação da mensagem, que depende **apenas** do
+ * `id` que o provedor traz.
+ */
+const dropboxFlow: OAuthFlow = {
+  id: 'dropbox',
+  authorizeEndpoint: 'https://www.dropbox.com/oauth2/authorize',
+  tokenEndpoint: 'https://api.dropboxapi.com/oauth2/token',
+  scopes: 'files.content.read',
+  timeoutMs: 1_000,
+  loopbackPath: '/callback',
+  renewError: () => 'falhou',
+  accountEmail: () => Promise.resolve(null),
+};
+
+describe('httpError: a mensagem nomeia o provedor que falhou', () => {
+  it('formata erro com nome do provedor', () => {
+    const error = httpError(dropboxFlow, 401, 'Unauthorized');
+    expect(error.message).toContain('Dropbox');
+    expect(error.message).toContain('401');
+    expect(error.message).toContain('Unauthorized');
+  });
+
+  it('formata erro para Google Drive', () => {
+    const error = httpError(googleFlow, 403, 'Forbidden');
+    expect(error.message).toContain('Google Drive');
+    expect(error.message).toContain('403');
+    expect(error.message).toContain('Forbidden');
   });
 });

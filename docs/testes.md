@@ -12,10 +12,16 @@ Três camadas, com três SIGNais diferentes. Esta doc é da primeira:
 
 Suíte em Vitest com ambiente `jsdom` único (`vitest.config.mts`): o renderer e
 também o processo main rodam em `jsdom`, com o `electron` trocado pelo stub de
-`tests/mocks/electron.ts`. São **52 arquivos** e **780 testes**; a duração gira
-em torno de 2 minutos porque os testes de backup cifram de verdade com scrypt
+`tests/mocks/electron.ts`. São **69 arquivos** e **1.087 testes**; a duração gira
+em torno de 3 minutos porque os testes de backup cifram de verdade com scrypt
 `N=2^17` (~128 MiB por derivação), enquanto o Argon2id do cofre roda com o KDF
 barato dos testes (16 MiB).
+
+> **Rodando em máquina com pouca memória:** a suíte padrão abre um `jsdom` por
+> arquivo de teste. Com os 8 núcleos dela em paralelo, o consumo chega a zerar a
+> memória disponível e o processo morre no meio sem mensagem. Passe
+> `--maxWorkers=4` (`npx vitest run --maxWorkers=4`) para reduzir o pico; o
+> resultado é o mesmo, só mais lento.
 
 ## Como rodar
 
@@ -36,48 +42,52 @@ São sob demanda (ver os guias linkados no topo).
 
 ### Processo main
 
-| Arquivo                                    | O que cobre                                                                                                                                                 |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/main/index.test.ts`                 | Boot (instância única, protocolos, IPC), handlers, `cover://`, ciclo da janela, F11 e diretórios XDG                                                        |
-| `tests/main/index.dev.test.ts`             | Modo desenvolvimento (Vite dev server, ausência em produção)                                                                                                |
-| `tests/main/index-startup.test.ts`         | Arranque resiliente: falha de disco em `initDrive` não impede a janela nem o registro de IPC                                                                |
-| `tests/main/index-vault.test.ts`           | Canais `vault:*` (criar/desbloquear/trava/destruir), guarda `assertAppFrame` e auto-lock (`vault:locked`)                                                   |
-| `tests/main/protocols.test.ts`             | Scheme `cronologia://`: tabela de MIME por extensão, 403 em traversal percent-encoded, 404 e 500, e `appPageUrl` como base única                            |
-| `tests/main/ipc-origem.test.ts`            | Guarda de origem do IPC: frames recusados, origem com porta diferente, dev server e a recusa no idioma em uso                                               |
-| `tests/main/node-loader.test.ts`           | Loader de aliases `@zero/*` rodando o Node de verdade em processo filho                                                                                     |
-| `tests/main/external.test.ts`              | `openExternalSafe`: só `https`, esquema em qualquer caixa, URL malformada e recusa do shell                                                                 |
-| `tests/main/cleanup.test.ts`               | Varredura de legado no boot: o que é sobrescrito, o que é contado como falha e o log sem caminho do home                                                    |
-| `tests/main/store-crypto.test.ts`          | Formato `CLIB1`: roundtrip, assinatura, tamanho, separação de domínio e recusa sem cofre aberto                                                             |
-| `tests/main/shred.test.ts`                 | sobrescrita segura: sumiu, bytes intermediários não são o original, symlink não é seguido, pasta vazia                                                      |
-| `tests/main/destroy.test.ts`               | destruição do cofre/acervo, guarda de não ressuscitar, legados em claro, `.tmp` órfãos                                                                      |
-| `tests/main/drive-purge.test.ts`           | `purgeRemote`: apaga tudo, conta falha parcial, não age sem cofre aberto                                                                                    |
-| `tests/main/drive-rest.test.ts`            | Chamadas REST do Dropbox: paginação, validação fail-closed do corpo, renovação e repetição após 401, erro traduzido                                         |
-| `tests/main/drive-oauth.test.ts`           | PKCE sem secret, loopback (porta fixa e porta livre quando a fixa está ocupada), troca e renovação de token, escopo parcial                                 |
-| `tests/main/drive-crypto.test.ts`          | Formato `WTENC3`: cifra, manifesto com salt, recusa do formato antigo, nomes opacos, falha com senha errada                                                 |
-| `tests/main/jsonfile.test.ts`              | `writeJsonAtomic`: escrita atômica, `mode` aplicado mesmo com `.tmp` pré-existente                                                                          |
-| `tests/main/library.test.ts`               | acervo cifrado: XDG, `clampProgress`, roundtrip, capa, restauração, mime, cofre fechado, arquivo corrompido                                                 |
-| `tests/main/settings.test.ts`              | `settings.json`: idioma no disco, segredos no cofre, normalização e recusa com cofre fechado                                                                |
-| `tests/main/vault-crypto.test.ts`          | Perfis de custo do Argon2id, AES-256-GCM, HKDF, faixa do KDF e (unico arquivo sem o stand-in de KDF) a integração com `hash-wasm`                           |
-| `tests/main/vault-container.test.ts`       | Formato do `vault.zkv`: roundtrip, custo por método, offsets, lixo, truncamento, faixa e fail-closed                                                        |
-| `tests/main/vault-lockout.test.ts`         | Escala da trava (10 s até 24 h), contagem ilegível no teto e invariante de nunca destravar                                                                  |
-| `tests/main/vault-session.test.ts`         | Singleton da sessão: `adopt`/`wipe`, zeragem de bytes e repasse do auto-lock                                                                                |
-| `tests/main/vault-wrapping.test.ts`        | Estado da trava (projeção para a tela) e estratégia de embrulho da chave por credencial                                                                     |
-| `tests/main/vault-unlock.test.ts`          | Cadeia de desbloqueio: reembrulho de custo antigo, embrulho com tamanho errado, KDF que lança por dentro e separação de salt entre coframes                 |
-| `tests/main/vault.test.ts`                 | Ciclo de vida: criar (3 credenciais), abrir por PIN/mestra, frase de recuperação, trocar credencial, segredos, adulteração, pasta sem permissão, destruição |
-| `tests/shared/policy.test.ts`              | Formato aceito de cada credencial, normalização da frase (espaço sim, caixa não) e contagem regressiva                                                      |
-| `tests/shared/strength.test.ts`            | Régua de força: o que recusa (`blocked`), a nota, o motivo, o acordo entre a tela e o main e a largura da barra                                             |
-| `tests/shared/json.test.ts`                | Guarda de dado externo: o que `isRecord` aceita, o que `field` devolve para valor falsy e o que sobe pela cadeia de protótipos                              |
-| `tests/shared/work.test.ts`                | Validador de obra: campo obrigatório faltando, campo no tipo errado, obra sem os opcionais do backup antigo e lista com um elemento ruim                    |
-| `tests/main/vault-secrets.test.ts`         | Cofre é a única fonte: sem/aberto/fechado/adulterado (falha fechada), JSON de forma errada e sessão ligada à chave em memória                               |
-| `tests/main/vault-privilege.test.ts`       | `setupVaultDirectory`: override bloqueia pkexec; exit 0/126/127/throw → ok/cancelled/failed; `isVaultDirUnavailable` e `createVault` sem pkexec no sandbox  |
-| `tests/main/drive-auth.test.ts`            | Estado do Dropbox, tokens no cofre, escopo divergente e refresh                                                                                             |
-| `tests/main/drive-backup.test.ts`          | `backupNow`/`restoreNow` ponta a ponta (rede simulada, cifra real), recusa sem cofre e execução paralela                                                    |
-| `tests/main/drive-info.test.ts`            | `backupInfo`, renovação de sessão e retry após 401                                                                                                          |
-| `tests/main/drive-provider.test.ts`        | Catálogo e disponibilidade dos provedores (Google Drive condicionado à credencial)                                                                          |
-| `tests/main/google-drive.test.ts`          | OAuth e REST Google Drive: paginação, appDataFolder, upload multipart/PATCH, retry 401 e renovação                                                          |
-| `tests/main/drive-switch-provider.test.ts` | Troca de destino e preservação de sessões independentes no cofre                                                                                            |
-| `tests/main/drive-remote-names.test.ts`    | Nomes remotos opacos (HMAC-SHA256) e manifesto de cadeia                                                                                                    |
-| `tests/main/drive-restore-lock.test.ts`    | Trava exponencial da restauração (só `PassphraseError` conta) e a rampa até saturar em 15 min                                                               |
+| Arquivo                                     | O que cobre                                                                                                                                                                |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/main/index.test.ts`                  | Boot (instância única, protocolos, IPC), handlers, `cover://`, ciclo da janela, F11 e diretórios XDG                                                                       |
+| `tests/main/index.dev.test.ts`              | Modo desenvolvimento (Vite dev server, ausência em produção)                                                                                                               |
+| `tests/main/index-startup.test.ts`          | Arranque resiliente: falha de disco em `initDrive` não impede a janela nem o registro de IPC                                                                               |
+| `tests/main/index-vault.test.ts`            | Canais `vault:*` (criar/desbloquear/trava/destruir), guarda `assertAppFrame` e auto-lock (`vault:locked`)                                                                  |
+| `tests/main/protocols.test.ts`              | Scheme `cronologia://`: tabela de MIME por extensão, 403 em traversal percent-encoded, 404 e 500, e `appPageUrl` como base única                                           |
+| `tests/main/ipc-origem.test.ts`             | Guarda de origem do IPC: frames recusados, origem com porta diferente, dev server e a recusa no idioma em uso                                                              |
+| `tests/main/node-loader.test.ts`            | Loader de aliases `@zero/*` rodando o Node de verdade em processo filho                                                                                                    |
+| `tests/main/external.test.ts`               | `openExternalSafe`: só `https`, esquema em qualquer caixa, URL malformada e recusa do shell                                                                                |
+| `tests/main/cleanup.test.ts`                | Varredura de legado no boot: o que é sobrescrito, o que é contado como falha e o log sem caminho do home                                                                   |
+| `tests/main/store-crypto.test.ts`           | Formato `CLIB1`: roundtrip, assinatura, tamanho, separação de domínio e recusa sem cofre aberto                                                                            |
+| `tests/main/shred.test.ts`                  | sobrescrita segura: sumiu, bytes intermediários não são o original, symlink não é seguido, pasta vazia                                                                     |
+| `tests/main/destroy.test.ts`                | destruição do cofre/acervo, guarda de não ressuscitar, legados em claro, `.tmp` órfãos                                                                                     |
+| `tests/main/drive-purge.test.ts`            | `purgeRemote`: apaga tudo, conta falha parcial, não age sem cofre aberto                                                                                                   |
+| `tests/main/drive-rest.test.ts`             | Chamadas REST do Dropbox: paginação, validação fail-closed do corpo, renovação e repetição após 401, erro traduzido                                                        |
+| `tests/main/drive-oauth.test.ts`            | PKCE sem secret, loopback (porta fixa e porta livre quando a fixa está ocupada), troca e renovação de token, escopo parcial                                                |
+| `tests/main/drive-crypto.test.ts`           | Formato `WTENC3`: cifra, manifesto com salt, recusa do formato antigo, nomes opacos, falha com senha errada                                                                |
+| `tests/main/jsonfile.test.ts`               | `writeJsonAtomic`: escrita atômica, `mode` aplicado mesmo com `.tmp` pré-existente                                                                                         |
+| `tests/main/library.test.ts`                | acervo cifrado: XDG, `clampProgress`, roundtrip, capa, restauração, mime, cofre fechado, arquivo corrompido                                                                |
+| `tests/main/settings.test.ts`               | `settings.json`: idioma no disco, segredos no cofre, normalização e recusa com cofre fechado                                                                               |
+| `tests/main/vault-crypto.test.ts`           | Perfis de custo do Argon2id, AES-256-GCM, HKDF, faixa do KDF e (unico arquivo sem o stand-in de KDF) a integração com `hash-wasm`                                          |
+| `tests/main/vault-container.test.ts`        | Formato do `vault.zkv`: roundtrip, custo por método, offsets, lixo, truncamento, faixa e fail-closed                                                                       |
+| `tests/main/vault-lockout.test.ts`          | Escala da trava (10 s até 24 h), contagem ilegível no teto e invariante de nunca destravar                                                                                 |
+| `tests/main/vault-session.test.ts`          | Singleton da sessão: `adopt`/`wipe`, zeragem de bytes e repasse do auto-lock                                                                                               |
+| `tests/main/vault-wrapping.test.ts`         | Estado da trava (projeção para a tela) e estratégia de embrulho da chave por credencial                                                                                    |
+| `tests/main/vault-unlock.test.ts`           | Cadeia de desbloqueio: reembrulho de custo antigo, embrulho com tamanho errado, KDF que lança por dentro e separação de salt entre coframes                                |
+| `tests/main/vault.test.ts`                  | Ciclo de vida: criar (3 credenciais), abrir por PIN/mestra, frase de recuperação, trocar credencial, segredos, adulteração, pasta sem permissão, destruição                |
+| `tests/shared/policy.test.ts`               | Formato aceito de cada credencial, normalização da frase (espaço sim, caixa não) e contagem regressiva                                                                     |
+| `tests/shared/strength.test.ts`             | Régua de força: o que recusa (`blocked`), a nota, o motivo, o acordo entre a tela e o main e a largura da barra                                                            |
+| `tests/shared/json.test.ts`                 | Guarda de dado externo: o que `isRecord` aceita, o que `field` devolve para valor falsy e o que sobe pela cadeia de protótipos                                             |
+| `tests/shared/work.test.ts`                 | Validador de obra: campo obrigatório faltando, campo no tipo errado, obra sem os opcionais do backup antigo e lista com um elemento ruim                                   |
+| `tests/main/vault-secrets.test.ts`          | Cofre é a única fonte: sem/aberto/fechado/adulterado (falha fechada), JSON de forma errada e sessão ligada à chave em memória                                              |
+| `tests/main/vault-privilege.test.ts`        | `setupVaultDirectory`: override bloqueia pkexec; exit 0/126/127/throw → ok/cancelled/failed; `isVaultDirUnavailable` e `createVault` sem pkexec no sandbox                 |
+| `tests/main/drive-auth.test.ts`             | Estado do Dropbox, tokens no cofre, escopo divergente e refresh                                                                                                            |
+| `tests/main/drive-backup.test.ts`           | `backupNow`/`restoreNow` ponta a ponta (rede simulada, cifra real), recusa sem cofre e execução paralela                                                                   |
+| `tests/main/drive-info.test.ts`             | `backupInfo`, renovação de sessão e retry após 401                                                                                                                         |
+| `tests/main/drive-provider.test.ts`         | Catálogo e disponibilidade dos provedores (Google Drive condicionado à credencial)                                                                                         |
+| `tests/main/drive-provider-adapter.test.ts` | Adaptador do Dropbox: o `operational` relido a cada acesso, o override do cofre sobre a chave do build e as operações falando com a rota da API                            |
+| `tests/main/google-drive.test.ts`           | OAuth e REST Google Drive: paginação, appDataFolder, upload multipart/PATCH, retry 401 e renovação                                                                         |
+| `tests/main/google-oauth.test.ts`           | `googleFlow`: parâmetros offline/consent, `client_secret` condicional, mensagem de renovação e o `userinfo` que nunca derruba a conexão                                    |
+| `tests/main/google-rest.test.ts`            | Defesas do REST do Google: `size` do Drive, corpo de erro truncado, 401 repetido uma vez, backup duplicado apagado depois do PATCH e sessão que não sobrevive sem gravação |
+| `tests/main/oauth-flow.test.ts`             | Servidor de callback compartilhado: requisição sem `url`, rota errada, `address()` de socket e limpeza do temporizador do timeout                                          |
+| `tests/main/drive-switch-provider.test.ts`  | Troca de destino e preservação de sessões independentes no cofre                                                                                                           |
+| `tests/main/drive-remote-names.test.ts`     | Nomes remotos opacos (HMAC-SHA256) e manifesto de cadeia                                                                                                                   |
+| `tests/main/drive-restore-lock.test.ts`     | Trava exponencial da restauração (só `PassphraseError` conta) e a rampa até saturar em 15 min                                                                              |
 
 ### Mensagens, preload, tipos e renderer
 
@@ -94,11 +104,11 @@ São sob demanda (ver os guias linkados no topo).
 | `tests/renderer/src/components/WorkModal.test.tsx`            | Criar/editar obra, validação e exclusão com confirmação                                                         |
 | `tests/renderer/src/components/SettingsModal.test.tsx`        | Configurações: carga, provedores, senha de backup e indicador de ocupado                                        |
 | `tests/renderer/src/components/SettingsModal.drive.test.tsx`  | Ações do Drive: rótulos de ocupado, fallbacks de erro e limpeza do prefixo de IPC                               |
-| `tests/renderer/src/components/SettingsModal.vault.test.tsx`  | Cofre nas configurações: badge, prompt, ação adiada e fechamento com Escape                                     |
+| `tests/renderer/src/components/SettingsModal.vault.test.tsx`  | Cofre nas configurações: badge, prompt, ação adiada, fechamento com Escape e troca de senha mestra/PIN          |
 | `tests/renderer/src/components/VaultModal.test.tsx`           | Cofre: medidor de força, confirmação, erro do backend, recontagem da trava e modo barreira                      |
 | `tests/renderer/src/components/DangerZone.test.tsx`           | Confirmação em duas etapas das ações destrutivas e os três caminhos de falha                                    |
 | `tests/renderer/src/components/RestorePasswordModal.test.tsx` | Senha de restauração: foco, tipo do campo, atalhos e cancelamento                                               |
-| `tests/renderer/src/components/Select.test.tsx`               | Select acessível (teclado, `aria`, busca, menu vazio)                                                           |
+| `tests/renderer/src/components/Select.test.tsx`               | Select acessível (teclado, `aria`, busca, menu vazio, e o controle desabilitado que não abre nem por clique)    |
 | `tests/renderer/src/components/AttributionsModal.test.tsx`    | Página de Atribuições: rolagem em pausa e as duas faces do clique no overlay                                    |
 | `tests/renderer/src/components/DonateModal.test.tsx`          | Página de Doações: cópia do link, sem clipboard e falha de escrita                                              |
 | `tests/renderer/src/constants.test.ts`                        | Opções de filtro, cores, `coverUrl`, `formatDate`, `clampProgress`                                              |
@@ -163,28 +173,42 @@ de DOM em `tests/setup.ts`: `setupFiles` roda para ele também.
 
 `vitest.config.mts` mede `src/**/*.{ts,tsx}` com o provedor v8 (relatórios em
 texto e HTML em `coverage/`) e exige **95% por arquivo** (`perFile: true`) de
-linhas, instruções, funções e ramos. Estado medido na 2.0.0 (983 testes em 65
-arquivos):
+linhas, instruções, funções e ramos. Estado medido na 2.0.0 (**1.087 testes em
+69 arquivos**, 81 arquivos de `src/` medidos):
 
 | Métrica    | Global | Pior arquivo                   |
 | ---------- | ------ | ------------------------------ |
-| Statements | 98,31% | 66,66% (`dropbox/provider.ts`) |
-| Branches   | 97,16% | 63,63% (`google/oauth.ts`)     |
-| Functions  | 98,79% | 50% (`dropbox/provider.ts`)    |
-| Lines      | 98,62% | 66,66% (`dropbox/provider.ts`) |
+| Statements | 99,23% | 95,71% (`main/index.ts`)       |
+| Branches   | 98,67% | 95,00% (`vault/unlock.ts`)     |
+| Functions  | 99,45% | 95,23% (`drive/oauth-flow.ts`) |
+| Lines      | 99,43% | 95,45% (`main/cleanup.ts`)     |
 
-Os testes passam, mas `npm run test:coverage` termina com erro porque estes
-arquivos ainda não atingem 95% em todas as métricas: `src/main/drive/oauth-flow.ts`,
-`src/main/drive/providers/dropbox/provider.ts`,
-`src/main/drive/providers/google/credentials.ts`,
-`src/main/drive/providers/google/oauth.ts`,
-`src/main/drive/providers/google/rest.ts`,
-`src/main/drive/providers/google/session.ts`,
-`src/renderer/src/components/Select.tsx` e
-`src/renderer/src/components/SettingsModal.tsx`. O piso subiu de 50% agregado
+**Nenhum arquivo fica abaixo de 95% em nenhuma das quatro métricas**, e
+`npm run test:coverage` termina com código 0. O piso subiu de 50% agregado
 para 95% por arquivo depois da varredura de baixo para cima: o piso agregado
 perdoa o arquivo esquecido, e era isso que acontecia, com o entry do renderer
 em 0%, os bundles de idioma em 10% e o scheme da SPA em 35%.
+
+Oito arquivos estavam abaixo do piso e subiram com os testes desta leva: o
+adaptador do Dropbox (`dropbox/provider.ts`, o `getter operational` lido a cada
+acesso e não congelado no import), o fluxo OAuth do Google
+(`google/oauth.ts`, `google/credentials.ts`, `google/rest.ts`,
+`google/session.ts`), o servidor de callback compartilhado
+(`drive/oauth-flow.ts`) e, no renderer, `Select.tsx` (a trava do controle
+desabilitado) e `SettingsModal.tsx` (troca de provedor recusada e troca de
+credencial do cofre).
+
+Dois achados que os testes gravaram, e que valem mais que a linha coberta:
+
+- **`googleDriveProvider.operational` congela no import**, ao contrário do
+  getter do Dropbox, que é relido a cada acesso. A diferença é de projeto, não
+  de acaso: a App key do Dropbox pode vir do override gravado no cofre e mudar
+  com o app aberto, enquanto o par do Google é chumbado no bundle no build.
+  `tests/main/drive-provider-adapter.test.ts` fixa as duas metades.
+- **Corpo não-JSON da API não vira `invalidListResponse`**: o `parseJson` devolve
+  o erro do parser. O que importa é que a listagem **não** devolve `[]` em
+  silêncio, que é como um backup apagaria o acervo inteiro como órfão.
+  `tests/main/google-rest.test.ts` fixa esse comportamento como ele é.
 
 Os módulos de destruição ficaram em 100% nas quatro métricas (`shred.ts`,
 `store-crypto.ts`, `vault/container.ts`, `vault/vault.ts`, `drive/rest.ts`,

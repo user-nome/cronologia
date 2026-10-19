@@ -15,6 +15,8 @@ apt
 # scripts em bin/ SÃO versionados.
 bin/osv-scanner
 coverage
+coverage-json
+# relatório de cobertura do Vitest, na raiz (artefatos fora do git).
 # relatório da varredura de mutação, na raiz (artefatos fora do git).
 # Ancorado de propósito: sem a barra, `mutation/` casaria também com
 # `tools/mutation/`, que é código-fonte e precisa estar no git (sem ele o
