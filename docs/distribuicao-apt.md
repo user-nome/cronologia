@@ -147,7 +147,7 @@ Biblioteca:
 | Secret            | Conteúdo                                                                                                                            |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `GPG_PRIVATE_KEY` | Bloco armoured completo da chave, **com** as linhas `-----BEGIN PGP PRIVATE KEY BLOCK-----` e `-----END PGP PRIVATE KEY BLOCK-----` |
-| `GPG_PASSPHRASE`  | Frase da chave privada exportada; só é necessária se a chave tiver frase                                                            |
+| `GPG_PASSPHRASE`  | Frase da chave privada exportada; a chave `GPG_FINGERPRINT` tem frase, então este secret é obrigatório                              |
 
 A chave de assinatura é a impressão digital `GPG_FINGERPRINT`, declarada no
 topo de `.github/workflows/publish.yml` (no `env:` do workflow, junto do
@@ -158,22 +158,13 @@ import e usa `--local-user` nas três operações — inclusive no
 despejaria o keyring inteiro no arquivo.
 
 Se algo faltar, esse passo do workflow falha com diagnóstico explícito
-(`::error::` legível na página da execução). O caso que mais confunde é o
-**"Bad passphrase"**: o gpg responde exatamente isso em três situações sem
-relação entre si (frase errada, chave protegida com o comando sem frase, e
-chave **sem** proteção com frase qualquer no comando). Por isso o passo não
-confia na mensagem: ele tenta assinar **com** a frase e, se falhar, tenta
-**sem** ela, e quem diz a causa é o par de resultados —
-
-| Com a frase | Sem a frase | O que o passo aponta                                         |
-| ----------- | ----------- | ------------------------------------------------------------ |
-| assina      | —           | segue, com a frase                                           |
-| falha       | assina      | a chave não tem frase; `GPG_PASSPHRASE` foi ignorado         |
-| falha       | falha       | secret ausente, ou frase errada (ou com espaço/ENTER no fim) |
-
-No último caso o log traz o comprimento e o `sha256` (16 caracteres) de cada
-secret recebido, para comparar com os arquivos locais — o `sha256` da string
-vazia (`e3b0c44298fc1c14…`) quer dizer secret cadastrado vazio. A frase nunca
+(`::error::` legível na página da execução): bloco que não contém a chave
+esperada, secret da frase ausente, ou frase que não confere. Nos dois últimos
+casos o log traz, além do erro do gpg **inteiro** (é ele que distingue
+`Bad passphrase` de `Inappropriate ioctl for device`), o comprimento e o
+`sha256` (16 caracteres) de cada secret recebido, para comparar com os arquivos
+locais — o `sha256` da string vazia (`e3b0c44298fc1c14…`) quer dizer secret
+cadastrado vazio. A frase nunca
 aparece no log nem no `argv`: entra por `--passphrase-file` num arquivo
 temporário com `600`, apagado com `shred` inclusive quando o passo falha.
 

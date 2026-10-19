@@ -130,15 +130,13 @@ error?: string }` aparecia em **cinco** arquivos como retorno de
 "$GPG_FINGERPRINT" > public.key` — que, sem o argumento, despejava o keyring
   inteiro no arquivo. Antes o key ID era derivado do keyring a cada run, então
   um secret novo combinado com o valor antigo passava em silêncio.
-- **O "Bad passphrase" do gpg deixou de ser um beco sem saída.** O gpg responde
-  exatamente isso em três casos sem relação entre si (frase errada, chave
-  protegida com o comando sem frase, e chave **sem** proteção com frase
-  qualquer), então a mensagem não diagnosticava nada e o passo só dizia
-  "GPG_PASSPHRASE incorreto (ou secret ausente)". Agora ele tenta assinar **com**
-  a frase e, se falhar, **sem** ela: o par de resultados separa secret ausente,
-  frase errada (com aviso próprio para espaço/ENTER no fim) e chave sem frase.
-  Na falha saem também o comprimento e o `sha256` de cada secret recebido, para
-  comparar com os arquivos locais.
+- **O "Bad passphrase" do gpg deixou de esconder a causa.** O passo imprime o
+  erro do gpg **inteiro** (o corte em uma linha jogava fora a mensagem que
+  distinguia `Bad passphrase` de `Inappropriate ioctl for device`) e, junto,
+  o comprimento e o `sha256` de cada secret recebido, para comparar com os
+  arquivos locais — o `sha256` da string vazia (`e3b0c44298fc1c14…`) quer dizer
+  secret cadastrado vazio. Espace/ENTER no fim do valor colado, que é o erro
+  mais comum quando a frase parece certa, ganha mensagem própria.
 - **A frase da chave sai do `argv` do processo.** Entrou por
   `--passphrase-file` num temporário com `600`, apagado com `shred` inclusive
   quando o passo falha; com `--passphrase`, ela ficava legível no `ps` do

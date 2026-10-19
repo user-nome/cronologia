@@ -336,11 +336,6 @@ jobs:
             echo "::error::Secret GPG_PRIVATE_KEY ausente em Settings → Secrets → Actions (repo cronologia)."
             exit 1
           fi
-          # O secret da frase pode não existir, e `set -u` quebra em `${#VAR}`
-          # de variável não definida (não existe `${#VAR:-0}`). Normalizar para
-          # string vazia uma vez aqui deixa o resto do passo sem `${VAR:-}` em
-          # toda linha.
-          GPG_PASSPHRASE="${GPG_PASSPHRASE:-}"
           sudo apt-get install -y --no-install-recommends dpkg-dev apt-utils gnupg
           mkdir -p apt
           # Alias estável SEM versão: o APT resolve Filename relativo à base
@@ -359,74 +354,50 @@ jobs:
           fi
           echo "Chave de assinatura: $GPG_FINGERPRINT"
 
-          # A frase entra por `--passphrase-file` num arquivo temporário, e não
-          # por `--passphrase`: o outro caminho põe a frase no argv do processo,
-          # legível por qualquer outro usuário da máquina. O `mktemp` cria com
-          # 600 e o arquivo é apagado no fim, inclusive quando o passo falha.
+          # A frase entra por `--passphrase-file` num arquivo temporário, e
+          # não por `--passphrase`: o outro caminho põe a frase no argv do
+          # processo, legível por qualquer outro usuário da máquina. O `mktemp`
+          # cria com 600 e o arquivo é apagado no fim, inclusive quando o passo
+          # falha.
           #
           # `--pinentry-mode loopback` é obrigatório: sem ele o agente do gpg
           # tenta pinentry, o runner não tem terminal e a assinatura morre com
           # `Inappropriate ioctl for device`.
-          PHRASE_FILE=""
-          trap 'if [ -n "$PHRASE_FILE" ]; then shred -u "$PHRASE_FILE" 2>/dev/null || rm -f "$PHRASE_FILE"; fi' EXIT
-          GPG_OPTS=(--batch --yes --local-user "$GPG_FINGERPRINT")
-          if [ -n "$GPG_PASSPHRASE" ]; then
-            umask 077
-            PHRASE_FILE="$(mktemp)"
-            printf '%s' "$GPG_PASSPHRASE" > "$PHRASE_FILE"
-            GPG_OPTS+=(--pinentry-mode loopback --passphrase-file "$PHRASE_FILE")
+          if [ -z "${GPG_PASSPHRASE:-}" ]; then
+            echo "::error::Secret GPG_PASSPHRASE ausente em Settings → Secrets → Actions (repo user-nome/cronologia). A chave $GPG_FINGERPRINT tem frase, então o CI não consegue desbloquear sem ela: o agente do gpg cairia em pinentry e o runner não tem terminal."
+            exit 1
           fi
+          umask 077
+          PHRASE_FILE="$(mktemp)"
+          trap 'shred -u "$PHRASE_FILE" 2>/dev/null || true' EXIT
+          printf '%s' "$GPG_PASSPHRASE" > "$PHRASE_FILE"
+          GPG_OPTS=(--batch --yes --pinentry-mode loopback --passphrase-file "$PHRASE_FILE")
 
-          # Teste de assinatura antes de gerar nada, para falhar com uma
-          # mensagem que aponta a causa em vez de dizer só que "não assinou".
-          #
-          # "Bad passphrase" é ambíguo: o gpg responde exatamente isso em três
-          # casos sem relação entre si (medido com o gpg 2.4 do runner) — frase
-          # errada, chave protegida com o comando sem frase, e chave SEM
-          # proteção com frase qualquer no comando. A mensagem não diagnostica
-          # nada, então o diagnóstico vem da estratégia: tenta com a frase e,
-          # se falhar, tenta sem ela. Só o par de resultados separa "secret não
-          # cadastrado" de "frase errada" de "chave que nem tem frase".
+          # Teste de assinatura antes de gerar qualquer coisa, para falhar com
+          # uma mensagem que aponta a causa em vez de dizer só que "não
+          # assinou".
           echo preflight > apt/.sign-test
-          if ! gpg "${GPG_OPTS[@]}" --clearsign -o apt/.sign-test.asc apt/.sign-test 2>apt/.sign-test.err; then
-            # Derruba o gpg-agent antes da segunda tentativa: ele guarda a chave
-            # destravada em cache, e uma tentativa contaminada por esse cache
-            # classificaria a falha ao contrário.
-            gpgconf --kill gpg-agent || true
-            if gpg --batch --yes --local-user "$GPG_FINGERPRINT" --clearsign \
-              -o apt/.sign-test.asc apt/.sign-test 2>>apt/.sign-test.err; then
-              # A chave não tem frase: segue sem ela, e avisa porque secret
-              # preenchido é a pegadinha que produz o mesmo erro do runner.
-              if [ -n "$GPG_PASSPHRASE" ]; then
-                echo "::notice::A chave $GPG_FINGERPRINT não tem frase; GPG_PASSPHRASE está preenchido e foi ignorado. Se essa chave deveria ter frase, a de GPG_PRIVATE_KEY é outra."
-              else
-                echo "::notice::A chave $GPG_FINGERPRINT não tem frase; assinando sem GPG_PASSPHRASE."
-              fi
-              GPG_OPTS=(--batch --yes --local-user "$GPG_FINGERPRINT")
+          if ! gpg "${GPG_OPTS[@]}" --local-user "$GPG_FINGERPRINT" --clearsign \
+            -o apt/.sign-test.asc apt/.sign-test 2>apt/.sign-test.err; then
+            # Diagnóstico: o erro do gpg vem inteiro, sem cortar em uma linha —
+            # é a única linha que diz se a frase não confere (Bad passphrase),
+            # se o agente caiu em pinentry (Inappropriate ioctl for device) ou
+            # se é outra coisa. Comprimento e sha256 dos secrets recebidos
+            # permitem comparar com os arquivos locais; o sha256 da string
+            # vazia (e3b0c44298fc1c14...) quer dizer secret cadastrado vazio.
+            cat apt/.sign-test.err
+            echo "GPG_PASSPHRASE recebido: ${#GPG_PASSPHRASE} caracteres, sha256 $(printf '%s' "$GPG_PASSPHRASE" | sha256sum | cut -c1-16)"
+            echo "GPG_PRIVATE_KEY recebido: ${#GPG_PRIVATE_KEY} caracteres, sha256 $(printf '%s' "$GPG_PRIVATE_KEY" | sha256sum | cut -c1-16)"
+            # Espaço, ENTER ou espaço no fim é o erro mais comum quando a
+            # pessoa jura que a frase está certa.
+            APARADO="${GPG_PASSPHRASE#"${GPG_PASSPHRASE%%[![:space:]]*}"}"
+            APARADO="${APARADO%"${APARADO##*[![:space:]]}"}"
+            if [ "$APARADO" != "$GPG_PASSPHRASE" ]; then
+              echo "::error::GPG_PASSPHRASE tem espaço ou quebra de linha no começo/fim: cole só a frase, sem ENTER depois."
             else
-              # Diagnóstico: o "Bad passphrase" é ambíguo (frase trocada, secret
-              # colado pela metade, whitespace...) e a chave importada já foi
-              # conferida acima. Comprimento e sha256 dos secrets recebidos
-              # permitem comparar com os arquivos locais; o sha256 da string
-              # vazia (e3b0c44298fc1c14...) no log quer dizer secret vazio.
-              echo "GPG_PASSPHRASE recebido: ${#GPG_PASSPHRASE} caracteres, sha256 $(printf '%s' "$GPG_PASSPHRASE" | sha256sum | cut -c1-16)"
-              echo "GPG_PRIVATE_KEY recebido: ${#GPG_PRIVATE_KEY} caracteres, sha256 $(printf '%s' "$GPG_PRIVATE_KEY" | sha256sum | cut -c1-16)"
-              echo "gpg: $(tail -n 1 apt/.sign-test.err)"
-              if [ -z "$GPG_PASSPHRASE" ]; then
-                echo "::error::A chave $GPG_FINGERPRINT pede frase e o secret GPG_PASSPHRASE não está cadastrado em Settings → Secrets → Actions (repo user-nome/cronologia). Sem ele não saem InRelease nem Release.gpg."
-              else
-                # Espaço, ENTER ou espaço no fim é o erro mais comum quando a
-                # pessoa jura que a frase está certa.
-                APARADO="${GPG_PASSPHRASE#"${GPG_PASSPHRASE%%[![:space:]]*}"}"
-                APARADO="${APARADO%"${APARADO##*[![:space:]]}"}"
-                if [ "$APARADO" != "$GPG_PASSPHRASE" ]; then
-                  echo "::error::GPG_PASSPHRASE tem espaço ou quebra de linha no começo/fim: cole só a frase, sem ENTER depois."
-                else
-                  echo "::error::GPG_PASSPHRASE não confere com a chave $GPG_FINGERPRINT. Confira frase trocada depois da exportação, ou bloco GPG_PRIVATE_KEY de outra chave."
-                fi
-              fi
-              exit 1
+              echo "::error::Falha ao assinar com a chave $GPG_FINGERPRINT. Confira se GPG_PRIVATE_KEY e GPG_PASSPHRASE correspondem à chave e à frase atuais."
             fi
+            exit 1
           fi
           rm -f apt/.sign-test apt/.sign-test.asc apt/.sign-test.err
           cd apt
@@ -448,13 +419,13 @@ jobs:
             -o APT::FTPArchive::Release::Description="Cronologia" \
             . > ../Release.tmp
           mv ../Release.tmp Release
-          # O `--local-user` das assinaturas vem no GPG_OPTS, montado com a impressão
-          # digital do topo do arquivo: a assinatura fica atrelada a ela, e não
+          # `--local-user` nas três operações: o runner é limpo, mas fixar a chave deixa
+          # a assinatura atrelada à impressão digital do topo do arquivo, e não
           # a "a primeira chave que o gpg achar". O mesmo vale para o `export`:
-          # sem o argumento, `gpg --armor --export` despeja o keyring inteiro
-          # no public.key.
-          gpg "${GPG_OPTS[@]}" --clearsign -o InRelease Release
-          gpg "${GPG_OPTS[@]}" -abs -o Release.gpg Release
+          # sem o argumento, `gpg --armor --export` despeja o keyring inteiro no
+          # public.key.
+          gpg "${GPG_OPTS[@]}" --local-user "$GPG_FINGERPRINT" --clearsign -o InRelease Release
+          gpg "${GPG_OPTS[@]}" --local-user "$GPG_FINGERPRINT" -abs -o Release.gpg Release
           gpg --armor --export "$GPG_FINGERPRINT" > public.key
           echo "Repo APT flat gerado (chave $GPG_FINGERPRINT):" && ls -l
 
