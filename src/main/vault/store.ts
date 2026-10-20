@@ -101,6 +101,8 @@ export function readContainer(): VaultContainer | null {
   }
 }
 
+export { decodeContainer, encodeContainer } from '@zero/main/vault/container';
+
 /**
  * Grava de forma atômica (`.tmp` + `rename`, `0600`) e recusa depois de uma
  * destruição: um `writeContainer` chamado depois deixaria um container pela

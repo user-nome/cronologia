@@ -18,6 +18,8 @@ describe('tipos compartilhados', () => {
     expectTypeOf<Work['marker']>().toEqualTypeOf<string | undefined>();
     expectTypeOf<Work['coverFile']>().toEqualTypeOf<string | undefined>();
     expectTypeOf<Work['category']>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<Work['startedAt']>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<Work['finishedAt']>().toEqualTypeOf<string | undefined>();
     expectTypeOf<keyof Work>().toEqualTypeOf<
       | 'id'
       | 'title'
@@ -28,6 +30,8 @@ describe('tipos compartilhados', () => {
       | 'marker'
       | 'coverFile'
       | 'category'
+      | 'startedAt'
+      | 'finishedAt'
       | 'createdAt'
       | 'updatedAt'
     >();

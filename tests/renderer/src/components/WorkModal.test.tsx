@@ -155,6 +155,37 @@ describe('WorkModal: campos', () => {
     expect(screen.getByPlaceholderText('Cap. 45 / Vol. 3')).toHaveValue('Vol. 2');
   });
 
+  it('edita datas de início e término', async () => {
+    const user = userEvent.setup();
+    setup(makeWork({ startedAt: '2026-01-10', finishedAt: '2026-02-15' }));
+    const startedInput = screen.getByTestId('started-at-input');
+    const finishedInput = screen.getByTestId('finished-at-input');
+
+    expect(startedInput).toHaveValue('2026-01-10');
+    expect(finishedInput).toHaveValue('2026-02-15');
+
+    await user.clear(startedInput);
+    await user.type(startedInput, '2026-02-01');
+    await user.clear(finishedInput);
+    await user.type(finishedInput, '2026-03-20');
+
+    expect(startedInput).toHaveValue('2026-02-01');
+    expect(finishedInput).toHaveValue('2026-03-20');
+  });
+
+  it('limpa as datas quando o input fica vazio', async () => {
+    const user = userEvent.setup();
+    setup(makeWork({ startedAt: '2026-01-10', finishedAt: '2026-02-15' }));
+    const startedInput = screen.getByTestId('started-at-input');
+    const finishedInput = screen.getByTestId('finished-at-input');
+
+    await user.clear(startedInput);
+    await user.clear(finishedInput);
+
+    expect(startedInput).toHaveValue('');
+    expect(finishedInput).toHaveValue('');
+  });
+
   it('altera o tipo e o status pelos selects', async () => {
     const user = userEvent.setup();
     setup();
@@ -252,6 +283,29 @@ describe('WorkModal: capa', () => {
     await user.click(screen.getByRole('button', { name: 'Remover capa' }));
     expect(document.querySelector('.cover-preview img')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Remover capa' })).not.toBeInTheDocument();
+  });
+
+  it('não altera a capa quando o usuário cancela a escolha', async () => {
+    const mock = createApiMock();
+    mock.pickCover.mockResolvedValueOnce(null);
+    const onClose = vi.fn();
+    const onSave = vi.fn((): Promise<void> => Promise.resolve());
+    const onDelete = vi.fn((): Promise<void> => Promise.resolve());
+    installApiMock(mock);
+    render(
+      <WorkModal
+        work={makeWork({ coverFile: '' })}
+        isNew
+        onSave={onSave}
+        onDelete={onDelete}
+        onClose={onClose}
+      />,
+    );
+    const user = userEvent.setup();
+    expect(document.querySelector('.cover-preview img')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: /Escolher imagem/ }));
+    expect(document.querySelector('.cover-preview img')).toBeNull();
   });
 });
 
