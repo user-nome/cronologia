@@ -218,6 +218,35 @@ export default function WorkModal({
             </div>
           </div>
 
+          <div className="form-row">
+            <div className="field">
+              <label>{m.workModal.startedAtLabel}</label>
+              <input
+                type="date"
+                data-testid="started-at-input"
+                value={draft.startedAt ?? ''}
+                placeholder={m.workModal.startedAtPlaceholder}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  patch({ startedAt: value !== '' ? value : undefined });
+                }}
+              />
+            </div>
+            <div className="field">
+              <label>{m.workModal.finishedAtLabel}</label>
+              <input
+                type="date"
+                data-testid="finished-at-input"
+                value={draft.finishedAt ?? ''}
+                placeholder={m.workModal.finishedAtPlaceholder}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  patch({ finishedAt: value !== '' ? value : undefined });
+                }}
+              />
+            </div>
+          </div>
+
           <div className="form-row progress-card">
             <div className="field">
               <label>{m.workModal.progressLabel}</label>

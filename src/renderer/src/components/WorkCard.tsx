@@ -21,7 +21,23 @@ export default function WorkCard({
   const done = work.status === 'concluido';
   const paused = work.status === 'pausado';
   const cancelled = work.status === 'cancelado';
+  const reading = work.status === 'lendo';
+  const planned = work.status === 'planejado';
   const marker = work.marker;
+
+  const getBarClass = (): string => {
+    if (done) return 'bar-fill done';
+    if (reading) return 'bar-fill reading';
+    if (paused) return 'bar-fill paused';
+    if (cancelled) return 'bar-fill cancelled';
+    return 'bar-fill planned';
+  };
+
+  const getBarStyle = (): React.CSSProperties => {
+    if (done) return { width: '100%' };
+    if (planned) return { width: '0%' };
+    return { width: `${Math.min(100, Math.max(0, work.progress))}%` };
+  };
 
   return (
     <article className="card" onClick={() => onOpen(work)}>
@@ -47,16 +63,25 @@ export default function WorkCard({
         {work.category !== undefined && work.category !== '' ? (
           <div className="card-category">{work.category}</div>
         ) : null}
+        {work.startedAt !== undefined && work.startedAt !== '' ? (
+          <div className="card-date">
+            <i className="fa-solid fa-calendar-days" /> {m.workModal.startedAtLabel}:{' '}
+            {work.startedAt}
+          </div>
+        ) : null}
+        {work.finishedAt !== undefined && work.finishedAt !== '' ? (
+          <div className="card-date">
+            <i className="fa-solid fa-calendar-check" /> {m.workModal.finishedAtLabel}:{' '}
+            {work.finishedAt}
+          </div>
+        ) : null}
 
         <div className="progress-row">
           <span>{m.workCard.progress}</span>
           <b>{done ? '100%' : m.workCard.progressValue(work.progress)}</b>
         </div>
         <div className="bar">
-          <div
-            className={`bar-fill${done ? ' done' : ' indeterminate'}`}
-            style={done ? { width: '100%' } : undefined}
-          />
+          <div data-testid="progress-bar-fill" className={getBarClass()} style={getBarStyle()} />
         </div>
 
         <div className="card-actions" onClick={(event) => event.stopPropagation()}>

@@ -128,4 +128,27 @@ describe('WorkCard', () => {
     expect(props.onStatus).toHaveBeenCalledWith(expect.objectContaining({ id: 'work-1' }), 'lendo');
     expect(screen.queryByRole('button', { name: /Concluir/ })).not.toBeInTheDocument();
   });
+
+  it('exibe data de início quando presente', () => {
+    setup({ work: makeWork({ startedAt: '2026-01-15' }) });
+    expect(screen.getByText('Início da leitura: 2026-01-15')).toBeInTheDocument();
+  });
+
+  it('exibe data de término quando presente', () => {
+    setup({ work: makeWork({ finishedAt: '2026-03-20' }) });
+    expect(screen.getByText('Término da leitura: 2026-03-20')).toBeInTheDocument();
+  });
+
+  it('não exibe datas vazias', () => {
+    setup({ work: makeWork({ startedAt: '', finishedAt: '' }) });
+    expect(screen.queryByText('Início da leitura')).not.toBeInTheDocument();
+    expect(screen.queryByText('Término da leitura')).not.toBeInTheDocument();
+  });
+
+  it('usa a classe planned para obras planejadas', () => {
+    setup({ work: makeWork({ status: 'planejado', progress: 0 }) });
+    const barFill = screen.getByTestId('progress-bar-fill');
+    expect(barFill).toHaveClass('bar-fill');
+    expect(barFill).toHaveClass('planned');
+  });
 });

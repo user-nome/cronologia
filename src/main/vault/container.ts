@@ -116,7 +116,7 @@ function writeMethod(buffer: Buffer, offset: number, method: WrappedKey): number
 }
 
 /** Par do leitor de blob: o que leu e onde recomeçar a ler. */
-interface BlobRead {
+export interface BlobRead {
   block: Sealed;
   next: number;
 }

@@ -48,23 +48,55 @@ export interface StrengthResult {
 }
 
 /** Nota bruta: o nível na régua e quantos segmentos da barra acendem. */
-interface Grade {
+export interface Grade {
   level: StrengthLevel;
   score: number;
 }
 
 /** Quantas categorias de caractere aparecem e o tamanho do alfabeto delas. */
-interface CharStats {
+export interface CharStats {
   kinds: number;
   size: number;
 }
 
 /** Bits por palavra de um vocabulário tipo diceware (~7776). */
-const WORDS_BIT = 12.9;
+export const WORDS_BIT = 12.9;
 /** Um bloco de até 12 caracteres repetido preenche a string toda = degenerado. */
-const MAX_BLOCK = 12;
+export const MAX_BLOCK = 12;
 /** Abaixo disso a entrada ainda está incompleta: nada de bloqueio. */
-const MIN_BLOCK_LENGTH = 8;
+export const MIN_BLOCK_LENGTH = 8;
+
+/** Limiares de bits para os níveis de força (senha mestra e frase). */
+export const MASTER_BIT_THRESHOLDS = [28, 36, 60, 80] as const;
+/** Limiares de bits para os níveis de força do PIN. */
+export const PIN_BIT_THRESHOLDS = [16, 24] as const;
+
+/** Limiares de bits com descontos por padrão (senha mestra). */
+export const MASTER_PENALTY_BITS = {
+  repeatedBlock: 10,
+  sequenceLong: 10,
+  sequenceShort: 30,
+  commonWord: 30,
+  lowVariety: 40,
+  fewKinds: 45,
+  dateLike: 25,
+} as const;
+
+/** Limiares de bits com descontos por padrão (PIN). */
+export const PIN_PENALTY_BITS = {
+  dateLike: 15,
+  lowVariety: 16,
+} as const;
+
+/** Limiares de bits com descontos por padrão (frase). */
+export const PHRASE_PENALTY_BITS = {
+  commonWord: 60,
+  shortWords: 45,
+} as const;
+
+/** Ano mínimo/máximo plausível para detecção de data. */
+export const DATE_YEAR_MIN = 1900;
+export const DATE_YEAR_MAX = 2099;
 
 const LEVELS: readonly StrengthLevel[] = ['veryWeak', 'weak', 'fair', 'strong', 'veryStrong'];
 
@@ -171,14 +203,19 @@ function emptyResult(): StrengthResult {
 }
 
 function grade(bits: number, cap = 4): Grade {
-  const raw = bits < 28 ? 0 : bits < 36 ? 1 : bits < 60 ? 2 : bits < 80 ? 3 : 4;
+  const [t1, t2, t3, t4] = MASTER_BIT_THRESHOLDS;
+  const raw = bits < t1 ? 0 : bits < t2 ? 1 : bits < t3 ? 2 : bits < t4 ? 3 : 4;
   const score = Math.max(0, Math.min(raw, cap, 4));
+  // O `score` é sempre 0..4 por causa do clamp acima; o fallback é segurança
+  // de tipos (TypeScript não prova que o índice está no intervalo).
   return { level: LEVELS[score] ?? 'veryWeak', score };
 }
 
 /** Nota do PIN: 8 dígitos nunca passam de "razoável" (o formato não é força). */
 function gradePin(bits: number): Grade {
-  const score = bits >= 24 ? 2 : bits >= 16 ? 1 : 0;
+  const [t1, t2] = PIN_BIT_THRESHOLDS;
+  const score = bits >= t2 ? 2 : bits >= t1 ? 1 : 0;
+  // Mesmo caso: `score` é 0..2, mas o TypeScript exige o fallback.
   return { level: LEVELS[score] ?? 'veryWeak', score };
 }
 
@@ -214,7 +251,7 @@ function repeatedBlock(text: string): number {
 /** 8 dígitos com cara de data: DDMMAAAA ou AAAAMMDD com ano plausível. */
 function looksLikeDate(digits: string): boolean {
   if (!/^\d{8}$/.test(digits)) return false;
-  const validYear = (year: number): boolean => year >= 1900 && year <= 2099;
+  const validYear = (year: number): boolean => year >= DATE_YEAR_MIN && year <= DATE_YEAR_MAX;
   const validDayMonth = (day: number, month: number): boolean =>
     month >= 1 && month <= 12 && day >= 1 && day <= 31;
   const ddmm = validDayMonth(Number(digits.slice(0, 2)), Number(digits.slice(2, 4)));
@@ -278,30 +315,30 @@ export function evaluateMaster(password: string): StrengthResult {
   }
   if (block >= 2 && password.length >= MIN_BLOCK_LENGTH) {
     reasons.push('repeatedBlock');
-    bits = Math.min(bits, 10);
+    bits = Math.min(bits, MASTER_PENALTY_BITS.repeatedBlock);
   }
   if (run >= 8) {
     reasons.push('sequence');
-    bits = Math.min(bits, 10);
+    bits = Math.min(bits, MASTER_PENALTY_BITS.sequenceLong);
   } else if (run >= 4) {
     reasons.push('sequence');
-    bits = Math.min(bits, 30);
+    bits = Math.min(bits, MASTER_PENALTY_BITS.sequenceShort);
   }
   if (common) {
     reasons.push('commonWord');
-    bits = Math.min(bits, 30);
+    bits = Math.min(bits, MASTER_PENALTY_BITS.commonWord);
   }
   if (password.length >= MIN_BLOCK_LENGTH && distinct <= 6) {
     reasons.push('lowVariety');
-    bits = Math.min(bits, 40);
+    bits = Math.min(bits, MASTER_PENALTY_BITS.lowVariety);
   }
   if (password.length >= 6 && kinds <= 1) {
     reasons.push('fewKinds');
-    bits = Math.min(bits, 45);
+    bits = Math.min(bits, MASTER_PENALTY_BITS.fewKinds);
   }
   if (containsDate(password)) {
     reasons.push('dateLike');
-    bits = Math.min(bits, 25);
+    bits = Math.min(bits, MASTER_PENALTY_BITS.dateLike);
   }
 
   // O bloqueio só vale com a entrada completa: com meio cofre criado, a régua
@@ -345,8 +382,8 @@ export function evaluatePin(pin: string): StrengthResult {
     bits = 8;
   } else {
     bits = pin.length * Math.log2(Math.max(distinct, 1));
-    if (looksLikeDate(pin)) bits = Math.min(bits, 15);
-    if (distinct <= 4) bits = Math.min(bits, 16);
+    if (looksLikeDate(pin)) bits = Math.min(bits, PIN_PENALTY_BITS.dateLike);
+    if (distinct <= 4) bits = Math.min(bits, PIN_PENALTY_BITS.lowVariety);
   }
 
   // A data entra no bloqueio, e não só na nota: `01012020` e `20200101` são
@@ -385,8 +422,8 @@ export function evaluatePhrase(phrase: string): StrengthResult {
   if (total >= 4 && averageLength <= 3) reasons.push('shortWords');
 
   let bits = Math.max(0, unique * WORDS_BIT - (total - unique) * 4);
-  if (reasons.includes('commonWord')) bits = Math.min(bits, 60);
-  if (reasons.includes('shortWords')) bits = Math.min(bits, 45);
+  if (reasons.includes('commonWord')) bits = Math.min(bits, PHRASE_PENALTY_BITS.commonWord);
+  if (reasons.includes('shortWords')) bits = Math.min(bits, PHRASE_PENALTY_BITS.shortWords);
 
   const blocked = complete && unique <= 4;
   const { level, score } = grade(bits);

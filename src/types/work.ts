@@ -16,6 +16,10 @@ export interface Work {
   coverFile?: string | undefined;
   /** Categoria principal da obra, ex.: 'Isekai' */
   category?: string | undefined;
+  /** Data de início da leitura (ISO 8601) */
+  startedAt?: string | undefined;
+  /** Data de conclusão da leitura (ISO 8601) */
+  finishedAt?: string | undefined;
   createdAt: string;
   updatedAt: string;
 }

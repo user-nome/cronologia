@@ -26,8 +26,9 @@ const REQUIRED_WORK_FIELDS = ['id', 'title', 'synopsis', 'type', 'status', 'prog
  *
  * O `in` antes do `typeof` é o que permite ao TypeScript estreitar `unknown`:
  * sem ele não há como saber que `value.id` existe. Os campos opcionais
- * (`createdAt`, `updatedAt`, `category`, `marker`, `notes`) não são conferidos:
- * são exatamente os que o backup antigo não tinha.
+ * (`createdAt`, `updatedAt`, `category`, `marker`, `coverFile`, `startedAt`,
+ * `finishedAt`) não são conferidos: são exatamente os que o backup antigo não
+ * tinha.
  */
 export function isWorkRecord(value: unknown): value is Work {
   if (typeof value !== 'object' || value === null) return false;
