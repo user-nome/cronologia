@@ -14,3 +14,4 @@ coverage/
 mutation/
 apt/
 .dev-vault/
+.dev-home/

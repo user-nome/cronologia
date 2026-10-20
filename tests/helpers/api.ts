@@ -13,6 +13,7 @@ import type {
   PurgeResult,
   ResetPinInput,
   UnlockInput,
+  VaultDestroyResult,
   VaultResult,
   VaultStatus,
   Work,
@@ -57,7 +58,7 @@ export interface ApiMock {
   vaultChangePin: Mock<(input: ChangePinInput) => Promise<VaultResult>>;
   driveSetProvider: Mock<() => Promise<{ ok: boolean; error?: string }>>;
   vaultLock: Mock<() => Promise<VaultStatus>>;
-  vaultDestroy: Mock<() => Promise<VaultResult>>;
+  vaultDestroy: Mock<() => Promise<VaultDestroyResult>>;
   vaultTouch: Mock<() => Promise<void>>;
   vaultOnLocked: Mock<(callback: (automatic: boolean) => void) => () => void>;
   /** `automatic = true` simula o auto-lock por ociosidade; `false`, o bloqueio manual. */
@@ -252,7 +253,9 @@ export function createApiMock(options: ApiMockOptions = {}): ApiMock {
     return Promise.resolve({ ...vault });
   });
 
-  const vaultDestroy = vi.fn((): Promise<VaultResult> => {
+  // A destruição apaga o acervo junto com o cofre, e devolve a contagem do
+  // que saiu do disco: `ok: false` é falha parcial (sobrou resíduo).
+  const vaultDestroy = vi.fn((): Promise<VaultDestroyResult> => {
     vault = {
       exists: false,
       unlocked: false,
@@ -261,7 +264,7 @@ export function createApiMock(options: ApiMockOptions = {}): ApiMock {
       lockRemainingMs: 0,
       hasRecovery: false,
     };
-    return Promise.resolve({ ok: true, status: { ...vault } });
+    return Promise.resolve({ ok: true, shredded: 1, failed: 0, status: { ...vault } });
   });
 
   const vaultTouch = vi.fn((): Promise<void> => Promise.resolve());

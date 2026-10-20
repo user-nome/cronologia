@@ -3,6 +3,7 @@ import { hkdfSync } from 'node:crypto';
 import { VaultError } from '@zero/main/vault/errors';
 import { seal, unseal, IV_BYTES, MASTER_KEY_BYTES, TAG_BYTES } from '@zero/main/vault/crypto';
 import { vaultSession } from '@zero/main/vault/session';
+import { FILE_MODE_PRIVATE } from '@zero/main/permissions';
 
 /**
  * Cifra do acervo: a biblioteca e as capas em disco, com a chave que só existe
@@ -108,9 +109,9 @@ export function readStoreFile(file: string, domain: StoreDomain): Buffer | null 
 /** Grava um arquivo `.enc` de forma atômica (`.tmp` + `rename`, `0600`). */
 export function writeStoreFile(file: string, domain: StoreDomain, plaintext: Buffer): void {
   const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, sealStoreFile(domain, plaintext), { mode: 0o600 });
+  fs.writeFileSync(tmp, sealStoreFile(domain, plaintext), { mode: FILE_MODE_PRIVATE });
   try {
-    fs.chmodSync(tmp, 0o600);
+    fs.chmodSync(tmp, FILE_MODE_PRIVATE);
   } catch {
     // Melhor esforço: gravar com a permissão mais larga é melhor que não gravar.
   }

@@ -8,6 +8,7 @@ import type {
   RestoreResult,
 } from '@zero/types/drive';
 import type { AppSettings } from '@zero/types/settings';
+import type { ShredCounts } from '@zero/types/shred';
 import type {
   ChangeMasterInput,
   ChangePinInput,
@@ -73,8 +74,11 @@ export interface ElectronApi {
     /** Troca o PIN do dia a dia com o cofre aberto (exige o PIN atual). */
     changePin: (input: ChangePinInput) => Promise<VaultResult>;
     lock: () => Promise<VaultStatus>;
-    /** Destrói o cofre e o acervo local (destrutivo, irreversível). */
-    destroy: () => Promise<VaultResult>;
+    /**
+     * Destrói o cofre e o acervo local (destrutivo, irreversível). A resposta
+     * traz a contagem do que saiu do disco: `ok: false` é falha parcial.
+     */
+    destroy: () => Promise<VaultDestroyResult>;
     /** Registra atividade do usuário (mantém a janela de ociosidade aberta). */
     touch: () => Promise<void>;
     /**
@@ -93,11 +97,22 @@ export interface ElectronApi {
  * `code` significa **falha parcial**: parte foi apagada, parte sobrou no
  * disco. Com `code` é a recusa do cofre, que não chegou a tocar no acervo.
  */
-export interface LibraryReset {
+export interface LibraryReset extends ShredCounts {
   ok: boolean;
-  shredded: number;
-  failed: number;
   code?: VaultErrorCode;
+}
+
+/**
+ * Destruição do cofre: o estado do cofre **e** a contagem real do acervo que
+ * saiu do disco.
+ *
+ * `ok: false` é **falha parcial** (sobrou resíduo do acervo), não recusa: o
+ * cofre foi destruído de qualquer jeito, e esconder o resíduo seria um
+ * "apagado" em falso — o pior tipo de mentira nesta tela.
+ */
+export interface VaultDestroyResult extends ShredCounts {
+  ok: boolean;
+  status: VaultStatus;
 }
 
 /**

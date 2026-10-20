@@ -3,7 +3,14 @@ import http from 'http';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AppSettings, LibraryReset, PurgeResult, VaultResult, Work } from '@zero/types';
+import type {
+  AppSettings,
+  LibraryReset,
+  PurgeResult,
+  VaultDestroyResult,
+  VaultResult,
+  Work,
+} from '@zero/types';
 import {
   configDir,
   coversDir,
@@ -358,6 +365,14 @@ describe('handlers de biblioteca', () => {
     const deleted = invoke('library:delete', 'nova') as Work[];
     expect(deleted).toHaveLength(1);
     expect(deleted[0]?.id).not.toBe('nova');
+  });
+
+  it('library:get com o cofre fechado recusa com a mensagem localizada', async () => {
+    destroyVault();
+
+    expect(() => invoke('library:get')).toThrow(currentMessages().vault.errors.vaultLocked);
+
+    await openTestVault();
   });
 
   it('library:reset devolve a contagem real do shred, sem "apagado" em falso', () => {
@@ -854,14 +869,16 @@ describe('falha real de disco vira resposta, não crash', () => {
     expect(erro).toHaveBeenCalled();
   });
 
-  it('vault:destroy apaga cofre e capas, e o acervo restante fica ilegível', () => {
+  it('vault:destroy apaga cofre, biblioteca e capas, e conta o que saiu do disco', () => {
     saveLibrary([makeWork()]);
     writeCoverFile('capa.png', Buffer.from('capa', 'utf-8'));
 
-    const resultado = invoke('vault:destroy') as VaultResult;
+    const resultado = invoke('vault:destroy') as VaultDestroyResult;
 
     expect(resultado).toEqual({
       ok: true,
+      shredded: 2,
+      failed: 0,
       status: {
         exists: false,
         unlocked: false,
@@ -872,12 +889,18 @@ describe('falha real de disco vira resposta, não crash', () => {
       },
     });
     expect(fs.existsSync(path.join(coversDir(), 'capa.png.enc'))).toBe(false);
-    // O acervo local continua no disco, mas sem chave ficou ilegível: some da
-    // tela por falta de chave, não por `[]` fingido.
-    expect(fs.existsSync(path.join(dataDir(), 'library.enc'))).toBe(true);
-    expect(() => invoke('library:get')).toThrow();
+    // O acervo sai do disco junto com o cofre: um `library.enc` sobrevivente
+    // seria ilegível para o cofre novo (viraria `libraryTampered` na
+    // primeira abertura) e continuaria no disco, contra o que a tela promete.
+    expect(fs.existsSync(path.join(dataDir(), 'library.enc'))).toBe(false);
     // Destruir o cofre local não é o mesmo que apagar o backup na nuvem:
     // quem apaga o backup é `drive:purge`, operação separada e explícita.
     expect(invoke('vault:status')).toMatchObject({ exists: false, unlocked: false });
+  });
+
+  it('vault:destroy sem acervo gravado não conta falha', () => {
+    const resultado = invoke('vault:destroy') as VaultDestroyResult;
+
+    expect(resultado).toMatchObject({ ok: true, shredded: 0, failed: 0 });
   });
 });

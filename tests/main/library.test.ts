@@ -22,7 +22,7 @@ import {
   upsertWork,
   userDataDir,
 } from '@zero/main/library';
-import { resetLibrary, writeCoverFile } from '@zero/main/library';
+import { resetLibrary, shredLibrary, writeCoverFile } from '@zero/main/library';
 import { isVaultError } from '@zero/main/vault/errors';
 import { writeStoreFile } from '@zero/main/store-crypto';
 import { lockVault, unlockVault } from '@zero/main/vault';
@@ -500,6 +500,26 @@ describe('acervo cifrado', () => {
 
     expect(result).toEqual({ shredded: 0, failed: 0 });
     expect(fs.statSync(coversDir()).isDirectory()).toBe(true);
+  });
+
+  it('shredLibrary apaga o acervo sem exigir cofre aberto', () => {
+    // É o caminho da destruição do cofre: a chave morre na mesma operação, e
+    // um `library.enc` sobrevivente seria ilegível para o cofre novo.
+    saveLibrary([makeWork()]);
+    writeCoversDirFile('a.png');
+    lockVault();
+
+    const result = shredLibrary();
+
+    expect(result).toEqual({ shredded: 2, failed: 0 });
+    expect(fs.existsSync(libraryFile())).toBe(false);
+    expect(fs.readdirSync(coversDir())).toEqual([]);
+    // A pasta continua utilizável para o próximo uso.
+    expect(fs.statSync(coversDir()).isDirectory()).toBe(true);
+  });
+
+  it('shredLibrary sem acervo gravado não conta nada como falha', () => {
+    expect(shredLibrary()).toEqual({ shredded: 0, failed: 0 });
   });
 
   it('a capa em claro de versão anterior é sobrescrita na limpeza de órfãos', () => {

@@ -4,6 +4,71 @@ Todos os lançamentos seguem [versionamento semântico](https://semver.org/lang/
 (`MAJOR.MINOR.PATCH`) e o formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 em português do Brasil.
 
+## [2.1.2]
+
+### Corrigido
+
+- **O `npm run dev` abria o acervo do app instalado e o app acusava
+  `libraryTampered`.** O sandbox de desenvolvimento movia só o cofre
+  (`CRONOLOGIA_VAULT_DIR=.dev-vault`), mas o acervo continuava em
+  `~/.local/share/cronologia/library.enc` — o arquivo do app instalado, cifrado
+  com a chave-mestra do cofre de `/var/lib`. Como o dev abria um cofre novo
+  (chave aleatória), a chave não batia, o AES-256-GCM recusava a tag e a
+  leitura falhava fechada: `libraryTampered`, "a biblioteca cifrada está
+  danificada", sem que ninguém tivesse adulterado nada. O sandbox agora é
+  **completo** (`bin/dev.sh`): cofre, `XDG_DATA_HOME`, `XDG_CONFIG_HOME` e
+  `XDG_CACHE_HOME` apontam para dentro do repositório, e o dev não toca no
+  acervo, nas settings nem no cache do app instalado. O teste
+  `tests/build/dev-sandbox.test.ts` exige as quatro variáveis, porque um teste
+  que só checasse o cofre passaria com o acervo quebrado de novo.
+- **Destruir o cofre deixava a biblioteca no disco.** A tela promete "apaga
+  biblioteca e segredos", mas só o cofre e as capas eram sobrescritos: o
+  `library.enc` ficava. Com a chave-mestra morta ele virava ruído — e, pior, o
+  cofre novo (chave nova) não conseguia mais abri-lo: a primeira leitura
+  depois de recriar o cofre era `libraryTampered`, o mesmo defeito de dentro do
+  app instalado. Agora a destruição apaga o acervo junto (`shredLibrary()`, em
+  `main/library.ts`) e a resposta traz a **contagem real** do que saiu do disco:
+  `ok: false` é falha parcial (sobrou resíduo), nunca um "apagado" em falso.
+- **A tela ficava no "carregando biblioteca…" para sempre quando a leitura
+  falhava.** A rejeição de `library:get` não era tratada em `App.tsx`: virava
+  uma promessa esquecida (o `Uncaught (in promise)` do console) e a grade
+  nunca aparecia. Agora a falha sai como aviso, a grade assume o lugar do
+  spinner, e o acervo continua no disco — a falha é fechada, ninguém apagou
+  nada.
+
+### Mudado
+
+- **O erro do acervo chega na tela no idioma da pessoa.** O código do domínio
+  (`libraryTampered`, `vaultLocked`) não sobrevive ao IPC: o renderer recebia
+  `VaultError: libraryTampered` e mostrava aquilo como se fosse interface. Os
+  canais que lançam (acervo e settings) agora traduzem o erro do cofre no main
+  (`localizedError()`, em `main/index.ts`), e o renderer tira o embrulho do
+  Electron (`ipcErrorMessage()`, em `renderer/src/errors.ts`) — uma função só,
+  em vez do regex copiado dentro de cada componente.
+- **Os tipos que estavam escritos na hora foram nomeados e movidos para
+  `src/types/`.** A mesma contagem de shred (`{ shredded, failed }`) vivia em
+  três lugares com três nomes (`ShredResult`, `SweepResult` e os campos
+  repetidos em `LibraryReset`): agora é `ShredCounts`, em `src/types/shred.ts`,
+  e as três camadas usam o mesmo tipo. O `unknown` — o valor que vem de fora e
+  ainda não foi conferido — ganhou o nome `Untrusted`
+  (`src/types/errors.ts`), para que a assinatura diga o que o tipo significa.
+  `VaultDestroyResult` (a resposta da destruição do cofre) e `TokensSecret` (a
+  entrada do cofre por provedor) também são tipos nomeados agora.
+- **Os números mágicos viraram constantes com nome e lugar.** As permissões de
+  arquivo e de pasta (`0600`/`0700`) foram para `main/permissions.ts`, único
+  lugar onde elas aparecem; os status HTTP e o cache das capas viraram
+  constantes em `main/protocols.ts`; o timeout e o código de saída do `pkexec`
+  viraram constantes em `main/vault/privilege.ts`.
+
+### Cobertura de teste
+
+- **A suíte mede o estado novo**: 1.120 testes em 72 arquivos, 83 arquivos de
+  `src/` medidos, com o piso de 95% por arquivo mantido nas quatro métricas
+  (pior arquivo: `main/cleanup.ts` em 95,45% das linhas e `vault/unlock.ts` em
+  95,00% dos ramos). O teste novo do sandbox de dev
+  (`tests/build/dev-sandbox.test.ts`) é o que impede a regressão: ele exige as
+  quatro variáveis do sandbox, não só o cofre.
+
 ## [2.1.1]
 
 ### Corrigido

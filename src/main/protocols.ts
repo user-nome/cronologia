@@ -58,17 +58,17 @@ export function registerCoverProtocol(): void {
     try {
       const url = new URL(request.url);
       const name = path.basename(decodeURIComponent(url.pathname));
-      if (name === '') return new Response(NOT_FOUND, { status: 404 });
+      if (name === '') return new Response(NOT_FOUND, { status: HTTP_NOT_FOUND });
       const buffer = readCoverBuffer(name);
-      if (buffer === null) return new Response(NOT_FOUND, { status: 404 });
+      if (buffer === null) return new Response(NOT_FOUND, { status: HTTP_NOT_FOUND });
       return new Response(new Uint8Array(buffer), {
         headers: {
           'Content-Type': mimeFor(name),
-          'Cache-Control': 'max-age=3600',
+          'Cache-Control': `max-age=${COVER_CACHE_MAX_AGE_SECONDS}`,
         },
       });
     } catch {
-      return new Response(INTERNAL_ERROR, { status: 500 });
+      return new Response(INTERNAL_ERROR, { status: HTTP_INTERNAL_ERROR });
     }
   });
 }
@@ -85,6 +85,20 @@ export function registerCoverProtocol(): void {
 const FORBIDDEN = 'Forbidden';
 const NOT_FOUND = 'Not Found';
 const INTERNAL_ERROR = 'Internal Error';
+
+/**
+ * Status HTTP das respostas de transporte.
+ *
+ * Números, e não texto: quem chega aqui é o carregador de asset ou de imagem,
+ * não a pessoa. O status é o que o carregador entende, e a frase de status é o
+ * corpo.
+ */
+const HTTP_FORBIDDEN = 403;
+const HTTP_NOT_FOUND = 404;
+const HTTP_INTERNAL_ERROR = 500;
+
+/** Tempo de cache da capa decifrada, em segundos (a capa só muda com a obra). */
+const COVER_CACHE_MAX_AGE_SECONDS = 3_600;
 
 /** Extensão → tipo MIME mínimo para servir a SPA local. */
 function rendererMime(file: string): string {
@@ -144,16 +158,16 @@ export function registerAppProtocol(): void {
       const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '');
       const full = path.resolve(root, rel === '' ? 'index.html' : rel);
       if (!full.startsWith(`${root}${path.sep}`)) {
-        return new Response(FORBIDDEN, { status: 403 });
+        return new Response(FORBIDDEN, { status: HTTP_FORBIDDEN });
       }
       if (!fs.existsSync(full) || fs.statSync(full).isDirectory()) {
-        return new Response(NOT_FOUND, { status: 404 });
+        return new Response(NOT_FOUND, { status: HTTP_NOT_FOUND });
       }
       return new Response(new Uint8Array(fs.readFileSync(full)), {
         headers: { 'Content-Type': rendererMime(full) },
       });
     } catch {
-      return new Response(INTERNAL_ERROR, { status: 500 });
+      return new Response(INTERNAL_ERROR, { status: HTTP_INTERNAL_ERROR });
     }
   });
 }

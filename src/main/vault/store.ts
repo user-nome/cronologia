@@ -4,6 +4,7 @@ import { isVaultError } from '@zero/main/vault/errors';
 import type { VaultContainer } from '@zero/main/vault/container';
 import { decodeContainer, encodeContainer } from '@zero/main/vault/container';
 import { VaultError } from '@zero/main/vault/errors';
+import { DIR_MODE_PRIVATE, FILE_MODE_PRIVATE } from '@zero/main/permissions';
 
 /**
  * Arquivo do cofre: onde ele mora, como é lido e como é gravado.
@@ -80,8 +81,8 @@ export function isDirUnavailable(error: unknown): boolean {
 export function ensureStructure(): void {
   const dir = vaultDir();
   try {
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-    fs.chmodSync(dir, 0o700);
+    fs.mkdirSync(dir, { recursive: true, mode: DIR_MODE_PRIVATE });
+    fs.chmodSync(dir, DIR_MODE_PRIVATE);
   } catch (error) {
     if (isDirUnavailable(error)) throw new VaultError('vaultDirUnavailable');
     throw error;
@@ -113,11 +114,11 @@ export function writeContainer(container: VaultContainer): void {
   ensureStructure();
   const file = vaultPath();
   const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, encodeContainer(container), { mode: 0o600 });
+  fs.writeFileSync(tmp, encodeContainer(container), { mode: FILE_MODE_PRIVATE });
   // `writeFileSync` só aplica o `mode` na criação: um `.tmp` órfão de um crash
   // anterior herdaria a permissão antiga (mesmo cuidado de `jsonfile.ts`).
   try {
-    fs.chmodSync(tmp, 0o600);
+    fs.chmodSync(tmp, FILE_MODE_PRIVATE);
   } catch {
     // melhor esforço: gravar com a permissão mais larga é melhor que não gravar
   }

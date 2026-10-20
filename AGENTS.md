@@ -130,9 +130,12 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
   executar. Também **não** entra no `npm run check`; no CI roda no job próprio do
   `quality.yml`, por disparo manual. Guia em `docs/mutation.md`.
 - `npm run dev` / `build` / `dist`: desenvolvimento, build, `.deb`. O `dev`
-  já exporta `CRONOLOGIA_VAULT_DIR` para a pasta `.dev-vault` (cofre no sandbox,
-  sem tocar em `/var/lib` nem disparar `pkexec`) e `ELECTRON_ENABLE_LOGGING=1`
-  (log do Chromium no terminal).
+  roda por `bin/dev.sh`, que monta o **sandbox completo**: cofre em `.dev-vault`
+  (`CRONOLOGIA_VAULT_DIR`), dados, config e cache em `.dev-home` (as três
+  `XDG_*`), mais `ELECTRON_ENABLE_LOGGING=1` (log do Chromium no terminal). O
+  sandbox é completo de propósito: o acervo é cifrado com a chave do cofre, e
+  cofre de dev com acervo do app instalado é ilegível (`libraryTampered`).
+  Nenhum `pkexec` em dev.
 - `npm run dev:inspect` / `dev:inspect-brk`: o mesmo `dev` com o V8 inspector do
   **processo main** na porta 5858 (`--inspect` e `--inspect-brk` do
   `electron-vite`). O DevTools do Chromium (F11) só cobre o renderer. Funciona

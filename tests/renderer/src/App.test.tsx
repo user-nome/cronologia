@@ -479,6 +479,60 @@ describe('App: status do Dropbox', () => {
   });
 });
 
+describe('App: leitura do acervo', () => {
+  it('acervo ilegível vira aviso na tela, e a grade não fica no spinner', async () => {
+    // O main recusa a leitura (`libraryTampered`): a rejeição precisa virar
+    // aviso, e não uma promessa esquecida que deixa a tela no "carregando"
+    // para sempre — que era o que acontecia.
+    const mock = createApiMock({ works: WORKS });
+    mock.libraryGet.mockRejectedValueOnce(
+      new Error(
+        "Error invoking remote method 'library:get': Error: A biblioteca cifrada está danificada ou foi alterada. Nenhum dado foi apagado.",
+      ),
+    );
+    installApiMock(mock);
+    render(<App />);
+
+    expect(
+      await screen.findByText(
+        'A biblioteca cifrada está danificada ou foi alterada. Nenhum dado foi apagado.',
+      ),
+    ).toBeInTheDocument();
+    // Sai do estado de carregamento: a grade assume o lugar do spinner.
+    expect(screen.queryByText('Carregando biblioteca…')).not.toBeInTheDocument();
+  });
+
+  it('cofre fechado no meio da leitura volta a pedir a senha', async () => {
+    // O que falta aqui é a credencial, não um acervo quebrado: a tela pede a
+    // senha em vez de acusar a biblioteca de danificada.
+    const mock = createApiMock({ works: WORKS });
+    mock.libraryGet.mockRejectedValueOnce(
+      new Error("Error invoking remote method 'library:get': Error: O cofre está fechado."),
+    );
+    mock.vaultStatus
+      .mockResolvedValueOnce({
+        exists: true,
+        unlocked: true,
+        attempts: 0,
+        lockUntil: 0,
+        lockRemainingMs: 0,
+        hasRecovery: true,
+      })
+      .mockResolvedValueOnce({
+        exists: true,
+        unlocked: false,
+        attempts: 0,
+        lockUntil: 0,
+        lockRemainingMs: 0,
+        hasRecovery: true,
+      });
+    installApiMock(mock);
+    render(<App />);
+
+    expect(await screen.findByText(m.auth.unlockTitle)).toBeInTheDocument();
+  });
+});
+
 describe('App: portão do cofre', () => {
   it('pede a senha mestra e não pede a biblioteca quando o cofre está fechado', async () => {
     const mock = createApiMock({

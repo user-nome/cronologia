@@ -97,11 +97,14 @@ export default function DangerZone({
 
   const destroyVault = async (): Promise<void> => {
     const result = await window.api.vault.destroy();
-    if (!result.ok) {
-      notify(m.vault.errors[result.code], 'error');
-      return;
+    // O cofre morreu de qualquer jeito; o que a contagem diz é se sobrou
+    // resíduo do acervo no disco, e esse resíduo precisa aparecer: um
+    // "apagado" em falso é pior que um erro.
+    if (result.ok) {
+      notify(m.danger.vaultDestroyed);
+    } else {
+      notify(m.danger.destroyPartial(result.shredded, result.failed), 'error');
     }
-    notify(m.danger.vaultDestroyed);
     onVaultDestroyed();
   };
 

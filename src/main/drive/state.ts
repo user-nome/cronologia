@@ -46,7 +46,14 @@ export interface DriveState {
  * gravada. A tabela é a fonte única: `loadState` valida contra ela, `persistState`
  * escreve na entrada dela, e o cofre tem um nome por provedor.
  */
-const TOKENS_SECRET: Record<BackupProviderId, { secret: string; scopeVersion: number }> = {
+export interface TokensSecret {
+  /** Nome do segredo no cofre (`VAULT_SECRET`). */
+  secret: string;
+  /** Versão de escopo com que a sessão foi gravada. */
+  scopeVersion: number;
+}
+
+const TOKENS_SECRET: Record<BackupProviderId, TokensSecret> = {
   dropbox: { secret: VAULT_SECRET.dropboxTokens, scopeVersion: DROPBOX_SCOPE_VERSION },
   'google-drive': {
     secret: VAULT_SECRET.googleDriveTokens,

@@ -334,6 +334,8 @@ export const en: Messages = {
     libraryReset: 'Library deleted.',
     resetPartial: (shredded: number, failed: number): string =>
       `${shredded} file(s) overwritten and deleted, but ${failed} could not be deleted. Leftovers may remain on disk; restart the app and try again.`,
+    destroyPartial: (shredded: number, failed: number): string =>
+      `Vault destroyed, but ${failed} library file(s) could not be deleted (${shredded} were). Leftovers may remain on disk; restart the app and delete the library by hand.`,
     vaultDestroyed: 'Vault destroyed. Create a new one to continue.',
     cloudPurged: 'Backup deleted from the cloud.',
     libraryLocked: 'Unlock the vault to delete the library.',

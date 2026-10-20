@@ -241,20 +241,53 @@ describe('DangerZone: o que a interface conta quando a operação falha', () => 
     expect(onLibraryChanged).toHaveBeenCalledTimes(1);
   });
 
-  it('a destruição recusada pelo cofre não joga a pessoa para a tela inicial', async () => {
+  it('a destruição avisa o que sobrou no disco quando o acervo não sai inteiro', async () => {
     const { mock, notify, onVaultDestroyed } = renderZone();
+    // A destruição não recusa: o cofre morre de qualquer jeito, e o que a
+    // contagem diz é se sobrou resíduo do acervo no disco.
     mock.vaultDestroy.mockResolvedValueOnce({
       ok: false,
-      code: 'vaultDestroyed',
-      retryInMs: 0,
+      shredded: 3,
+      failed: 1,
+      status: {
+        exists: false,
+        unlocked: false,
+        attempts: 0,
+        lockUntil: 0,
+        lockRemainingMs: 0,
+        hasRecovery: false,
+      },
     });
 
     await confirm(/Destruir cofre/i, 'DESTRUIR');
 
     await waitFor(() =>
-      expect(notify).toHaveBeenCalledWith(m.vault.errors.vaultDestroyed, 'error'),
+      expect(notify).toHaveBeenCalledWith(m.danger.destroyPartial(3, 1), 'error'),
     );
-    expect(onVaultDestroyed).not.toHaveBeenCalled();
+    // O cofre morreu mesmo assim: a tela volta a pedir a criação de um novo.
+    expect(onVaultDestroyed).toHaveBeenCalledTimes(1);
+  });
+
+  it('a destruição bem-sucedida avisa que o cofre foi destruído', async () => {
+    const { mock, notify, onVaultDestroyed } = renderZone();
+    mock.vaultDestroy.mockResolvedValueOnce({
+      ok: true,
+      shredded: 2,
+      failed: 0,
+      status: {
+        exists: false,
+        unlocked: false,
+        attempts: 0,
+        lockUntil: 0,
+        lockRemainingMs: 0,
+        hasRecovery: false,
+      },
+    });
+
+    await confirm(/Destruir cofre/i, 'DESTRUIR');
+
+    await waitFor(() => expect(notify).toHaveBeenCalledWith(m.danger.vaultDestroyed));
+    expect(onVaultDestroyed).toHaveBeenCalledTimes(1);
   });
 
   it('purge sem erro do backend avisa a falha genérica e relê o status', async () => {

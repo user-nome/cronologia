@@ -16,6 +16,7 @@ que ela protege.
 | Leitura do acervo falha fechada (`libraryTampered`, nunca `[]`)           | `src/main/store-crypto.ts` (`readStoreFile`)                                            |
 | Portão do acervo: sem cofre aberto, nada é lido nem gravado               | `src/main/library.ts` (`requireVault`)                                                  |
 | Sobrescrita segura antes de apagar (`fsync` antes do `unlink`)            | `src/main/shred.ts`                                                                     |
+| Destruir o cofre leva o acervo junto (e conta a falha parcial)            | `src/main/library.ts` (`shredLibrary`), `src/main/index.ts` (`vault:destroy`)           |
 | Destruição do cofre não ressuscita container                              | `src/main/vault/store.ts` (marca de destruição), `src/main/vault/vault.ts`              |
 | `.tmp` órfão varrido no boot (sem legado: ninguém tem formato antigo)     | `src/main/cleanup.ts`                                                                   |
 | Apagar o backup na nuvem, com contagem de falha parcial                   | `src/main/drive/backup.ts` (`purgeRemote`)                                              |

@@ -338,6 +338,8 @@ export const ja: Messages = {
     libraryReset: 'ライブラリを削除しました。',
     resetPartial: (shredded: number, failed: number): string =>
       `${shredded} 件のファイルを上書きして削除しましたが、${failed} 件は削除できませんでした。ディスクにデータが残る可能性があります。アプリを再起動して再試行してください。`,
+    destroyPartial: (shredded: number, failed: number): string =>
+      `金庫は破棄しましたが、ライブラリファイル ${failed} 件を削除できませんでした（${shredded} 件は削除済み）。ディスクにデータが残る可能性があります。アプリを再起動してライブラリを手動で削除してください。`,
     vaultDestroyed: '金庫を破棄しました。続行するには新しい金庫を作成してください。',
     cloudPurged: 'バックアップをクラウドから削除しました。',
     libraryLocked: 'ライブラリを削除するには金庫のロックを解除してください。',

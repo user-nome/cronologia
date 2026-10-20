@@ -11,6 +11,7 @@ import type {
   PurgeResult,
   ResetPinInput,
   UnlockInput,
+  VaultDestroyResult,
   VaultResult,
   VaultStatus,
   Work,
@@ -56,7 +57,7 @@ const api: ElectronApi = {
     changePin: (input: ChangePinInput): Promise<VaultResult> =>
       ipcRenderer.invoke('vault:change-pin', input),
     lock: (): Promise<VaultStatus> => ipcRenderer.invoke('vault:lock'),
-    destroy: (): Promise<VaultResult> => ipcRenderer.invoke('vault:destroy'),
+    destroy: (): Promise<VaultDestroyResult> => ipcRenderer.invoke('vault:destroy'),
     /** Registra atividade do usuário para a janela de ociosidade do cofre. */
     touch: () => ipcRenderer.invoke('vault:touch'),
     onLocked: (cb: (automatic: boolean) => void) => {

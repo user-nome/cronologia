@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import type { ShredCounts } from '@zero/types';
 import { cacheDir, configDir, dataDir } from '@zero/main/paths';
 import { vaultDir } from '@zero/main/vault/store';
 import { shredFile } from '@zero/main/shred';
@@ -24,19 +25,13 @@ import { shredFile } from '@zero/main/shred';
  */
 export const STALE_TMP_MS = 60 * 60_000;
 
-/** Contagem do que foi sobrescrito e do que sobrou (sem dado do usuário). */
-export interface SweepResult {
-  shredded: number;
-  failed: number;
-}
-
 /**
  * Sobrescreve `.tmp` órfãos das pastas do app e do cofre. O `.enc` e o
  * `vault.zkv` **não** entram aqui: são apagados pelo próprio domínio, na
  * operação que os substitui.
  */
-export function sweepStaleTempFiles(dirs: readonly string[], maxAgeMs = STALE_TMP_MS): SweepResult {
-  const result: SweepResult = { shredded: 0, failed: 0 };
+export function sweepStaleTempFiles(dirs: readonly string[], maxAgeMs = STALE_TMP_MS): ShredCounts {
+  const result: ShredCounts = { shredded: 0, failed: 0 };
   const now = Date.now();
   for (const dir of [...dirs, dataDir(), configDir(), cacheDir()]) {
     let entries: fs.Dirent[];
@@ -59,7 +54,7 @@ export function sweepStaleTempFiles(dirs: readonly string[], maxAgeMs = STALE_TM
   return result;
 }
 
-function count(shredded: boolean, result: SweepResult): void {
+function count(shredded: boolean, result: ShredCounts): void {
   if (shredded) result.shredded += 1;
   else result.failed += 1;
 }

@@ -6,6 +6,7 @@ import type { AppSettings, BackupProviderId, Language } from '@zero/types';
 import { field, isRecord } from '@zero/shared';
 import { VAULT_SECRET, vaultUnlocked } from '@zero/main/vault/secrets';
 import { getSecret, setSecret } from '@zero/main/vault/vault';
+import { FILE_MODE_PRIVATE } from '@zero/main/permissions';
 
 /**
  * Configurações persistidas. O disco guarda `language` e `backupProvider`: os
@@ -134,7 +135,7 @@ export function saveSettings(settings: AppSettings): AppSettings {
   writeJsonAtomic(
     settingsPath(),
     { language: next.language, backupProvider: next.backupProvider },
-    0o600,
+    FILE_MODE_PRIVATE,
   );
   return next;
 }

@@ -10,6 +10,7 @@ import type {
 } from '@zero/types';
 import { LANGUAGES, LANGUAGE_LABELS, messages } from '@zero/messages';
 import { formatDate } from '@zero/renderer/constants';
+import { ipcErrorMessage } from '@zero/renderer/errors';
 import { richText, useLanguage, useMessages } from '@zero/renderer/i18n';
 import CredentialModal from '@zero/renderer/components/CredentialModal';
 import RestorePasswordModal from '@zero/renderer/components/RestorePasswordModal';
@@ -154,9 +155,7 @@ export default function SettingsModal({
     try {
       await task();
     } catch (error) {
-      const raw = error instanceof Error ? error.message : String(error);
-      const wrapped = /Error invoking remote method '[^']+': (?:Error: )?([\s\S]*)$/.exec(raw);
-      notify(wrapped?.[1] ?? raw, 'error');
+      notify(ipcErrorMessage(error), 'error');
     } finally {
       setBusy(null);
     }

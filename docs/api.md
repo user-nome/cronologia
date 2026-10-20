@@ -433,11 +433,17 @@ Registra atividade do usuário e renova a janela de ociosidade. O renderer
 chama em `pointerdown`/`keydown`/`wheel`; o throttle de 30 s é do lado main.
 Ler a chave no main **não** conta como atividade.
 
-### `vault.destroy() → Promise<VaultResult>`
+### `vault.destroy() → Promise<VaultDestroyResult>`
 
 **Destrutivo.** Zera a chave em memória, sobrescreve e apaga `vault.zkv` e o
-`.tmp`, e sobrescreve as capas. O backup na nuvem **não** é tocado: apagar lá
-é `drive.purge`, operação separada e explícita.
+`.tmp`, e sobrescreve as capas **e a biblioteca**. O acervo sai do disco na
+mesma operação: a chave morre junto, e um `library.enc` sobrevivente seria
+ilegível para o cofre novo (a leitura viraria `libraryTampered`).
+
+A resposta traz a contagem real do que saiu do disco (`shredded`/`failed`) e o
+estado pós-destruição: `ok: false` é **falha parcial** (sobrou resíduo do
+acervo), nunca um "apagado" em falso. O backup na nuvem **não** é tocado:
+apagar lá é `drive.purge`, operação separada e explícita.
 
 Depois da destruição, nada recria o container sem um `vault.create` explícito:
 escritas devolvem `vaultDestroyed` em vez de deixar um container pela metade,

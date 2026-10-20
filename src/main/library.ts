@@ -6,7 +6,7 @@ import { isWorkArray } from '@zero/shared';
 import { currentMessages } from '@zero/main/i18n';
 import { cacheDir, configDir, coversDir, dataDir, userDataDir } from '@zero/main/paths';
 import { shredDirectory, shredFile } from '@zero/main/shred';
-import type { ShredResult } from '@zero/main/shred';
+import type { ShredCounts } from '@zero/types';
 import {
   coverFileName,
   plainCoverName,
@@ -295,9 +295,24 @@ export function restoreLibrary(works: Work[]): Work[] {
  * sobrou resíduo no disco em vez de anunciar uma limpeza que não aconteceu.
  * Biblioteca ausente não conta como falha (instalação nova, `0` e `0`).
  */
-export function resetLibrary(): ShredResult {
+export function resetLibrary(): ShredCounts {
   requireVault();
-  const result: ShredResult = { shredded: 0, failed: 0 };
+  return shredLibrary();
+}
+
+/**
+ * Apaga o acervo em disco (biblioteca e capas) sobrescrevendo, **sem** exigir
+ * cofre aberto, e devolve a contagem real do que saiu do disco.
+ *
+ * Existe separada de `resetLibrary` por causa da destruição do cofre: ali a
+ * chave-mestra morre na mesma operação, e um `library.enc` sobrevivente seria
+ * ilegível para o cofre novo (a biblioteca viraria `libraryTampered` na
+ * primeira abertura) — além de continuar no disco, contra o que a tela
+ * promete ao usuário. `resetLibrary` exige cofre aberto justamente para não
+ * deixar um acervo ser apagado por engano com o cofre fechado.
+ */
+export function shredLibrary(): ShredCounts {
+  const result: ShredCounts = { shredded: 0, failed: 0 };
   if (shredFile(libraryPath())) result.shredded += 1;
   else if (libraryExists()) result.failed += 1;
   const covers = shredDirectory(coversDir());
@@ -358,10 +373,4 @@ export function mimeFor(fileName: string): string {
     default:
       return 'application/octet-stream';
   }
-}
-
-/** Sobrescreve e apaga a pasta de capas, deixando a pasta pronta de novo. */
-export function shredCovers(): void {
-  shredDirectory(coversDir());
-  coversDir();
 }

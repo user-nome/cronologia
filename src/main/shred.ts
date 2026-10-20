@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import type { ShredCounts } from '@zero/types';
 
 /**
  * Sobrescrita segura de arquivo antes da remoção.
@@ -112,18 +113,17 @@ function closeQuietly(fd: number | null): void {
   }
 }
 
-/** Contagem do que foi de fato sobrescrito e do que não deu. */
-export interface ShredResult {
-  shredded: number;
-  failed: number;
-}
-
 /**
  * Sobrescreve e apaga todo arquivo regular dentro de `dir`, e só então remove
  * a pasta. Diretório inexistente não é falha: `0` e `0`.
+ *
+ * A contagem devolvida é `ShredCounts` (de `@zero/types`): o mesmo formato
+ * atravessa a IPC (`LibraryReset`/`VaultDestroyResult`) e a varredura de disco
+ * (`cleanup.ts`), e um nome só para as três é o que impede a duplicação de
+ * `{ shredded, failed }` em cada camada.
  */
-export function shredDirectory(dir: string, passes: number = SHRED_PASSES): ShredResult {
-  const result: ShredResult = { shredded: 0, failed: 0 };
+export function shredDirectory(dir: string, passes: number = SHRED_PASSES): ShredCounts {
+  const result: ShredCounts = { shredded: 0, failed: 0 };
   let names: string[];
   try {
     names = fs.readdirSync(dir);

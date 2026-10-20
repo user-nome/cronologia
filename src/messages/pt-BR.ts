@@ -342,6 +342,8 @@ export const ptBR = {
     libraryReset: 'Biblioteca apagada.',
     resetPartial: (shredded: number, failed: number): string =>
       `${shredded} arquivo(s) sobrescrito(s) e apagado(s), mas ${failed} não puderam ser apagados. Pode ter sobrado resíduo no disco; feche e abra o app e tente de novo.`,
+    destroyPartial: (shredded: number, failed: number): string =>
+      `Cofre destruído, mas ${failed} arquivo(s) do acervo não puderam ser apagados (${shredded} foram). Pode ter sobrado resíduo no disco; feche e abra o app e apague a biblioteca à mão.`,
     vaultDestroyed: 'Cofre destruído. Crie um novo para continuar.',
     cloudPurged: 'Backup apagado da nuvem.',
     libraryLocked: 'Abra o cofre para apagar a biblioteca.',

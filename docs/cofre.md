@@ -247,16 +247,22 @@ a biblioteca depois da troca.
 Três operações destrutivas, todas com confirmação em duas etapas na interface
 (componente `DangerZone`):
 
-| Operação          | Canal           | O que faz                                                           |
-| ----------------- | --------------- | ------------------------------------------------------------------- |
-| Apagar biblioteca | `library:reset` | Sobrescreve e apaga `library.enc` e toda a pasta `covers/`          |
-| Destruir cofre    | `vault:destroy` | Zera a chave, sobrescreve `vault.zkv` e o `.tmp`, e shreda as capas |
-| Apagar backup     | `drive:purge`   | Apaga os blobs na conta de nuvem conectada                          |
+| Operação          | Canal           | O que faz                                                                       |
+| ----------------- | --------------- | ------------------------------------------------------------------------------- |
+| Apagar biblioteca | `library:reset` | Sobrescreve e apaga `library.enc` e toda a pasta `covers/`                      |
+| Destruir cofre    | `vault:destroy` | Zera a chave, sobrescreve `vault.zkv` e o `.tmp`, e shreda a biblioteca e capas |
+| Apagar backup     | `drive:purge`   | Apaga os blobs na conta de nuvem conectada                                      |
 
 Detalhes que valem saber:
 
 - **o que o erase precisa apagar**: o `vault.zkv.tmp` importa tanto quanto o
   container, porque carrega os mesmos blobs de chave embrulhada;
+- **destruir o cofre leva o acervo junto**: a chave-mestra morre na mesma
+  operação, e um `library.enc` sobrevivente seria ilegível para o cofre novo
+  (a leitura viraria `libraryTampered`) — além de continuar no disco, contra o
+  que a tela promete. A resposta traz a contagem real do que saiu
+  (`shredded`/`failed`): `ok: false` é falha parcial, nunca um "apagado" em
+  falso;
 - **nada recria o cofre depois**: `writeContainer` recusa com `vaultDestroyed`
   enquanto a marca estiver de pé, e só `createVault` a limpa. Sem isso, uma
   escrita acidental deixaria um container pela metade e o usuário leria
@@ -344,10 +350,12 @@ antes de qualquer release.
   (ver acima) e, se recusada, `vaultAuthCancelled`. A caixinha só aparece na
   **criação** do cofre: gravar um segredo num cofre cuja pasta perdeu a
   permissão falha direto com `vaultDirUnavailable`, sem diálogo.
-- Os canais `vault:create`/`unlock`/`destroy` devolvem o envelope `VaultResult`
-  com `code` + `retryInMs` (tabela em [`api.md`](api.md) §6) e o texto exibido
-  é localizado no renderer; `vault:status` e `vault:lock` devolvem `VaultStatus`
-  direto, e `settings:set` propaga como erro já localizado no main.
+- Os canais `vault:create`/`unlock` devolvem o envelope `VaultResult` com
+  `code` + `retryInMs` (tabela em [`api.md`](api.md) §6) e o texto exibido
+  é localizado no renderer; `vault:destroy` devolve `VaultDestroyResult` (o
+  mesmo envelope de estado, mais a contagem do acervo apagado); `vault:status`
+  e `vault:lock` devolvem `VaultStatus` direto, e `settings:set` propaga como
+  erro já localizado no main.
 
 ## Sem migração do legado
 
@@ -372,12 +380,18 @@ e o backup seguinte nasce no formato vigente (ver
 
 ## Variáveis de ambiente (testes e dev)
 
-| Variável               | Efeito                                                                |
-| ---------------------- | --------------------------------------------------------------------- |
-| `CRONOLOGIA_VAULT_DIR` | sobrepõe o diretório do cofre (testes usam sandbox própria)           |
-| `CRONOLOGIA_VAR_LIB`   | sobrepõe o `/var/lib` de base (testes e `npm run dev` usam o sandbox) |
+| Variável               | Efeito                                                              |
+| ---------------------- | ------------------------------------------------------------------- |
+| `CRONOLOGIA_VAULT_DIR` | sobrepõe o diretório do cofre (testes e `npm run dev` usam sandbox) |
+| `CRONOLOGIA_VAR_LIB`   | sobrepõe o `/var/lib` de base (testes usam sandbox)                 |
 
-Ambas desligam o pedido de sudo. Os testes também isolam
+Ambas desligam o pedido de sudo. O `npm run dev` (via `bin/dev.sh`) move ainda
+as três `XDG_*` (dados, configuração e cache) para dentro do repositório: o
+acervo é cifrado com a chave do cofre, e um cofre de dev com o acervo do app
+instalado é ilegível (`libraryTampered`). O dev não toca em nada do app
+instalado.
+
+Os testes também isolam
 `HOME`/`XDG_CONFIG_HOME` (`tests/setup-env.ts`) e trocam o Argon2id por um
 stand-in barato (`tests/helpers/kdf.ts`), senão cada cofre aberto na suíte
 custaria os 2,1 s do perfil do PIN. Um único arquivo

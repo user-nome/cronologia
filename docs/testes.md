@@ -12,7 +12,7 @@ Três camadas, com três SIGNais diferentes. Esta doc é da primeira:
 
 Suíte em Vitest com ambiente `jsdom` único (`vitest.config.mts`): o renderer e
 também o processo main rodam em `jsdom`, com o `electron` trocado pelo stub de
-`tests/mocks/electron.ts`. São **69 arquivos** e **1.093 testes**; a duração gira
+`tests/mocks/electron.ts`. São **72 arquivos** e **1.120 testes**; a duração gira
 em torno de 3 minutos porque os testes de backup cifram de verdade com scrypt
 `N=2^17` (~128 MiB por derivação), enquanto o Argon2id do cofre roda com o KDF
 barato dos testes (16 MiB).
@@ -50,6 +50,7 @@ São sob demanda (ver os guias linkados no topo).
 | `tests/main/index-vault.test.ts`            | Canais `vault:*` (criar/desbloquear/trava/destruir), guarda `assertAppFrame` e auto-lock (`vault:locked`)                                                                  |
 | `tests/main/protocols.test.ts`              | Scheme `cronologia://`: tabela de MIME por extensão, 403 em traversal percent-encoded, 404 e 500, e `appPageUrl` como base única                                           |
 | `tests/main/ipc-origem.test.ts`             | Guarda de origem do IPC: frames recusados, origem com porta diferente, dev server e a recusa no idioma em uso                                                              |
+| `tests/main/ipc-biblioteca.test.ts`         | Mensagem que atravessa o IPC do acervo: erro do cofre localizado e erro do domínio intacto                                                                                 |
 | `tests/main/node-loader.test.ts`            | Loader de aliases `@zero/*` rodando o Node de verdade em processo filho                                                                                                    |
 | `tests/main/external.test.ts`               | `openExternalSafe`: só `https`, esquema em qualquer caixa, URL malformada e recusa do shell                                                                                |
 | `tests/main/cleanup.test.ts`                | Varredura de legado no boot: o que é sobrescrito, o que é contado como falha e o log sem caminho do home                                                                   |
@@ -112,7 +113,15 @@ São sob demanda (ver os guias linkados no topo).
 | `tests/renderer/src/components/AttributionsModal.test.tsx`    | Página de Atribuições: rolagem em pausa e as duas faces do clique no overlay                                    |
 | `tests/renderer/src/components/DonateModal.test.tsx`          | Página de Doações: cópia do link, sem clipboard e falha de escrita                                              |
 | `tests/renderer/src/constants.test.ts`                        | Opções de filtro, cores, `coverUrl`, `formatDate`, `clampProgress`                                              |
+| `tests/renderer/src/errors.test.ts`                           | `ipcErrorMessage`: limpeza do prefixo do Electron, mensagem com quebra de linha e valor que não é `Error`       |
 | `tests/renderer/src/i18n.test.tsx`                            | `richText()` (marcadores no meio, no começo e no fim), contexto de idioma e catálogo de 5 idiomas               |
+
+### Build
+
+| Arquivo                                | O que cobre                                                                                                 |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `tests/build/apparmor-profile.test.ts` | Perfil AppArmor: socket do IBus, mídia removível, macros do perfil e estrutura                              |
+| `tests/build/dev-sandbox.test.ts`      | Sandbox do `npm run dev`: cofre e as três pastas XDG dentro do repositório (o acervo de dev não é o do app) |
 
 ### Apoios
 
@@ -173,14 +182,14 @@ de DOM em `tests/setup.ts`: `setupFiles` roda para ele também.
 
 `vitest.config.mts` mede `src/**/*.{ts,tsx}` com o provedor v8 (relatórios em
 texto e HTML em `coverage/`) e exige **95% por arquivo** (`perFile: true`) de
-linhas, instruções, funções e ramos. Estado medido na 2.1.1 (**1.093 testes em
-69 arquivos**, 81 arquivos de `src/` medidos):
+linhas, instruções, funções e ramos. Estado medido na 2.1.2 (**1.120 testes em
+72 arquivos**, 83 arquivos de `src/` medidos):
 
 | Métrica    | Global | Pior arquivo                   |
 | ---------- | ------ | ------------------------------ |
-| Statements | 99,30% | 96,00% (`main/cleanup.ts`)     |
-| Branches   | 98,67% | 95,00% (`vault/unlock.ts`)     |
-| Functions  | 99,56% | 95,23% (`drive/oauth-flow.ts`) |
+| Statements | 99,31% | 96,00% (`main/cleanup.ts`)     |
+| Branches   | 98,69% | 95,00% (`vault/unlock.ts`)     |
+| Functions  | 99,57% | 95,23% (`drive/oauth-flow.ts`) |
 | Lines      | 99,51% | 95,45% (`main/cleanup.ts`)     |
 
 **Nenhum arquivo fica abaixo de 95% em nenhuma das quatro métricas**, e
@@ -284,9 +293,10 @@ npm run dev:inspect-brk  # para na primeira linha, esperando o depurador
 ```
 
 Ambos passam `--inspect[=-brk]=5858` ao binário do Electron via
-`electron-vite`, com o mesmo cofre de sandbox (`.dev-vault`) e
-`ELECTRON_ENABLE_LOGGING=1`. Para anexar: `chrome://inspect` em um Chromium
-com "Configure…" apontando para `localhost:5858`, ou a porta `5858` na sua IDE.
+`electron-vite`, com o mesmo sandbox do `npm run dev` (cofre em `.dev-vault`,
+dados/config/cache em `.dev-home`) e `ELECTRON_ENABLE_LOGGING=1`. Para anexar:
+`chrome://inspect` em um Chromium com "Configure…" apontando para
+`localhost:5858`, ou a porta `5858` na sua IDE.
 
 Vale para `library.ts`, `store-crypto.ts`, `vault/*`, `drive/*` e para o
 `registerIpc` — inclusive para caçar um handler que devolve a promise errada.

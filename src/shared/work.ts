@@ -1,4 +1,5 @@
 import type { Work } from '@zero/types';
+import type { Untrusted } from '@zero/types/errors';
 
 /**
  * Validadores da forma de uma obra, compartilhados por quem **lê** acervo.
@@ -24,16 +25,16 @@ const REQUIRED_WORK_FIELDS = ['id', 'title', 'synopsis', 'type', 'status', 'prog
  * `true` quando `value` é uma obra com todos os campos obrigatórios no tipo
  * certo.
  *
- * O `in` antes do `typeof` é o que permite ao TypeScript estreitar `unknown`:
- * sem ele não há como saber que `value.id` existe. Os campos opcionais
- * (`createdAt`, `updatedAt`, `category`, `marker`, `coverFile`, `startedAt`,
- * `finishedAt`) não são conferidos: são exatamente os que o backup antigo não
- * tinha.
+ * O `in` antes do `typeof` é o que permite ao TypeScript estreitar o valor
+ * não-confiável: sem ele não há como saber que `value.id` existe. Os campos
+ * opcionais (`createdAt`, `updatedAt`, `category`, `marker`, `coverFile`,
+ * `startedAt`, `finishedAt`) não são conferidos: são exatamente os que o
+ * backup antigo não tinha.
  */
-export function isWorkRecord(value: unknown): value is Work {
+export function isWorkRecord(value: Untrusted): value is Work {
   if (typeof value !== 'object' || value === null) return false;
   if (!REQUIRED_WORK_FIELDS.every((field) => field in value)) return false;
-  const record = value as Record<(typeof REQUIRED_WORK_FIELDS)[number], unknown>;
+  const record = value as Record<(typeof REQUIRED_WORK_FIELDS)[number], Untrusted>;
   return (
     typeof record.id === 'string' &&
     typeof record.title === 'string' &&
@@ -45,6 +46,6 @@ export function isWorkRecord(value: unknown): value is Work {
 }
 
 /** `true` quando `value` é uma lista (possivelmente vazia) de obras válidas. */
-export function isWorkArray(value: unknown): value is Work[] {
+export function isWorkArray(value: Untrusted): value is Work[] {
   return Array.isArray(value) && value.every(isWorkRecord);
 }

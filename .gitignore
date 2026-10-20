@@ -9,6 +9,11 @@ release
 .env.*.local
 # cofre de desenvolvimento criado pelo `npm run dev` (CRONOLOGIA_VAULT_DIR)
 .dev-vault
+# sandbox de dados do `npm run dev` (XDG_DATA_HOME/XDG_CONFIG_HOME/XDG_CACHE_HOME).
+# O dev nunca toca o acervo, as settings nem o cache do app instalado: o acervo
+# é cifrado com a chave do cofre, e chave de dev com acervo de produção é
+# ilegível (viraria `libraryTampered` sem que nada tivesse sido adulterado).
+.dev-home
 # workspace temporário do repo APT flat gerado no CI (publish.yml)
 apt
 # bin/osv-scanner é um binário vendored (57 MB, só uso local). Não versionar;

@@ -306,6 +306,8 @@ export const zhCN: Messages = {
     libraryReset: '书库已删除。',
     resetPartial: (shredded: number, failed: number): string =>
       `已覆写并删除 ${shredded} 个文件，但有 ${failed} 个无法删除。磁盘上可能残留数据，请重启应用后重试。`,
+    destroyPartial: (shredded: number, failed: number): string =>
+      `密码库已销毁，但有 ${failed} 个书库文件无法删除（已删除 ${shredded} 个）。磁盘上可能残留数据，请重启应用后手动删除书库。`,
     vaultDestroyed: '密码库已销毁。请创建一个新的以继续。',
     cloudPurged: '备份已从云端删除。',
     libraryLocked: '请解锁密码库以删除书库。',

@@ -1,7 +1,7 @@
 {
   "name": "cronologia",
   "productName": "Cronologia",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Biblioteca de anotação de progresso em leituras de webtoons, manhwas, manhuas, mangás e livros",
   "main": "out/main/index.js",
   "desktopName": "cronologia.desktop",
@@ -17,9 +17,9 @@
   "homepage": "https://github.com/user-nome/cronologia",
   "license": "MIT",
   "scripts": {
-    "dev": "CRONOLOGIA_VAULT_DIR=\"$PWD/.dev-vault\" ELECTRON_ENABLE_LOGGING=1 electron-vite dev",
-    "dev:inspect": "CRONOLOGIA_VAULT_DIR=\"$PWD/.dev-vault\" ELECTRON_ENABLE_LOGGING=1 electron-vite dev --inspect 5858",
-    "dev:inspect-brk": "CRONOLOGIA_VAULT_DIR=\"$PWD/.dev-vault\" ELECTRON_ENABLE_LOGGING=1 electron-vite dev --inspectBrk 5858",
+    "dev": "bin/dev.sh",
+    "dev:inspect": "bin/dev.sh --inspect 5858",
+    "dev:inspect-brk": "bin/dev.sh --inspectBrk 5858",
     "clean": "rm -rf out",
     "build": "npm run clean && electron-vite build",
     "start": "electron-vite preview",

@@ -11,6 +11,7 @@ import {
   type StatusFilter,
 } from '@zero/renderer/constants';
 import { MessagesProvider } from '@zero/renderer/i18n';
+import { ipcErrorMessage } from '@zero/renderer/errors';
 import WorkCard from '@zero/renderer/components/WorkCard';
 import WorkModal from '@zero/renderer/components/WorkModal';
 import SettingsModal from '@zero/renderer/components/SettingsModal';
@@ -103,17 +104,33 @@ export default function App(): JSX.Element {
       setLoading(false);
       return;
     }
-    const [library, status, settings] = await Promise.all([
-      window.api.library.get(),
-      window.api.drive.status(),
-      window.api.settings.get(),
-    ]);
-    setWorks(library);
-    setDrive(status);
-    setLanguage(settings.language);
-    setVaultPrompt(null);
-    setLoading(false);
-  }, []);
+    try {
+      const [library, status, settings] = await Promise.all([
+        window.api.library.get(),
+        window.api.drive.status(),
+        window.api.settings.get(),
+      ]);
+      setWorks(library);
+      setDrive(status);
+      setLanguage(settings.language);
+      setVaultPrompt(null);
+      setLoading(false);
+    } catch (error) {
+      // O acervo ilegível (`libraryTampered`) não pode deixar a tela no
+      // spinner para sempre: a grade some, o motivo aparece e o acervo
+      // continua no disco (a falha é fechada, ninguém apagou nada).
+      setWorks([]);
+      setLoading(false);
+      // Se o cofre fechou no meio do caminho, o que falta é a senha, não um
+      // acervo quebrado: a tela volta a pedir a credencial.
+      const agora = await window.api.vault.status();
+      if (!agora.unlocked) {
+        setVaultPrompt(agora.exists ? 'unlock' : 'create');
+        return;
+      }
+      notify(ipcErrorMessage(error), 'error');
+    }
+  }, [notify]);
 
   useEffect(() => {
     void reload();

@@ -398,12 +398,15 @@ paths:
       tags: [cofre]
       summary: Destruir o cofre (destrutivo)
       description: >
-        Apaga a chave da sessão e sobrescreve `vault.zkv` (mais o `.tmp`
-        órfão). Sem a chave, todo `.enc` do acervo já é irrecuperável
-        (Cryptographic Erase), mas as capas são sobrescritas mesmo assim para
-        não deixar resíduo ilegível. O backup na nuvem **não** é tocado aqui:
-        é `/drive/purge`, operação separada e explícita. Depois da destruição,
-        `vaultDestroyed` barra qualquer gravação até um `vault:create` novo.
+        Apaga a chave da sessão, sobrescreve `vault.zkv` (mais o `.tmp`
+        órfão) e apaga o acervo local (biblioteca e capas). A chave morre na
+        mesma operação, então um acervo sobrevivente seria ilegível para o
+        cofre novo — por isso ele sai do disco junto. A resposta traz a
+        contagem real do que saiu: `ok: false` é falha parcial (sobrou
+        resíduo), nunca um "apagado" em falso. O backup na nuvem **não** é
+        tocado aqui: é `/drive/purge`, operação separada e explícita. Depois
+        da destruição, `vaultDestroyed` barra qualquer gravação até um
+        `vault:create` novo.
       x-ipc-channel: vault:destroy
       requestBody:
         required: false
@@ -414,11 +417,11 @@ paths:
               maxProperties: 0
       responses:
         '200':
-          description: Resultado com o estado pós-destruição
+          description: Estado pós-destruição e contagem do acervo apagado
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VaultResult'
+                $ref: '#/components/schemas/VaultDestroyResult'
   /vault/locked:
     post:
       tags: [cofre]
@@ -823,6 +826,26 @@ components:
               type: integer
               minimum: 0
               description: Espera antes de nova tentativa (0 = sem trava)
+    VaultDestroyResult:
+      description: >
+        Destruição do cofre: o estado pós-destruição e a contagem real do
+        acervo que saiu do disco. `ok: false` é **falha parcial** (sobrou
+        resíduo do acervo), não recusa: o cofre foi destruído de qualquer jeito.
+      type: object
+      required: [ok, shredded, failed, status]
+      properties:
+        ok:
+          type: boolean
+        shredded:
+          type: integer
+          minimum: 0
+          description: Arquivos do acervo sobrescritos e apagados
+        failed:
+          type: integer
+          minimum: 0
+          description: Arquivos do acervo que não puderam ser sobrescritos/apagados
+        status:
+          $ref: '#/components/schemas/VaultStatus'
     DriveStatus:
       type: object
       required: [connected, syncing, lastSync, lastError, accountEmail]

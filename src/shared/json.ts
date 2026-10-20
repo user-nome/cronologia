@@ -10,6 +10,8 @@
  * pergunta.
  */
 
+import type { Untrusted } from '@zero/types/errors';
+
 /**
  * `true` quando `value` é um objeto (não `null`, não primitivo), e portanto
  * admite `in`, `Reflect.get` e acesso por chave.
@@ -17,7 +19,7 @@
  * Arrays também passam: é proposital, porque `Array.isArray` é a checagem
  * seguinte em todo uso real (uma lista de obras, uma página de `list_folder`).
  */
-export function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: Untrusted): value is Record<string, Untrusted> {
   return typeof value === 'object' && value !== null;
 }
 
@@ -25,10 +27,10 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
  * Lê uma propriedade de um objeto já conferido por {@link isRecord}.
  *
  * Existe para o par `in` + `Reflect.get` ficar escrito uma vez só: `'x' in value`
- * estreita o tipo, mas o valor continua `unknown` e precisa de um segundo
- * passo. Devolve `unknown` de propósito, porque quem chamou ainda vai conferir
- * o tipo do campo.
+ * estreita o tipo, mas o valor continua sem tipo e precisa de um segundo passo.
+ * Devolve dado não-confiável de propósito, porque quem chamou ainda vai
+ * conferir o tipo do campo.
  */
-export function field(value: Record<string, unknown>, key: string): unknown {
+export function field(value: Record<string, Untrusted>, key: string): Untrusted {
   return key in value ? Reflect.get(value, key) : undefined;
 }

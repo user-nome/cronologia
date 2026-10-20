@@ -1,4 +1,5 @@
-export type { ElectronApi, LibraryReset, PurgeResult } from '@zero/types/api';
+export type { ElectronApi, LibraryReset, PurgeResult, VaultDestroyResult } from '@zero/types/api';
+export type { Untrusted } from '@zero/types/errors';
 export type {
   AccountEmailResponse,
   AuthorizationCode,
@@ -19,6 +20,7 @@ export type {
 } from '@zero/types/drive';
 export type { IpcFrameEvent, IpcSenderFrame } from '@zero/types/ipc';
 export type { AppSettings, Language } from '@zero/types/settings';
+export type { ShredCounts } from '@zero/types/shred';
 export type {
   ChangeMasterInput,
   ChangePinInput,

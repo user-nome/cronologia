@@ -20,7 +20,7 @@ import {
   importCover,
   loadLibrary,
   resetLibrary,
-  shredCovers,
+  shredLibrary,
   upsertWork,
 } from '@zero/main/library';
 import { loadSettings, saveSettings } from '@zero/main/settings';
@@ -67,6 +67,8 @@ import type {
   PurgeResult,
   ResetPinInput,
   UnlockInput,
+  Untrusted,
+  VaultDestroyResult,
   VaultResult,
   VaultStatus,
   Work,
@@ -223,7 +225,7 @@ function assertAppFrame(event: IpcFrameEvent | null | undefined): void {
  * Converte o `VaultError` do domínio no envelope de resposta dos canais de
  * cofre (o main nunca lança no IPC: o renderer localiza `code` no bundle).
  */
-function vaultFailure(error: unknown): VaultResult {
+function vaultFailure(error: Untrusted): VaultResult {
   if (isVaultError(error)) {
     return { ok: false, code: error.code, retryInMs: error.retryInMs ?? 0 };
   }
@@ -231,20 +233,53 @@ function vaultFailure(error: unknown): VaultResult {
   return { ok: false, code: 'vaultTampered', retryInMs: 0 };
 }
 
+/**
+ * Erro do cofre como o renderer consegue ler.
+ *
+ * O código do domínio (`libraryTampered`, `vaultLocked`) não sobrevive ao IPC:
+ * o renderer recebe só a mensagem, e a mensagem crua
+ * (`VaultError: libraryTampered`) não diz nada para quem lê a tela. Nos canais
+ * que **lançam** (o acervo e as settings), a mensagem sai no idioma vigente,
+ * como o resto do app.
+ *
+ * Erro que não é do cofre passa intacto, com a pilha dele: aqui só se traduz o
+ * que se sabe traduzir.
+ */
+function localizedError(error: Untrusted): unknown {
+  if (isVaultError(error)) {
+    return new Error(currentMessages().vault.errors[error.code], { cause: error });
+  }
+  return error;
+}
+
 function registerIpc(): void {
   ipcMain.handle('library:get', (event): Work[] => {
     assertAppFrame(event);
-    return loadLibrary();
+    try {
+      return loadLibrary();
+    } catch (error) {
+      // Acervo ilegível é falha fechada: a mensagem vai localizada para a tela
+      // e o acervo continua no disco (nada foi apagado).
+      throw localizedError(error);
+    }
   });
 
   ipcMain.handle('library:save', (event, work: Work): Work[] => {
     assertAppFrame(event);
-    return upsertWork(work);
+    try {
+      return upsertWork(work);
+    } catch (error) {
+      throw localizedError(error);
+    }
   });
 
   ipcMain.handle('library:delete', (event, id: string): Work[] => {
     assertAppFrame(event);
-    return deleteWork(id);
+    try {
+      return deleteWork(id);
+    } catch (error) {
+      throw localizedError(error);
+    }
   });
 
   // Destrutivo: apaga todo o acervo sobrescrevendo. Devolve a contagem real,
@@ -304,10 +339,7 @@ function registerIpc(): void {
         settings.driveClientId === '' ? loadSettings().driveClientId : settings.driveClientId;
       return saveSettings({ ...settings, driveClientId });
     } catch (error) {
-      if (isVaultError(error)) {
-        throw new Error(currentMessages().vault.errors[error.code], { cause: error });
-      }
-      throw error;
+      throw localizedError(error);
     }
   });
 
@@ -440,16 +472,26 @@ function registerIpc(): void {
     return status;
   });
 
-  // Destrutivo: apaga o cofre e o acervo local. Sem a chave, todo `.enc` do
-  // acervo já é irrecuperável, mas eles são sobrescritos mesmo assim para não
-  // deixar resíduo ilegível no disco. O backup na nuvem **não** é tocado aqui:
-  // é `drive:purge`, operação separada e explícita.
-  ipcMain.handle('vault:destroy', (event): VaultResult => {
+  // Destrutivo: apaga o cofre e o acervo local. O acervo é sobrescrito e apagado
+  // na mesma operação, porque a chave-mestra morre junto: sem chave ele já é
+  // irrecuperável (Cryptographic Erase), e um `library.enc` sobrevivente seria
+  // ilegível para o cofre novo. O backup na nuvem **não** é tocado aqui: é
+  // `drive:purge`, operação separada e explícita.
+  ipcMain.handle('vault:destroy', (event): VaultDestroyResult => {
     assertAppFrame(event);
+    // O acervo sai do disco **antes** do cofre: a chave morre na mesma
+    // operação, e a biblioteca que sobrasse seria ilegível para o cofre novo
+    // (viraria `libraryTampered` na primeira abertura) — além de continuar no
+    // disco, contra o que a tela promete ao usuário.
+    const acervo = shredLibrary();
     destroyVault();
-    shredCovers();
     reloadDriveState();
-    return { ok: true, status: vaultStatus() };
+    return {
+      ok: acervo.failed === 0,
+      shredded: acervo.shredded,
+      failed: acervo.failed,
+      status: vaultStatus(),
+    };
   });
 
   /**
