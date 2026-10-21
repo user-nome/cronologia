@@ -21,7 +21,8 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
   guia em `docs/messages.md`.
 - `src/shared/`: regras puras que o renderer e o main precisam concordar
   (`@zero/shared`): formato e força das credenciais do cofre (`policy`,
-  `strength`, `strategy`) e normalização de frase/contagem de trava (`format`).
+  `strength`, `strategy`), normalização de frase/contagem de trava (`format`) e
+  a digitação de data do campo de obra (`date`).
   Sem Node e sem DOM, para rodar nos dois processos; sem regra duplicada, ou o
   main acaba aceitando o que a tela recusa.
 - `src/preload/`: única ponte da UI; monta e expõe `window.api` tipado.
@@ -125,7 +126,7 @@ Camadas (diagrama no `README.md`, seção Arquitetura; detalhe em
   mas **não** no `npm run check` (abre janela, sobe porta de depuração e paga
   Argon2id de produção). Guia em `docs/e2e.md`.
 - `npm run test:mutation` / `test:mutation:plan`: varredura de mutação de
-  `src/` (2.045 mutantes). Leva horas: planeje em `--file src/main/arquivo.ts`
+  `src/` (3.036 mutantes). Leva horas: planeje em `--file src/main/arquivo.ts`
   para remediar um arquivo, e use `test:mutation:plan` para ver o plano sem
   executar. Também **não** entra no `npm run check`; no CI roda no job próprio do
   `quality.yml`, por disparo manual. Guia em `docs/mutation.md`.

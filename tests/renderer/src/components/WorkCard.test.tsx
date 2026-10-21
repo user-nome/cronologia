@@ -131,12 +131,12 @@ describe('WorkCard', () => {
 
   it('exibe data de início quando presente', () => {
     setup({ work: makeWork({ startedAt: '2026-01-15' }) });
-    expect(screen.getByText('Início da leitura: 2026-01-15')).toBeInTheDocument();
+    expect(screen.getByText('Início da leitura: 15/01/2026')).toBeInTheDocument();
   });
 
   it('exibe data de término quando presente', () => {
     setup({ work: makeWork({ finishedAt: '2026-03-20' }) });
-    expect(screen.getByText('Término da leitura: 2026-03-20')).toBeInTheDocument();
+    expect(screen.getByText('Término da leitura: 20/03/2026')).toBeInTheDocument();
   });
 
   it('não exibe datas vazias', () => {

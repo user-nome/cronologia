@@ -8,7 +8,7 @@
 manhuas, mangás e livros com capa, progresso e status, tudo gravado **cifrado**
 no seu próprio disco, sem conta e sem servidor.
 
-**Versão atual: 2.1.2 · Linux (amd64)**
+**Versão atual: 2.2.1 · Linux (amd64)**
 
 [Baixar .deb](https://github.com/user-nome/cronologia/releases/latest/download/cronologia_amd64.deb)
 &nbsp;·&nbsp; [Site do projeto](https://cronologia-delirante.vercel.app)
@@ -35,19 +35,26 @@ invadir. Quem tem o aplicativo tem as chaves; quem não tem, não vê nada.
 
 ### Suas leituras, em um lugar só
 
-Uma biblioteca com capa, título, tipo, status e progresso para cada obra. Nada sai
-da sua máquina e ninguém, nem nós, vemos o que está dentro.
+Uma biblioteca com capa, título, tipo, status, categoria e progresso para cada
+obra. Nada sai da sua máquina e ninguém, nem nós, vemos o que está dentro.
 
 - **Biblioteca em grade.** Cada obra entra com capa, título, tipo (**webtoon**,
-  **manhwa**, **manhua**, **mangá**, **livro** ou outro), status e progresso. O
-  cabeçalho mostra o total e o quanto você já leu da coleção inteira.
+  **manhwa**, **manhua**, **mangá**, **livro** ou outro), status, categoria e
+  progresso. O cabeçalho mostra o total e o progresso médio do que está na tela
+  agora, e a barra de estatísticas abaixo mostra os da coleção inteira.
 - **Capa da obra.** Escolha uma imagem JPG, PNG ou WebP do seu disco. A imagem é
   copiada para a biblioteca local e passa a ser a capa daquela obra.
 - **Título, descrição e marcação livres.** O que você precisar escrever: o nome,
   uma sinopse e, se quiser, um marcador como `Cap. 45` ou `Vol. 3`.
-- **Busca e filtros.** A lista filtra enquanto você digita, pelo título ou pela
-  descrição, e pelos chips de status (Lendo, Planejados, Pausados, Concluídos,
-  Cancelados).
+- **Categoria por obra.** Uma lista pronta (Isekai, Romance, Ação…) para
+  agrupar e achar as obras; o card mostra a categoria e a busca também a
+  enxerga.
+- **Data de início e de término.** O dia em que você começou e o dia em que
+  terminou, escritos com os números que você quiser (`10/02/2026`); o card
+  mostra as duas datas.
+- **Busca e filtros.** A lista filtra enquanto você digita, pelo título, pela
+  descrição ou pela categoria, e pelos chips de status (Lendo, Planejados,
+  Pausados, Concluídos, Cancelados).
 
 ### Progresso que dá para usar no dia a dia
 
@@ -115,7 +122,9 @@ demais costuma entregar menos do que parece:
 - **Não importa nem exporta** a biblioteca de outros aplicativos, e não
   sincroniza entre computadores.
 - **Não pede cadastro, e-mail ou pagamento.** Não há conta para criar e nada para
-  assinar: o aplicativo é gratuito, de código aberto e não mostra anúncios.
+  assinar: o aplicativo é gratuito, de código aberto e não mostra anúncios. A
+  página **Doar** é um link de contribuição voluntária que abre no navegador —
+  não é assinatura, e nada de pagamento acontece dentro do app.
 - **Não gera a sua frase de recuperação.** O aplicativo só conta as palavras. Quem
   escreve é você, e ela precisa ficar guardada fora do computador.
 
@@ -142,12 +151,15 @@ O acervo fica em `~/.local/share/cronologia/` (`library.enc` e `covers/*.enc`), 
 as **obras e capas são gravadas cifradas** com a chave do cofre. O idioma fica em
 `~/.config/cronologia/settings.json`.
 
-Os **segredos** (a senha mestra, o PIN, a frase de recuperação, os tokens da nuvem
-e a senha do backup) ficam em um cofre próprio, em
-`/var/lib/.cronologia/.vault/`, ou seja, **fora da sua pasta pessoal**. Isso é de
-propósito: ele não é apagado quando você limpa a pasta do usuário e não entra por
-acaso nos backups sincronizados da nuvem. A pasta é protegida pelo sistema e só o
-seu usuário consegue abrir.
+Os **segredos guardados** — os tokens das contas de nuvem, a senha de
+criptografia do backup e a chave alternativa do Dropbox, se você usar uma — ficam
+em um cofre próprio, em `/var/lib/.cronologia/.vault/`, ou seja, **fora da sua
+pasta pessoal**. Isso é de propósito: ele não é apagado quando você limpa a pasta
+do usuário e não entra por acaso nos backups sincronizados da nuvem. A pasta é
+protegida pelo sistema e só o seu usuário consegue abrir.
+
+A senha mestra, o PIN e a frase de recuperação **não são guardados**: eles são o
+que **abre** o cofre.
 
 Na primeira vez, o Cronologia pode pedir a senha de administrador pelo **diálogo
 padrão do Linux** para criar essa pasta. A senha é digitada no sistema e **nunca

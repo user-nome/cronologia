@@ -2,12 +2,11 @@
  * Guarda de dado que vem de fora: o JSON da nuvem, o container em disco, o
  * segredo guardado no cofre.
  *
- * `unknown` é o tipo certo na chegada (é o que o `JSON.parse` devolve), mas o
- * `typeof === 'object'` sozinho não ajuda o TypeScript: ele precisa saber que o
- * valor tem propriedades indexáveis antes de `in` e de `Reflect.get`. Esta
- * função é a ponte nomeada entre os dois, e ela mora em `src/shared/` porque
- * `library.ts`, `vault/` e os três módulos de `drive/` fazem exatamente a mesma
- * pergunta.
+ * `unknown` é o tipo certo na chegada, mas o `typeof === 'object'` sozinho não
+ * ajuda o TypeScript: ele precisa saber que o valor tem propriedades
+ * indexáveis antes de `in` e de `Reflect.get`. Esta função é a ponte nomeada
+ * entre os dois, e ela mora em `src/shared/` porque `library.ts`, `vault/` e os
+ * três módulos de `drive/` fazem exatamente a mesma pergunta.
  */
 
 import type { Untrusted } from '@zero/types/errors';
@@ -26,10 +25,8 @@ export function isRecord(value: Untrusted): value is Record<string, Untrusted> {
 /**
  * Lê uma propriedade de um objeto já conferido por {@link isRecord}.
  *
- * Existe para o par `in` + `Reflect.get` ficar escrito uma vez só: `'x' in value`
- * estreita o tipo, mas o valor continua sem tipo e precisa de um segundo passo.
- * Devolve dado não-confiável de propósito, porque quem chamou ainda vai
- * conferir o tipo do campo.
+ * Existe para o par `in` + `Reflect.get` ficar escrito uma vez só, e devolve
+ * dado não-confiável de propósito: quem chamou ainda vai conferir o tipo.
  */
 export function field(value: Record<string, Untrusted>, key: string): Untrusted {
   return key in value ? Reflect.get(value, key) : undefined;

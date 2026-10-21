@@ -21,6 +21,7 @@ export const ptBR = {
     noOptionsFound: 'Nenhuma opção encontrada',
     next: 'Avançar',
     back: 'Voltar',
+    invalidDate: (mask: string): string => `Data inválida. Use o formato ${mask}.`,
   },
 
   dialogs: {
@@ -172,9 +173,9 @@ export const ptBR = {
     increaseStep: (step: number): string => `Aumentar ${step}`,
     progressValue: (progress: number): string => `Cap. ${progress}`,
     startedAtLabel: 'Início da leitura',
-    startedAtPlaceholder: 'YYYY-MM-DD',
+    startedAtPlaceholder: 'DD/MM/AAAA',
     finishedAtLabel: 'Término da leitura',
-    finishedAtPlaceholder: 'YYYY-MM-DD',
+    finishedAtPlaceholder: 'DD/MM/AAAA',
     finish: 'Concluir',
     reset: 'Zerar',
     confirmDelete: 'Confirmar exclusão?',
@@ -216,25 +217,23 @@ export const ptBR = {
     ariaLabel: 'Doações',
     title: 'Apoie o projeto',
     banner:
-      'Se cada leitor pagasse um cafezinho, a revisão de produção do app no Dropbox saía ' +
-      'antes do próximo capítulo.',
+      'Com um cafezinho por leitor, a revisão de produção do app saía antes do próximo capítulo.',
     text1:
-      'Esse projeto nasceu para a comunidade otaku: um lugar para salvarmos nossas leituras ' +
-      'e não ficarmos perdidos caso percamos acesso às nossas plataformas de leitura ' +
-      'favoritas.',
+      'O projeto nasceu pra comunidade otaku: um lugar pra guardar nossas leituras e não ' +
+      'perder tudo se perdermos acesso às plataformas favoritas.',
     text2:
-      'Querendo ou não, eu tô mais quebrado que arroz de quinta, e o backup em nuvem depende ' +
-      'do Dropbox: enquanto o app não passar pela revisão de produção, depois das primeiras ' +
-      '50 contas conectadas ele tem 2 semanas para ser aprovado. Caso contrário, para de ' +
-      'aceitar gente nova. Sua doação ajuda a manter o app (e a minha paciência) no ar.',
+      'E eu tô mais quebrado que arroz de quinta: o backup em nuvem depende de um serviço ' +
+      'externo e, depois das primeiras 50 contas conectadas, o app tem só 2 semanas pra ser ' +
+      'aprovado, senão para de aceitar gente nova. Sua doação ajuda a manter tudo (e a minha ' +
+      'paciência) no ar.',
     text3:
-      'A verdade é que esse projeto é pessoal, para eu acompanhar minhas leituras. Porque ' +
-      'você, um otaku compulsivo como eu, sabe o que é ver sua plataforma favorita ir ' +
-      'de Vasco e perder todo o progresso das suas leituras.',
+      'Na real, o projeto é pessoal: é pra eu acompanhar minhas leituras. E você, otaku ' +
+      'compulsivo como eu, sabe o que é ver a plataforma favorita ir de Vasco e perder todo ' +
+      'o progresso.',
     text4:
-      'Mas se por algum milagre esse projeto vier a receber doações, vou fazer o meu melhor ' +
-      'para que ele seja o mais completo possível, assim podemos dormir tranquilos, sem ' +
-      'medo de acordar no outro dia e ver que o seu histórico de leitura foi de Vasco.',
+      'Mas se por milagre aparecer doação, faço o possível pra deixar tudo o mais completo ' +
+      'possível, aí a gente dorme tranquilo, sem medo de acordar com o histórico de leitura ' +
+      'indo de Vasco.',
     openTitle: 'Abre a página de doação no navegador',
     donateNow: 'Doar agora',
     copyTitle: 'Copia o link de doação',

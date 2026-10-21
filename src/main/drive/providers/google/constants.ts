@@ -28,11 +28,7 @@ export const GOOGLE_USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v3/us
  *
  * `drive.appdata` é o único que dá acesso à pasta oculta do app
  * (`appDataFolder`), que é onde o backup mora: ele **não** enxerga o Drive do
- * usuário, então o pedido não é "acesso ao Drive inteiro". `userinfo.email` só
- * serve para mostrar de quem é a conta conectada.
- *
- * Menos escopo é a defesa que o Google revisa: um pedido menor passa pela
- * verificação do app sem revisão de escopo sensível.
+ * usuário. `userinfo.email` só serve para mostrar de quem é a conta conectada.
  */
 export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/drive.appdata',
@@ -42,13 +38,11 @@ export const GOOGLE_SCOPES = [
 /**
  * Versão do escopo pedido; mudança invalida a sessão salva (reconexão
  * obrigatória). É independente da versão do Dropbox: os dois provedores têm
- * as suas próprias versões, e trocar de provedor não desconecta o outro.
+ * as suas próprias versões.
  */
 export const GOOGLE_SCOPE_VERSION = 1;
 
-/**
- * Desconto de renovação: o access token se considera velho 60 s antes do fim.
- */
+/** Desconto de renovação: o access token se considera velho 60 s antes do fim. */
 export const GOOGLE_TOKEN_MARGIN_MS = 60_000;
 
 /**
@@ -56,7 +50,6 @@ export const GOOGLE_TOKEN_MARGIN_MS = 60_000;
  *
  * Não há porta fixa aqui, ao contrário do Dropbox: para clientes *Desktop* o
  * Google aceita `http://localhost` em **qualquer** porta, sem cadastrar
- * cada uma no painel. O app sempre sobe em porta efêmera (sobe com `0`) e
- * monta o `redirect_uri` com a porta que o sistema escolheu.
+ * cada uma no painel. O app sempre sobe em porta efêmera (sobe com `0`).
  */
 export const GOOGLE_LOOPBACK_PATH = '/callback';

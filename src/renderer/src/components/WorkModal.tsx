@@ -11,9 +11,11 @@ import {
   clampProgress,
   coverUrl,
 } from '@zero/renderer/constants';
-import { useMessages } from '@zero/renderer/i18n';
+import { useLanguage, useMessages } from '@zero/renderer/i18n';
+import DateField from '@zero/renderer/components/DateField';
 import Select from '@zero/renderer/components/Select';
 import type { SelectOption } from '@zero/renderer/components/Select';
+import { dateMask } from '@zero/shared/date';
 
 interface WorkModalProps {
   work: Work;
@@ -31,10 +33,13 @@ export default function WorkModal({
   onClose,
 }: WorkModalProps): JSX.Element {
   const m = useMessages();
+  const language = useLanguage();
   const [draft, setDraft] = useState<Work>(work);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [startedInvalid, setStartedInvalid] = useState(false);
+  const [finishedInvalid, setFinishedInvalid] = useState(false);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -68,6 +73,12 @@ export default function WorkModal({
     const title = draft.title.trim();
     if (title === '') {
       setError(m.workModal.titleRequired);
+      return;
+    }
+    if (startedInvalid || finishedInvalid) {
+      // Uma data pela metade não pode virar acervo: o campo avisa, e o modal
+      // não salva por cima da última data boa.
+      setError(m.common.invalidDate(dateMask(language)));
       return;
     }
     setSaving(true);
@@ -219,32 +230,22 @@ export default function WorkModal({
           </div>
 
           <div className="form-row">
-            <div className="field">
-              <label>{m.workModal.startedAtLabel}</label>
-              <input
-                type="date"
-                data-testid="started-at-input"
-                value={draft.startedAt ?? ''}
-                placeholder={m.workModal.startedAtPlaceholder}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  patch({ startedAt: value !== '' ? value : undefined });
-                }}
-              />
-            </div>
-            <div className="field">
-              <label>{m.workModal.finishedAtLabel}</label>
-              <input
-                type="date"
-                data-testid="finished-at-input"
-                value={draft.finishedAt ?? ''}
-                placeholder={m.workModal.finishedAtPlaceholder}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  patch({ finishedAt: value !== '' ? value : undefined });
-                }}
-              />
-            </div>
+            <DateField
+              label={m.workModal.startedAtLabel}
+              value={draft.startedAt}
+              placeholder={m.workModal.startedAtPlaceholder}
+              testId="started-at-input"
+              onChange={(iso) => patch({ startedAt: iso })}
+              onInvalidChange={setStartedInvalid}
+            />
+            <DateField
+              label={m.workModal.finishedAtLabel}
+              value={draft.finishedAt}
+              placeholder={m.workModal.finishedAtPlaceholder}
+              testId="finished-at-input"
+              onChange={(iso) => patch({ finishedAt: iso })}
+              onInvalidChange={setFinishedInvalid}
+            />
           </div>
 
           <div className="form-row progress-card">

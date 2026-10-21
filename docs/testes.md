@@ -12,7 +12,7 @@ Três camadas, com três SIGNais diferentes. Esta doc é da primeira:
 
 Suíte em Vitest com ambiente `jsdom` único (`vitest.config.mts`): o renderer e
 também o processo main rodam em `jsdom`, com o `electron` trocado pelo stub de
-`tests/mocks/electron.ts`. São **72 arquivos** e **1.120 testes**; a duração gira
+`tests/mocks/electron.ts`. São **74 arquivos** e **1.154 testes**; a duração gira
 em torno de 3 minutos porque os testes de backup cifram de verdade com scrypt
 `N=2^17` (~128 MiB por derivação), enquanto o Argon2id do cofre roda com o KDF
 barato dos testes (16 MiB).
@@ -75,6 +75,7 @@ São sob demanda (ver os guias linkados no topo).
 | `tests/shared/strength.test.ts`             | Régua de força: o que recusa (`blocked`), a nota, o motivo, o acordo entre a tela e o main e a largura da barra                                                            |
 | `tests/shared/json.test.ts`                 | Guarda de dado externo: o que `isRecord` aceita, o que `field` devolve para valor falsy e o que sobe pela cadeia de protótipos                                             |
 | `tests/shared/work.test.ts`                 | Validador de obra: campo obrigatório faltando, campo no tipo errado, obra sem os opcionais do backup antigo e lista com um elemento ruim                                   |
+| `tests/shared/date.test.ts`                 | Digitação de data: máscara por idioma, números soltos, data colada, ano bissexto e o que não é uma data                                                                    |
 | `tests/main/vault-secrets.test.ts`          | Cofre é a única fonte: sem/aberto/fechado/adulterado (falha fechada), JSON de forma errada e sessão ligada à chave em memória                                              |
 | `tests/main/vault-privilege.test.ts`        | `setupVaultDirectory`: override bloqueia pkexec; exit 0/126/127/throw → ok/cancelled/failed; `isVaultDirUnavailable` e `createVault` sem pkexec no sandbox                 |
 | `tests/main/drive-auth.test.ts`             | Estado do Dropbox, tokens no cofre, escopo divergente e refresh                                                                                                            |
@@ -110,6 +111,7 @@ São sob demanda (ver os guias linkados no topo).
 | `tests/renderer/src/components/DangerZone.test.tsx`           | Confirmação em duas etapas das ações destrutivas e os três caminhos de falha                                    |
 | `tests/renderer/src/components/RestorePasswordModal.test.tsx` | Senha de restauração: foco, tipo do campo, atalhos e cancelamento                                               |
 | `tests/renderer/src/components/Select.test.tsx`               | Select acessível (teclado, `aria`, busca, menu vazio, e o controle desabilitado que não abre nem por clique)    |
+| `tests/renderer/src/components/DateField.test.tsx`            | Data digitada à mão: máscara, ISO na saída, texto inválido (aviso no campo), colagem e troca de valor por fora  |
 | `tests/renderer/src/components/AttributionsModal.test.tsx`    | Página de Atribuições: rolagem em pausa e as duas faces do clique no overlay                                    |
 | `tests/renderer/src/components/DonateModal.test.tsx`          | Página de Doações: cópia do link, sem clipboard e falha de escrita                                              |
 | `tests/renderer/src/constants.test.ts`                        | Opções de filtro, cores, `coverUrl`, `formatDate`, `clampProgress`                                              |
@@ -182,15 +184,15 @@ de DOM em `tests/setup.ts`: `setupFiles` roda para ele também.
 
 `vitest.config.mts` mede `src/**/*.{ts,tsx}` com o provedor v8 (relatórios em
 texto e HTML em `coverage/`) e exige **95% por arquivo** (`perFile: true`) de
-linhas, instruções, funções e ramos. Estado medido na 2.1.2 (**1.120 testes em
-72 arquivos**, 83 arquivos de `src/` medidos):
+linhas, instruções, funções e ramos. Estado medido na 2.2.1 (**1.154 testes em
+74 arquivos**, 85 arquivos de `src/` medidos):
 
 | Métrica    | Global | Pior arquivo                   |
 | ---------- | ------ | ------------------------------ |
-| Statements | 99,31% | 96,00% (`main/cleanup.ts`)     |
-| Branches   | 98,69% | 95,00% (`vault/unlock.ts`)     |
-| Functions  | 99,57% | 95,23% (`drive/oauth-flow.ts`) |
-| Lines      | 99,51% | 95,45% (`main/cleanup.ts`)     |
+| Statements | 99,35% | 96,00% (`main/cleanup.ts`)     |
+| Branches   | 98,71% | 95,00% (`vault/unlock.ts`)     |
+| Functions  | 99,58% | 95,23% (`drive/oauth-flow.ts`) |
+| Lines      | 99,54% | 95,45% (`main/cleanup.ts`)     |
 
 **Nenhum arquivo fica abaixo de 95% em nenhuma das quatro métricas**, e
 `npm run test:coverage` termina com código 0. O piso subiu de 50% agregado

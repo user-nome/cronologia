@@ -23,6 +23,7 @@ Todo texto vem do contexto de idioma (`useMessages()`), nunca embutido no JSX.
 | `components/AttributionsModal.tsx`    | Créditos das dependências em rolagem (pós-créditos)                        |
 | `components/DonateModal.tsx`          | Página de doação (Mercado Pago: abrir e copiar o link)                     |
 | `components/Select.tsx`               | Select custom acessível (teclado, `aria`, busca opcional)                  |
+| `components/DateField.tsx`            | Data digitada à mão: números livres com máscara do idioma, sem calendário  |
 | `i18n.tsx`                            | `MessagesProvider`, `useMessages()`, `useLanguage()`, `richText()`         |
 | `constants.ts`                        | Opções de filtro/tipo/status, cores, `clampProgress`, `coverUrl`           |
 | `donations.ts`                        | Constantes do link de doação (`DONATION_URL`)                              |
@@ -70,6 +71,13 @@ biblioteca.
   **Remover capa**.
 - Campos: título (obrigatório; erro em banner), sinopse, tipo, status,
   categoria (select pesquisável) e marcador.
+- Datas de início e término (`DateField`): a pessoa digita os números como
+  quiser (`10022026`, `10/02/2026`, `5/6/26`) e o campo mostra a máscara do
+  idioma (`10/02/2026`, `DD/MM/AAAA`); o calendário do navegador não aparece. O
+  que fica gravado é sempre ISO (`YYYY-MM-DD`), e o card mostra a data no mesmo
+  formato do campo. Data que não existe (31 de fevereiro) ou pela metade
+  avisa no campo e **bloqueia o salvamento** — a data guardada continua sendo a
+  última válida.
 - Progresso: campo numérico, `−10`/`+10`, percentual, **Concluir** e **Zerar**
   (volta para 0 e `planejado`).
 - Exclusão só em modo de edição, com confirmação em dois cliques no próprio

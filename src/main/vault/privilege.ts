@@ -7,7 +7,7 @@ import path from 'node:path';
  * - `cancelled`: o usuário dispensou a caixinha de senha (pkexec 126);
  * - `failed`: não deu para sequer tentar (sem pkexec, timeout, exit 127).
  */
-export type VaultSetupResult = 'ok' | 'cancelled' | 'failed';
+type VaultSetupResult = 'ok' | 'cancelled' | 'failed';
 
 function hasVaultOverride(): boolean {
   const dir = process.env.CRONOLOGIA_VAULT_DIR;
@@ -22,7 +22,7 @@ function hasVaultOverride(): boolean {
  * Dois minutos: é o que a caixinha do PolicyKit costuma levar para a pessoa
  * digitar a senha, e o que o app espera antes de desistir e devolver `failed`.
  */
-export const PKEXEC_TIMEOUT_MS = 120_000;
+const PKEXEC_TIMEOUT_MS = 120_000;
 
 /** O `pkexec` saiu com 126: a pessoa dispensou o diálogo de autenticação. */
 const PKEXEC_DISMISSED = 126;

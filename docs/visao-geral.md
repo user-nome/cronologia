@@ -2,9 +2,10 @@
 
 O Cronologia é um aplicativo desktop para anotar o **progresso das suas
 leituras** (webtoons, manhwas, manhuas, mangás, livros e outros): capa, título,
-descrição, barra de progresso em capítulos e marcação de conclusão, com
-**backup manual criptografado no Dropbox ou Google Drive**. Roda em Electron, é escrito em
-TypeScript com React na interface e é empacotado como `.deb` para o Linux Mint.
+descrição, categoria, barra de progresso em capítulos, marcação de conclusão e
+as datas de início e de término, com **backup manual criptografado no Dropbox ou
+Google Drive**. Roda em Electron, é escrito em TypeScript com React na interface
+e é empacotado como `.deb` para o Linux Mint.
 
 Tudo é local: a biblioteca mora na sua máquina, e a nuvem só é usada quando
 você mesmo clica em **Fazer backup agora** (ou **Restaurar**), pela pasta do
@@ -28,9 +29,11 @@ Drive só fica selecionável quando o build tem `GOOGLE_CLIENT_ID`.
 
 ## O que ele faz
 
-- Mantém a biblioteca em grade com capa, tipo, status e progresso, com busca e
-  filtros por status, e gravação atômica em `library.enc` (cifrado com a
-  chave do cofre).
+- Mantém a biblioteca em grade com capa, tipo, status, categoria e progresso, com
+  busca (título, descrição e categoria) e filtros por status, e gravação atômica
+  em `library.enc` (cifrado com a chave do cofre).
+- Anota as datas de início e de término da leitura, digitadas com os números que
+  a pessoa quiser (`10/02/2026`) e gravadas em ISO.
 - Copia a imagem de capa escolhida do disco para a biblioteca local e a serve
   pelo protocolo interno `cover://`.
 - Faz backup do `library.json` e das capas **sempre criptografados**

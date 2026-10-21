@@ -37,6 +37,12 @@ Regras das strings:
 (`SettingsModal` chama `onLanguageChange`); datas usam
 `formatDate(iso, language)` (`src/renderer/src/constants.ts`).
 
+A **data digitada à mão** (o campo de data do modal de obra) tem a ordem dos
+campos por idioma, e essa ordem mora em `src/shared/date.ts` (`dateMask`), que
+é a fonte única: a máscara exibida (`DD/MM/AAAA`, `MM/DD/YYYY`, `YYYY/MM/DD`) e
+o texto do aviso de data inválida (`m.common.invalidDate(mask)`) saem dela, e
+não de cada bundle.
+
 ## O que NÃO se traduz
 
 - **Dados por dependência**: `ATTRIBUTIONS[].description` e nomes/licenças de

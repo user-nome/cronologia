@@ -749,6 +749,22 @@ input[type='range']::-webkit-slider-thumb {
   border-color: var(--border-strong);
 }
 
+/* Data digitada à mão: os números ficam em coluna, para o olho achar o campo. */
+.field input.date-input {
+  letter-spacing: 0.6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.field input.date-input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .field input:focus,
 .field select:focus,
 .field textarea:focus {

@@ -4,9 +4,7 @@
  *
  * Vive em `src/types/` porque a checagem é regra de **segurança** e precisa de
  * nome, não de um `as` inline em `main/index.ts`: `assertAppFrame` é o que
- * barra uma página de terceiro de chamar os canais do cofre e da biblioteca, e
- * um tipo escrito na hora é exatamente o tipo que se esquece de atualizar quando
- * a barra muda.
+ * barra uma página de terceiro de chamar os canais do cofre e da biblioteca.
  */
 
 import type { Untrusted } from '@zero/types/errors';
@@ -14,12 +12,11 @@ import type { Untrusted } from '@zero/types/errors';
 /**
  * O frame que emitiu o pedido.
  *
- * `url` fica `Untrusted` (isto é, `unknown`) de propósito, e é a única coisa
- * neste arquivo que fica: o valor vem do processo do navegador, então a única
- * afirmação segura sobre ele é que não é uma string até `isAppFrameUrl`
- * conferir. `senderFrame` é `null` quando o pedido não veio de um frame (e
- * `undefined` quando a versão do Electron não o traz), e nos dois casos o
- * pedido é recusado.
+ * `url` fica `Untrusted` (isto é, `unknown`) de propósito: o valor vem do
+ * processo do navegador, então a única afirmação segura sobre ele é que não é
+ * uma string até `isAppFrameUrl` conferir. `senderFrame` é `null` quando o
+ * pedido não veio de um frame (e `undefined` quando a versão do Electron não o
+ * traz), e nos dois casos o pedido é recusado.
  */
 export interface IpcSenderFrame {
   url?: Untrusted;
