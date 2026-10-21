@@ -48,31 +48,31 @@ export interface StrengthResult {
 }
 
 /** Nota bruta: o nível na régua e quantos segmentos da barra acendem. */
-export interface Grade {
+interface Grade {
   level: StrengthLevel;
   score: number;
 }
 
 /** Quantas categorias de caractere aparecem e o tamanho do alfabeto delas. */
-export interface CharStats {
+interface CharStats {
   kinds: number;
   size: number;
 }
 
 /** Bits por palavra de um vocabulário tipo diceware (~7776). */
-export const WORDS_BIT = 12.9;
+const WORDS_BIT = 12.9;
 /** Um bloco de até 12 caracteres repetido preenche a string toda = degenerado. */
-export const MAX_BLOCK = 12;
+const MAX_BLOCK = 12;
 /** Abaixo disso a entrada ainda está incompleta: nada de bloqueio. */
-export const MIN_BLOCK_LENGTH = 8;
+const MIN_BLOCK_LENGTH = 8;
 
 /** Limiares de bits para os níveis de força (senha mestra e frase). */
-export const MASTER_BIT_THRESHOLDS = [28, 36, 60, 80] as const;
+const MASTER_BIT_THRESHOLDS = [28, 36, 60, 80] as const;
 /** Limiares de bits para os níveis de força do PIN. */
-export const PIN_BIT_THRESHOLDS = [16, 24] as const;
+const PIN_BIT_THRESHOLDS = [16, 24] as const;
 
 /** Limiares de bits com descontos por padrão (senha mestra). */
-export const MASTER_PENALTY_BITS = {
+const MASTER_PENALTY_BITS = {
   repeatedBlock: 10,
   sequenceLong: 10,
   sequenceShort: 30,
@@ -83,20 +83,20 @@ export const MASTER_PENALTY_BITS = {
 } as const;
 
 /** Limiares de bits com descontos por padrão (PIN). */
-export const PIN_PENALTY_BITS = {
+const PIN_PENALTY_BITS = {
   dateLike: 15,
   lowVariety: 16,
 } as const;
 
 /** Limiares de bits com descontos por padrão (frase). */
-export const PHRASE_PENALTY_BITS = {
+const PHRASE_PENALTY_BITS = {
   commonWord: 60,
   shortWords: 45,
 } as const;
 
 /** Ano mínimo/máximo plausível para detecção de data. */
-export const DATE_YEAR_MIN = 1900;
-export const DATE_YEAR_MAX = 2099;
+const DATE_YEAR_MIN = 1900;
+const DATE_YEAR_MAX = 2099;
 
 const LEVELS: readonly StrengthLevel[] = ['veryWeak', 'weak', 'fair', 'strong', 'veryStrong'];
 

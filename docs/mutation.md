@@ -33,8 +33,8 @@ node tools/mutation/run.ts --file src/main/library.ts --fresh
 `--fresh` descarta só os resultados dos arquivos selecionados, não os da
 varredura inteira.
 
-Plano atual de `src/` inteiro: **2.045 mutantes em 44 arquivos**, dos quais 37
-ficam fora do denominador por estarem em linha sem cobertura. Nenhum arquivo de
+Plano atual de `src/` inteiro: **3.036 mutantes em 69 arquivos**, dos quais 5
+ficam fora do denominador por terem linha sem cobertura. Nenhum arquivo de
 `src/` está sem teste.
 
 ## Escopo
@@ -105,7 +105,7 @@ O operador `numeric` também pula número em posição de tipo
 
 ## Como a varredura fica barata
 
-Uma execução da suíte inteira custa cerca de 100 s. Multiplicada por 2.045
+Uma execução da suíte inteira custa cerca de 100 s. Multiplicada por 3.036
 mutantes, a varredura seria de dias. O que reduz isso:
 
 - **Seleção por linha.** Uma matriz arquivo de teste → linhas de `src/`

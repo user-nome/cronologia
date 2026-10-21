@@ -49,7 +49,7 @@ import { isWorkArray } from '@zero/shared';
 import { vaultUnlocked } from '@zero/main/vault/secrets';
 
 /** Resultado de `purgeRemote`: contagem real, nunca um "apagado" em falso. */
-export interface PurgeSummary {
+interface PurgeSummary {
   ok: boolean;
   deleted: number;
   failed: number;

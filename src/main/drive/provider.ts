@@ -6,8 +6,6 @@ import { dropboxProvider } from '@zero/main/drive/providers/dropbox';
 import { googleDriveProvider } from '@zero/main/drive/providers/google';
 import { state } from '@zero/main/drive/state';
 
-export type { RemoteFile };
-
 /**
  * Contrato de um provedor de backup em nuvem.
  *

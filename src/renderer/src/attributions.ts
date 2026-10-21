@@ -1,4 +1,4 @@
-export interface Attribution {
+interface Attribution {
   name: string;
   license: string;
   description: string;

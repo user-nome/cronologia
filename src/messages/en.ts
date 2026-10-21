@@ -16,6 +16,7 @@ export const en: Messages = {
     noOptionsFound: 'No options found',
     next: 'Next',
     back: 'Back',
+    invalidDate: (mask: string): string => `Invalid date. Use the ${mask} format.`,
   },
 
   dialogs: {
@@ -166,9 +167,9 @@ export const en: Messages = {
     increaseStep: (step: number): string => `Increase ${step}`,
     progressValue: (progress: number): string => `Ch. ${progress}`,
     startedAtLabel: 'Started reading',
-    startedAtPlaceholder: 'YYYY-MM-DD',
+    startedAtPlaceholder: 'MM/DD/YYYY',
     finishedAtLabel: 'Finished reading',
-    finishedAtPlaceholder: 'YYYY-MM-DD',
+    finishedAtPlaceholder: 'MM/DD/YYYY',
     finish: 'Complete',
     reset: 'Reset',
     confirmDelete: 'Confirm deletion?',
@@ -210,16 +211,16 @@ export const en: Messages = {
     ariaLabel: 'Donations',
     title: 'Support the project',
     banner:
-      'If every reader bought a small coffee, the production review of the app on Dropbox ' +
-      'would land before the next chapter.',
+      'If every reader bought a small coffee, the production review of the app would land ' +
+      'before the next chapter.',
     text1:
       'This project was born for the otaku community: a place to save our readings and not ' +
       'get lost if we lose access to our favorite reading platforms.',
     text2:
-      'Like it or not, I am more broke than week-old rice and cloud backup depends on ' +
-      'Dropbox: until the app passes production review, after the first 50 connected ' +
-      'accounts it gets a 2-week clock to be approved or it stops accepting new people. ' +
-      'Your donation helps keep the app (and my patience) up.',
+      'Like it or not, I am more broke than week-old rice and cloud backup depends on an ' +
+      'external service: after the first 50 connected accounts the app has only 2 weeks to ' +
+      'be approved, or it stops accepting new people. Your donation helps keep everything ' +
+      '(and my patience) up.',
     text3:
       'The truth is this project is personal, for me to track my own readings. Because you, ' +
       'a compulsive otaku like me, know what it is to watch your favorite platform go down ' +

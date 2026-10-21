@@ -161,16 +161,43 @@ describe('WorkModal: campos', () => {
     const startedInput = screen.getByTestId('started-at-input');
     const finishedInput = screen.getByTestId('finished-at-input');
 
-    expect(startedInput).toHaveValue('2026-01-10');
-    expect(finishedInput).toHaveValue('2026-02-15');
+    // O campo mostra a data no formato do idioma, não o ISO que fica gravado.
+    expect(startedInput).toHaveValue('10/01/2026');
+    expect(finishedInput).toHaveValue('15/02/2026');
 
     await user.clear(startedInput);
-    await user.type(startedInput, '2026-02-01');
+    await user.type(startedInput, '01022026');
     await user.clear(finishedInput);
-    await user.type(finishedInput, '2026-03-20');
+    await user.type(finishedInput, '20032026');
 
-    expect(startedInput).toHaveValue('2026-02-01');
-    expect(finishedInput).toHaveValue('2026-03-20');
+    expect(startedInput).toHaveValue('01/02/2026');
+    expect(finishedInput).toHaveValue('20/03/2026');
+  });
+
+  it('grava a data em ISO quando a pessoa digita números livres', async () => {
+    const user = userEvent.setup();
+    const { onSave } = setup(makeWork({ startedAt: undefined }));
+    const startedInput = screen.getByTestId('started-at-input');
+
+    await user.type(startedInput, '10022026');
+    await user.click(screen.getByRole('button', { name: /Salvar/ }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ startedAt: '2026-02-10' }));
+  });
+
+  it('recusa salvar com uma data que não existe', async () => {
+    const user = userEvent.setup();
+    const { onSave } = setup(makeWork({ startedAt: undefined }));
+    const startedInput = screen.getByTestId('started-at-input');
+
+    await user.type(startedInput, '31022026');
+    await user.click(screen.getByRole('button', { name: /Salvar/ }));
+
+    expect(screen.getAllByText('Data inválida. Use o formato DD/MM/AAAA.').length).toBeGreaterThan(
+      0,
+    );
+    expect(onSave).not.toHaveBeenCalled();
   });
 
   it('limpa as datas quando o input fica vazio', async () => {

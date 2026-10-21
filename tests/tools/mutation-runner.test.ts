@@ -147,12 +147,22 @@ describe('os nós que o motor de mutação reconhece', () => {
 });
 
 describe('grafo de módulos', () => {
+  // O grafo é caro (o Babel parseia `src/` e `tests/` inteiros) e não muda
+  // entre os três vereditos: construí-lo uma vez é a diferença entre passar e
+  // estourar o tempo limite quando a suíte roda instrumentada. O prazo do hook
+  // é maior que o padrão porque o trabalho é de verdade — e a máquina pode
+  // estar ocupada com os outros arquivos da suíte.
+  let graph: ReturnType<typeof buildModuleGraph>;
+
+  beforeAll(() => {
+    graph = buildModuleGraph(process.cwd());
+  }, 60_000);
+
   it('o preload entra no grafo, alcançado pelo import() dinâmico do teste', () => {
     // `tests/preload/index.test.ts` carrega o preload com `await import()` para
     // poder rodar `vi.resetModules()`, e é o único caminho até ele. Sem
     // *following* do `import()` literal, este arquivo saía do plano de mutação e
     // a ponte entre a interface e o processo main deixava de ser medida.
-    const graph = buildModuleGraph(process.cwd());
     expect(graph.testsBySource.get('src/preload/index.ts')).toContain(
       'tests/preload/index.test.ts',
     );
@@ -164,7 +174,6 @@ describe('grafo de módulos', () => {
     // exclui os tipos, as traduções, o carregador do Node e os dados puros, então
     // este teste falha no momento em que um desses arquivos ganha teste: o sinal
     // para tirá-lo da lista de exclusões.
-    const graph = buildModuleGraph(process.cwd());
     expect(graph.orphans.filter((file) => isInScope(file))).toEqual([]);
   });
 
@@ -172,7 +181,6 @@ describe('grafo de módulos', () => {
     // Nenhum teste importa `src/types/index.ts` (só tipos, que somem em tempo de
     // runtime) nem `src/node.loader.ts` (só roda em processo filho). São órfãos
     // esperados, e `scope.ts` já os tira do denominador.
-    const graph = buildModuleGraph(process.cwd());
     expect(graph.orphans).toContain('src/node.loader.ts');
     expect(graph.orphans).toContain('src/types/index.ts');
   });

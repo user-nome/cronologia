@@ -1,4 +1,3 @@
-export type { PurgeSummary } from '@zero/main/drive/backup';
 export {
   backupInfo,
   backupNow,

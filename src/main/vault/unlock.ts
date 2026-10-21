@@ -35,13 +35,13 @@ export interface UnlockContext {
  * Falha de um elo: o código vai para a camada de cima localizar a mensagem no
  * bundle corrente, e `retryInMs` alimenta a contagem regressiva da tela.
  */
-export interface UnlockFailure {
+interface UnlockFailure {
   code: VaultErrorCode;
   retryInMs: number;
 }
 
 /** Resposta de um elo: `null` segue a cadeia, o resto encerra o desbloqueio. */
-export type HandlerOutcome = UnlockFailure | null;
+type HandlerOutcome = UnlockFailure | null;
 
 /**
  * Elo da cadeia (Chain of Responsibility): devolve `null` para passar a

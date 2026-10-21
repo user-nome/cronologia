@@ -12,8 +12,8 @@ import type { Untrusted } from '@zero/types/errors';
  *   vira `libraryTampered` — **nunca** `[]`, porque `[]` faria o próximo
  *   salvamento sobrescrever o acervo inteiro;
  * - `drive/backup.ts`, que restaura da nuvem. Aí corpo de outro formato é
- *   Simply ignorado pelo `every` abaixo, porque o backup pode não ter obra
- *   alguma e lista vazia é resultado legítimo.
+ *   simplesmente ignorado pelo `every` abaixo, porque o backup pode não ter
+ *   obra alguma e lista vazia é resultado legítimo.
  *
  * Pura e sem estado: só texto e objetos, então roda nos dois processos.
  */

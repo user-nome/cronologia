@@ -17,7 +17,7 @@ import type { VaultContainer } from '@zero/main/vault/container';
  */
 
 /** Estado da trava no container. */
-export interface AuthState {
+interface AuthState {
   attempts: number;
   /** Epoch em ms; `0` = sem trava. */
   lockUntil: number;
