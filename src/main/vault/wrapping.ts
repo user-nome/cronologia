@@ -27,15 +27,12 @@ import type { CredentialKind, VaultKdfParams } from '@zero/types/vault';
  * embrulho que regenera o do PIN.
  */
 
-/** Todo método que embrulha a chave, inclusive a frase de recuperação. */
-export type { CredentialKind };
-
 /**
  * Embrulhador de uma credencial: a única diferença entre os tipos é o custo do
  * Argon2id (`kdfProfileFor`), então uma hierarquia de classes seria quatro
  * subclasses idênticas sem polimorfismo nenhum.
  */
-export interface KeyWrapper {
+interface KeyWrapper {
   readonly kind: CredentialKind;
   /** Custo do Argon2id deste método (lido do container, na prática). */
   readonly kdf: VaultKdfParams;

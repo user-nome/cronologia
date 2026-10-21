@@ -1,6 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
-  AppSettings,
   BackupProviderId,
   ChangeMasterInput,
   ChangePinInput,
@@ -14,7 +13,6 @@ import type {
   VaultDestroyResult,
   VaultResult,
   VaultStatus,
-  Work,
 } from '@zero/types';
 
 const api: ElectronApi = {
@@ -70,5 +68,3 @@ const api: ElectronApi = {
 };
 
 contextBridge.exposeInMainWorld('api', api);
-
-export type { AppSettings, Work };

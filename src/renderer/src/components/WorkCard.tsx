@@ -1,7 +1,8 @@
 import type { JSX } from 'react';
 import type { Work, WorkStatus } from '@zero/types';
 import { STATUS_COLORS, TYPE_COLORS, coverUrl } from '@zero/renderer/constants';
-import { useMessages } from '@zero/renderer/i18n';
+import { useLanguage, useMessages } from '@zero/renderer/i18n';
+import { formatDateText } from '@zero/shared/date';
 
 interface WorkCardProps {
   work: Work;
@@ -17,6 +18,7 @@ export default function WorkCard({
   onStatus,
 }: WorkCardProps): JSX.Element {
   const m = useMessages();
+  const language = useLanguage();
   const url = coverUrl(work.coverFile);
   const done = work.status === 'concluido';
   const paused = work.status === 'pausado';
@@ -66,13 +68,13 @@ export default function WorkCard({
         {work.startedAt !== undefined && work.startedAt !== '' ? (
           <div className="card-date">
             <i className="fa-solid fa-calendar-days" /> {m.workModal.startedAtLabel}:{' '}
-            {work.startedAt}
+            {formatDateText(work.startedAt, language)}
           </div>
         ) : null}
         {work.finishedAt !== undefined && work.finishedAt !== '' ? (
           <div className="card-date">
             <i className="fa-solid fa-calendar-check" /> {m.workModal.finishedAtLabel}:{' '}
-            {work.finishedAt}
+            {formatDateText(work.finishedAt, language)}
           </div>
         ) : null}
 

@@ -21,15 +21,15 @@ não fala com a rede. Tudo que importa acontece no processo main, e o preload é
 
 ## Camadas
 
-| Pasta           | Papel                                                                                      | Arquivo principal                                |
-| --------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------ |
-| `src/main/`     | Janela, IPC, protocolos, persistência e backup em nuvem                                    | `index.ts`, `protocols.ts`                       |
-| `src/preload/`  | Fachada `window.api` registrada no `contextBridge` (build CJS)                             | `index.ts` (entrypoint)                          |
-| `src/renderer/` | Interface React: grade, modais, configurações e contexto de idioma                         | `App.tsx`                                        |
-| `src/types/`    | Contratos compartilhados (`Work`, `AppSettings`, `ElectronApi`)                            | `index.ts` (barrel)                              |
-| `src/messages/` | Textos em pt-BR (canônico), en, ko, zh-CN e ja                                             | `pt-BR.ts`, `index.ts`                           |
-| `src/shared/`   | Regras puras que renderer e main precisam concordar (credenciais e guarda de dado externo) | `policy.ts`, `strength.ts`, `json.ts`, `work.ts` |
-| `tests/`        | Suíte Vitest (ambiente jsdom, `electron` mockado)                                          | `tests/main/`, `tests/renderer/`                 |
+| Pasta           | Papel                                                                                                         | Arquivo principal                                           |
+| --------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `src/main/`     | Janela, IPC, protocolos, persistência e backup em nuvem                                                       | `index.ts`, `protocols.ts`                                  |
+| `src/preload/`  | Fachada `window.api` registrada no `contextBridge` (build CJS)                                                | `index.ts` (entrypoint)                                     |
+| `src/renderer/` | Interface React: grade, modais, configurações e contexto de idioma                                            | `App.tsx`                                                   |
+| `src/types/`    | Contratos compartilhados (`Work`, `AppSettings`, `ElectronApi`)                                               | `index.ts` (barrel)                                         |
+| `src/messages/` | Textos em pt-BR (canônico), en, ko, zh-CN e ja                                                                | `pt-BR.ts`, `index.ts`                                      |
+| `src/shared/`   | Regras puras que renderer e main precisam concordar (credenciais, guarda de dado externo e digitação de data) | `policy.ts`, `strength.ts`, `json.ts`, `work.ts`, `date.ts` |
+| `tests/`        | Suíte Vitest (ambiente jsdom, `electron` mockado)                                                             | `tests/main/`, `tests/renderer/`                            |
 
 Regras de organização: arquivo `index.ts` só reexporta (exceto os dois
 entrypoints que o Electron exige) e arquivo no teto de ~500 linhas é quebrado.

@@ -4,6 +4,57 @@ Todos os lançamentos seguem [versionamento semântico](https://semver.org/lang/
 (`MAJOR.MINOR.PATCH`) e o formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 em português do Brasil.
 
+## [2.2.1]
+
+### Mudado
+
+- **A data de início e de término agora se escreve com os números.** O campo
+  era o `date` do navegador: cinza, com calendário, e fora do tom do resto da
+  tela. Agora é o `DateField` (`renderer/src/components/DateField.tsx`): a pessoa
+  digita os números como quiser (`10022026`, `10/02/2026`, `5/6/26`) e o campo
+  mostra a máscara do idioma (`10/02/2026`, `DD/MM/AAAA`), no mesmo desenho dos
+  outros campos do modal. O que fica gravado continua sendo ISO
+  (`YYYY-MM-DD`) — é o que o acervo guarda — e o card passa a mostrar a data no
+  mesmo formato do campo, em vez do ISO cru. Data que não existe (31 de
+  fevereiro) ou pela metade avisa no campo e **bloqueia o salvamento**: a data
+  guardada continua sendo a última válida. A ordem dos campos por idioma mora
+  em `src/shared/date.ts`, que é a fonte única da máscara e da validação.
+
+### Limpeza
+
+- **O código fragmentado foi consolidado.** Tipos que só o próprio arquivo usa
+  (`Grade` e `CharStats` em `shared/strength.ts`, `StrengthStrategy` em
+  `shared/strategy.ts`, `BlobRead` em `main/vault/container.ts`, `PurgeSummary`
+  em `main/drive/backup.ts`, `VaultSetupResult` em `main/vault/privilege.ts`,
+  `AuthState`, `TokensSecret`, `UnlockFailure`, `HandlerOutcome` e
+  `Attribution`) deixaram de ser exportados: ninguém de fora os usava, e eles
+  só ocupavam os barrels. As constantes locais de um arquivo só
+  (`PROVIDER_LABELS`, `PKEXEC_TIMEOUT_MS`, `WORDS_BIT` e os limiares de força)
+  pararam de viajar pelo barrel do `@zero/shared`, e os reexports de passagem
+  (`RemoteFile` em `drive/provider.ts`, `CredentialKind` em `vault/wrapping.ts`,
+  `AppSettings`/`Work` no preload) foram embora. O ganho é o inverso do
+  barrel: agora ele é a lista do que é **de verdade** compartilhado.
+- **Os comentários verbosos dos arquivos pequenos foram encurtados.** Doze
+  arquivos de `src/` tinham mais comentário que código (o pior: `types/errors.ts`,
+  13 linhas de comentário para um alias de uma linha). O "porquê" continua
+  escrito, em uma ou duas linhas; o resto era repetição.
+
+### Cobertura de teste
+
+- **A suíte mede o estado novo**: 1.154 testes em 74 arquivos, 85 arquivos de
+  `src/` medidos, com o piso de 95% por arquivo mantido nas quatro métricas
+  (pior arquivo: `main/cleanup.ts` em 95,45% das linhas e `vault/unlock.ts` em
+  95,00% dos ramos). As regras de data têm teste próprio
+  (`tests/shared/date.test.ts`) e o campo tem o seu
+  (`tests/renderer/src/components/DateField.test.tsx`): o primeiro fixa a
+  máscara e o que é uma data válida, o segundo fixa o que a tela faz com o
+  texto que a pessoa digita.
+- **O grafo de módulos da varredura de mutação não estourava mais o tempo
+  limite.** Os três vereditos do grafo construíam o grafo inteiro cada vez (o
+  Babel parseia `src/` e `tests/` do começo ao fim), e com a suíte instrumentada
+  e a máquina ocupada isso passava dos 15 s. O grafo é o mesmo nos três
+  vereditos: agora ele é construído uma vez, num hook com prazo próprio.
+
 ## [2.1.2]
 
 ### Corrigido

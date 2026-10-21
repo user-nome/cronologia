@@ -16,6 +16,7 @@ export const zhCN: Messages = {
     noOptionsFound: '没有找到选项',
     next: '下一步',
     back: '返回',
+    invalidDate: (mask: string): string => `日期无效。请使用 ${mask} 格式。`,
   },
 
   dialogs: {
@@ -157,9 +158,9 @@ export const zhCN: Messages = {
     increaseStep: (step: number): string => `加${step}`,
     progressValue: (progress: number): string => `第${progress}话`,
     startedAtLabel: '开始阅读日期',
-    startedAtPlaceholder: 'YYYY-MM-DD',
+    startedAtPlaceholder: 'YYYY/MM/DD',
     finishedAtLabel: '完成阅读日期',
-    finishedAtPlaceholder: 'YYYY-MM-DD',
+    finishedAtPlaceholder: 'YYYY/MM/DD',
     finish: '完结',
     reset: '清零',
     confirmDelete: '确认删除？',
@@ -199,11 +200,11 @@ export const zhCN: Messages = {
   donate: {
     ariaLabel: '捐赠',
     title: '支持本项目',
-    banner: '如果每位读者请喝一杯咖啡，Dropbox上应用的正式审核就能在下一话之前通过。',
+    banner: '如果每位读者请喝一杯咖啡，应用的正式审核就能在下一话之前通过。',
     text1:
       '本项目为御宅族社区而生：一个保存我们阅读记录的地方，即使失去喜爱的阅读平台的访问权限也不会迷失。',
     text2:
-      '不管愿不愿意，我穷得叮当响，而云备份依赖Dropbox：在应用通过正式审核之前，连接满50个账号后，它只有2周时间获批，否则就不再接受新用户。您的捐赠有助于让应用（和我的耐心）继续运转。',
+      '不管愿不愿意，我穷得叮当响，而云备份依赖外部服务：连接满50个账号后，它只有2周时间获批，否则就不再接受新用户。您的捐赠有助于让一切（和我的耐心）继续运转。',
     text3:
       '说实话，这个项目起初只是我个人的追更记录。因为您，和我一样的强迫症御宅族，懂得看着喜爱的平台倒闭、阅读进度全部丢失是什么滋味。',
     text4:

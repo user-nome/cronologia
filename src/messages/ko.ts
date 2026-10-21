@@ -16,6 +16,7 @@ export const ko: Messages = {
     noOptionsFound: '일치하는 항목 없음',
     next: '다음',
     back: '뒤로',
+    invalidDate: (mask: string): string => `잘못된 날짜입니다. ${mask} 형식을 사용하세요.`,
   },
 
   dialogs: {
@@ -162,9 +163,9 @@ export const ko: Messages = {
     increaseStep: (step: number): string => `${step} 증가`,
     progressValue: (progress: number): string => `${progress}화`,
     startedAtLabel: '읽기 시작일',
-    startedAtPlaceholder: 'YYYY-MM-DD',
+    startedAtPlaceholder: 'YYYY/MM/DD',
     finishedAtLabel: '읽기 완료일',
-    finishedAtPlaceholder: 'YYYY-MM-DD',
+    finishedAtPlaceholder: 'YYYY/MM/DD',
     finish: '완독',
     reset: '초기화',
     confirmDelete: '삭제하시겠습니까?',
@@ -205,16 +206,15 @@ export const ko: Messages = {
     ariaLabel: '후원',
     title: '프로젝트 후원하기',
     banner:
-      '독자 한 분 한 분이 커피 한 잔 값을 내주신다면, Dropbox 앱의 정식 심사가 다음 ' +
-      '화보다 먼저 끝날 텐데요.',
+      '독자 한 분 한 분이 커피 한 잔 값을 내주신다면, 앱의 정식 심사가 다음 화보다 먼저 ' +
+      '끝날 텐데요.',
     text1:
       '이 프로젝트는 오타쿠 커뮤니티를 위해 태어났습니다: 좋아하는 읽기 플랫폼에 ' +
       '접근하지 못하게 되더라도 헤매지 않도록, 우리의 읽기를 저장하는 곳입니다.',
     text2:
-      '좋든 싫든 저는 정말 빈털터리이고, 클라우드 백업은 Dropbox에 달려 있습니다: 앱이 ' +
-      '정식 심사를 통과하기 전까지는 처음 50개 계정이 연결된 뒤 2주 안에 승인받지 못하면 ' +
-      '신규 가입을 받지 못합니다. 여러분의 후원이 앱(과 제 인내심)을 유지하는 데 도움이 ' +
-      '됩니다.',
+      '좋든 싫든 저는 정말 빈털터리이고, 클라우드 백업은 외부 서비스에 달려 있습니다: 처음 ' +
+      '50개 계정이 연결된 뒤 2주 안에 승인받지 못하면 신규 가입을 받지 못합니다. 여러분의 ' +
+      '후원이 모든 것(과 제 인내심)을 유지하는 데 도움이 됩니다.',
     text3:
       '사실 이 프로젝트는 제 읽기를 기록하기 위한 개인 프로젝트입니다. 저처럼 강박적인 ' +
       '오타쿠라면 아실 겁니다, 좋아하던 플랫폼이 망해서 읽기 기록을 몽땅 날려버리는 게 ' +

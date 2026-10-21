@@ -10,7 +10,7 @@ export type StrengthKind = 'master' | 'pin' | 'phrase';
  * Pura e sem estado, roda no main (recusa) e no renderer (medidor ao vivo),
  * sem depender de React nem de Node.
  */
-export interface StrengthStrategy {
+interface StrengthStrategy {
   readonly kind: StrengthKind;
   evaluate(value: string): StrengthResult;
 }
