@@ -36,7 +36,7 @@ env:
   VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
   # Impressão digital da chave que assina o repo APT: troque aqui e nos dois
   # secrets ao renovar. Procedimento e troubleshooting em docs/distribuicao-apt.md.
-  GPG_FINGERPRINT: 25300DF604649306F87CDF777DC37BA3C21FFA81
+  GPG_FINGERPRINT: 816E5A36A995EB61986F500002D8689E0CD7D378
 
 jobs:
   resolver-versao:
