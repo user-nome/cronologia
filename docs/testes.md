@@ -184,13 +184,13 @@ de DOM em `tests/setup.ts`: `setupFiles` roda para ele também.
 
 `vitest.config.mts` mede `src/**/*.{ts,tsx}` com o provedor v8 (relatórios em
 texto e HTML em `coverage/`) e exige **95% por arquivo** (`perFile: true`) de
-linhas, instruções, funções e ramos. Estado medido na 2.2.1 (**1.154 testes em
+linhas, instruções, funções e ramos. Estado medido na 2.2.2 (**1.154 testes em
 74 arquivos**, 85 arquivos de `src/` medidos):
 
 | Métrica    | Global | Pior arquivo                   |
 | ---------- | ------ | ------------------------------ |
 | Statements | 99,35% | 96,00% (`main/cleanup.ts`)     |
-| Branches   | 98,71% | 95,00% (`vault/unlock.ts`)     |
+| Branches   | 98,72% | 95,00% (`vault/unlock.ts`)     |
 | Functions  | 99,58% | 95,23% (`drive/oauth-flow.ts`) |
 | Lines      | 99,54% | 95,45% (`main/cleanup.ts`)     |
 

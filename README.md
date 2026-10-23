@@ -8,7 +8,7 @@
 manhuas, mangás e livros com capa, progresso e status, tudo gravado **cifrado**
 no seu próprio disco, sem conta e sem servidor.
 
-**Versão atual: 2.2.1 · Linux (amd64)**
+**Versão atual: 2.2.2 · Linux (amd64)**
 
 [Baixar .deb](https://github.com/user-nome/cronologia/releases/latest/download/cronologia_amd64.deb)
 &nbsp;·&nbsp; [Site do projeto](https://cronologia-delirante.vercel.app)

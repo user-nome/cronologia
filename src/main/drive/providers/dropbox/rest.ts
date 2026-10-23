@@ -76,6 +76,9 @@ async function apiFetch(path: string, body: unknown): Promise<Response> {
 /** Quantos caracteres do corpo cru entram na exceção quando não há `error_summary`. */
 const RAW_BODY_CHARS = 160;
 
+/** Página da listagem: 2000 é o teto que a API do Dropbox aceita. */
+const LIST_PAGE_SIZE = 2000;
+
 async function toDropboxError(res: Response): Promise<Error> {
   let detail = '';
   let raw = '';
@@ -114,7 +117,7 @@ export async function listAppFiles(): Promise<RemoteFile[]> {
   const first = await apiFetch('/files/list_folder', {
     path: '',
     recursive: false,
-    limit: 2000,
+    limit: LIST_PAGE_SIZE,
   });
   let data = await listFolderPage(first);
   for (const entry of data.entries ?? []) {

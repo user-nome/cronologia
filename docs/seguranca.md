@@ -33,6 +33,9 @@ que ela protege.
 | Auto-lock por ociosidade **real** (atividade da UI, não acesso a segredo) | `src/main/vault/session.ts` (`touch` com throttle), `src/main/index.ts` (`vault:touch`) |
 | Segredos com nome canônico (sem string solta)                             | `src/main/vault/secrets.ts`                                                             |
 | Cofre fora de `~` em `/var/lib` (raiz `0711` + vault `0700`)              | `build/scripts/after-install.sh`, `build/scripts/cronologia-setup`                      |
+| Helper do cofre recusa symlink nos caminhos fixos (root não segue link)   | `build/scripts/cronologia-setup`                                                        |
+| Perfil AppArmor e ação do PolicyKit instalados por troca atômica          | `build/scripts/after-install.sh`                                                        |
+| `postrm` não desmonta nada no `upgrade` do dpkg                           | `build/postrm`                                                                          |
 | Reparo da pasta do cofre só com PolicyKit (senha do sistema)              | `src/main/vault/privilege.ts` (`pkexec` + ação no `.policy`)                            |
 | Sem cofre não há segredo (falha fechada; nada em claro)                   | `src/main/settings.ts`, `src/main/drive/state.ts`                                       |
 | Canais `vault:*` com origem validada e envelope sem lançar                | `src/main/index.ts`                                                                     |
@@ -74,10 +77,11 @@ que ela protege.
 | CodeQL no push/PR                                                         | `.github/workflows/codeql.yml`                         |
 | Gate: check + testes antes de qualquer Release                            | `.github/workflows/publish.yml` (job `qualidade`)      |
 | `after-pack.cjs` sem mexer em `DT_NEEDED` (lição da 1.1.1)                | `build/after-pack.cjs`                                 |
+| Arquivos obrigatórios conferidos depois do enxugamento                    | `build/after-pack.cjs` (`REQUIRED_FILES`)              |
 | Confinamento AppArmor do processo instalado (escrita nos dirs do app e no | `build/apparmor-profile`                               |
 | vault em `/var/lib`, deny de credenciais no home, exec só `xdg-open`,     |                                                        |
 | rede só `stream`/`dgram`)                                                 |                                                        |
-| `purge` de dados + unload do perfil na remoção                            | `build/postrm`                                         |
+| `purge` de dados + unload do perfil na remoção (nada disso no `upgrade`)  | `build/postrm`                                         |
 
 ## Fluxo de confiança
 
@@ -118,7 +122,15 @@ nunca conteúdo em claro.
   cópia em variável de módulo ou Buffer que escape do Singleton.
 - O gate do `publish.yml` não pode voltar a ser advisory: `build-deb` precisa
   manter `needs: [resolver-versao, qualidade]`.
-- `libffmpeg.so` fora da lista do `after-pack.cjs` (o app não abre sem ela).
+- `libffmpeg.so` fora da lista do `after-pack.cjs` (o app não abre sem ela) e a
+  conferência de `REQUIRED_FILES` depois do enxugamento: é ela que transforma
+  "apaguei o arquivo errado" em build vermelho, não em `.deb` que não abre.
+- O `cronologia-setup` não pode parar de **recusar symlink** nos caminhos
+  fixos: ele roda como root e `install -d` segue ligação, então um diretório
+  plantado levaria o `chown`/`chmod` para outro lugar.
+- O `postrm` não pode voltar a desmontar perfil/PolicyKit no `upgrade` do dpkg
+  nem o `postinst` a gravar o `.policy` direto (a troca atômica evita um XML
+  truncado que derruba todas as ações do arquivo).
 - `build/apparmor-profile` não pode voltar ao perfil decorativo
   (`flags=(unconfined)`): ele só vale alguma coisa se for restritivo, a
   deny-list de credenciais não pode encolher, e cada regra nova precisa de

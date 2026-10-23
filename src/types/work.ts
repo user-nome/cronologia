@@ -23,3 +23,10 @@ export interface Work {
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * Obra como o formulário entrega ao `save`: os campos editáveis e os
+ * timestamps opcionais (o main carimba quando eles faltam).
+ */
+export type WorkDraft = Omit<Work, 'createdAt' | 'updatedAt'> &
+  Partial<Pick<Work, 'createdAt' | 'updatedAt'>>;

@@ -60,7 +60,9 @@ export default function Select<T extends string>({
     if (!open) return;
     const onPointerDown = (event: MouseEvent): void => {
       const root = rootRef.current;
-      if (root !== null && !root.contains(event.target as Node)) setOpen(false);
+      if (root !== null && event.target instanceof Node && !root.contains(event.target)) {
+        setOpen(false);
+      }
     };
     document.addEventListener('mousedown', onPointerDown);
     return () => document.removeEventListener('mousedown', onPointerDown);
@@ -104,8 +106,10 @@ export default function Select<T extends string>({
   };
 
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    const target = event.target as HTMLElement;
-    const typing = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+    const target = event.target;
+    const typing =
+      target instanceof HTMLElement &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
 
     if (disabled) {
       // Nem abrir nem navegar: um `Tab` que chega aqui não pode acionar nada.

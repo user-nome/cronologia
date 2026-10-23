@@ -15,8 +15,9 @@ name: Qualidade
 # "Testes de mutação" só por disparo manual, porque a varredura leva horas
 # (`docs/mutation.md`).
 #
-# Imagem `ubuntu-24.04` fixada e actions fixadas por SHA em Node 24: o porquê de
-# cada escolha está em `docs/build.md`.
+# Imagem `ubuntu-24.04` fixada e actions fixadas por SHA (runtime das actions
+# em Node 24; o projeto em si roda em Node 26): o porquê de cada escolha está
+# em `docs/build.md`.
 
 on:
   push:
@@ -53,7 +54,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
           cache: npm
 
       - run: npm ci
@@ -80,7 +81,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
           cache: npm
 
       - run: npm ci
@@ -134,7 +135,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
           cache: npm
 
       - run: npm ci
@@ -188,7 +189,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
           cache: npm
 
       - run: npm ci

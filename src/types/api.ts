@@ -19,14 +19,12 @@ import type {
   VaultResult,
   VaultStatus,
 } from '@zero/types/vault';
-import type { Work } from '@zero/types/work';
+import type { Work, WorkDraft } from '@zero/types/work';
 
 export interface ElectronApi {
   library: {
     get: () => Promise<Work[]>;
-    save: (
-      work: Omit<Work, 'createdAt' | 'updatedAt'> & Partial<Pick<Work, 'createdAt' | 'updatedAt'>>,
-    ) => Promise<Work[]>;
+    save: (work: WorkDraft) => Promise<Work[]>;
     remove: (id: string) => Promise<Work[]>;
     /** Apaga o acervo inteiro (destrutivo, irreversível). */
     reset: () => Promise<LibraryReset>;

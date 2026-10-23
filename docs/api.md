@@ -95,8 +95,9 @@ Arquivo cifrado ilegível **não** volta como lista vazia: falha com
 
 Cria ou atualiza uma obra e devolve a lista completa atualizada.
 
-- Entrada: `Omit<Work, 'createdAt' | 'updatedAt'>` (os carimbos são gerados
-  pelo main; `updatedAt` é renovado a cada salvamento).
+- Entrada: `WorkDraft` (`types/work.ts`) — os campos da obra com `createdAt`/
+  `updatedAt` opcionais; os carimbos são gerados pelo main e `updatedAt` é
+  renovado a cada salvamento.
 - `id` vazio gera UUID novo; fora da régua `^[A-Za-z0-9_-]{1,64}$` a chamada
   falha com `Identificador de obra inválido.` (nenhum id vira caminho de
   arquivo, `isValidWorkId`).

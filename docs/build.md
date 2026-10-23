@@ -28,9 +28,10 @@ no binário instalado — o fuse `enableNodeCliInspectArguments` está em `false
 depurador no processo que tem a chave-mestra em memória. Uso prático em
 [`testes.md`](testes.md) § "Depuração".
 
-Pré-requisitos: Node 24 + npm 11 e `fakeroot` no Linux para o `dist`. O binário
-`bin/osv-scanner` (usado por `security:audit`) não é versionado; localmente
-copie uma release (2.6.0) e no CI ele é baixado pelo próprio workflow.
+Pré-requisitos: Node 26 + npm 12 (o `engines` de `package.json` é o piso) e
+`fakeroot` no Linux para o `dist`. O binário `bin/osv-scanner` (usado por
+`security:audit`) não é versionado; localmente copie uma release (2.6.0) e no CI
+ele é baixado pelo próprio workflow.
 
 ## Saída do build
 
@@ -80,12 +81,19 @@ Remove do pacote o que o app não usa: `locales/` além de `pt-BR`, `pt-PT` e
 (sem WebGL). **Nunca** remover `libffmpeg.so`: o binário do Electron declara
 `DT_NEEDED` nele e o app não abre sem o arquivo (lição da v1.1.1).
 
+O enxugamento é conferido depois das remoções: se faltar no pacote
+`chrome-sandbox`, `libffmpeg.so`, `resources/app.asar` ou o próprio executável
+(ou se uma entrada errada em `REMOVE_FILES`/`KEEP_LOCALES` apagar um deles), o
+build **falha aqui**, com o nome do arquivo, em vez de gerar um `.deb` que não
+abre. Falha ao apagar um arquivo (filesystem sem suporte) só perde o
+enxugamento e vira aviso, sem derrubar o build.
+
 ### Perfil AppArmor (`build/apparmor-profile`)
 
-O `postinst` padrão do electron-builder copia o perfil para
-`/etc/apparmor.d/cronologia` e o carrega, **pulando** (sem falhar) onde
-AppArmor é antigo (base < `abi/4.0`, ex.: Mint 22 sobre 22.04) ou ausente. Sem
-essa chave, o que o `.deb` embutiria seria o perfil decorativo padrão
+O `postinst` custom do pacote (`build/scripts/after-install.sh`, abaixo) copia o
+perfil para `/etc/apparmor.d/cronologia` e o carrega, **pulando** (sem falhar)
+onde AppArmor é antigo (base < `abi/4.0`, ex.: Mint 22 sobre 22.04) ou ausente.
+Sem essa chave, o que o `.deb` embutiria seria o perfil decorativo padrão
 (`flags=(unconfined)`, que só dá nome ao processo). O perfil real confina o
 processo instalado:
 
@@ -118,7 +126,18 @@ Se esse cenário virar requisito, acrescente a regra de pai e registre o custo
 de permissão aqui.
 
 O perfil usa as macros `${executable}`/`${sanitizedProductName}`, que o
-electron-builder substitui na hora do build. Validação de sintaxe local:
+electron-builder substitui na hora do build.
+
+A instalação é do `postinst`, não do template: ele compila o perfil sem tocar no
+kernel (`apparmor_parser --skip-kernel-load -K`, com `--warn=rule-not-enforced`
+e `--warn=rule-downgraded` para que uma regra que o kernel atual ignora apareça
+no log do apt em vez de sumir), grava por troca atômica (`install` num `.new` +
+`mv` — um arquivo truncado pela metade derrubaria o `apparmor.service` no
+próximo boot) e, se o kernel recusar o carregamento, apaga o perfil em vez de
+deixar o serviço quebrado. O postinst é idempotente: roda igual em toda
+atualização.
+
+Validação de sintaxe local:
 
 ```bash
 apparmor_parser --skip-kernel-load --debug build/apparmor-profile
@@ -172,23 +191,40 @@ com o template padrão do electron-builder **mais** o que o cofre precisa:
   identificado, o app repara a pasta no primeiro uso;
 - a ação do PolicyKit `com.cronologia.setup-vault`
   (`/usr/share/polkit-1/actions/com.cronologia.policy`), que autoriza
-  **só** o helper do pacote (`annotate` com o caminho absoluto);
+  **só** o helper do pacote (`annotate` com o caminho absoluto) e é escrita
+  por troca atômica (`mktemp` no mesmo diretório + `mv`): um XML truncado faria
+  o polkit recusar a ação, e o app perderia o caminho para criar o cofre;
 - normalização do dono/modo de `resources/cronologia-setup` (o build pode
-  gravar com outro dono; `pkexec` exige root e sem escrita do grupo).
+  gravar com outro dono; `pkexec` exige root e sem escrita do grupo);
+- o link de `/usr/bin` nunca sobrescreve um arquivo real de outro pacote (só
+  symlink sai da frente), e se o `update-alternatives` terminar sem apontar
+  para o binário do pacote o postinst avisa no log do apt;
+- `chrome-sandbox` com dono root nos dois ramos do teste de user namespace
+  (com namespace, `0755`; sem, `4755`).
 
 O helper `build/scripts/cronologia-setup` (copiado por `extraResources` para
 `resources/`) roda como root via `pkexec`, **não** aceita caminho do chamador
 e só cria os dois diretórios fixos com os modos acima, dando o dono do vault a
-`PKEXEC_UID`. É ele que o `src/main/vault/privilege.ts` chama quando o app
-não consegue escrever em `/var/lib`.
+`PKEXEC_UID`. Antes de criar, ele **recusa ligação simbólica** em qualquer
+ponto fixo da árvore: `install -d` seguido de `chown`/`chmod` como root
+transferiria dono e modo para onde o link apontasse. É ele que o
+`src/main/vault/privilege.ts` chama quando o app não consegue escrever em
+`/var/lib`.
 
 ### `postrm` (after-remove)
 
 Substitui o template padrão (via `deb.afterRemove`; roda pelo `writeConfigFile`,
-que resolve os placeholders de nome). No No `remove` comum: remove o `update-alternatives`, **descarrega o perfil
-AppArmor do kernel** e apaga o arquivo (sem isso a policy ficaria imposta até
-o reboot), e apaga a ação do PolicyKit (fora do banco do dpkg). No `apt
-purge`, apaga também os dados do usuário em todos os homes
+que resolve os placeholders de nome). O dpkg chama o script com a ação em `$1`,
+e só `remove`, `purge` e `disappear` desmontam: em `upgrade` o script sai sem
+tocar em nada, para o perfil e a ação do PolicyKit continuarem de pé até o
+`postinst` novo recarregá-los (se ele falhar, o app não fica sem confinamento
+nem sem o caminho de reparo do cofre).
+
+No `remove` comum: remove o `update-alternatives` (inclusive o link direto
+órfão de uma instalação sem alternatives), **descarrega o perfil AppArmor do
+kernel** e apaga o arquivo (sem isso a policy ficaria imposta até o reboot),
+apaga o `.new` de um postinst interrompido e a ação do PolicyKit (fora do banco
+do dpkg). No `apt purge`, apaga também os dados do usuário em todos os homes
 (`.config`/`.local/share`/`.cache`/`.state/cronologia`) **e o cofre
 em `/var/lib/.cronologia`** (decisão de produto: purge leva junto).
 Pastas de marcas antigas (`Cronologia`, `Webtoons Biblioteca`) não
@@ -257,9 +293,11 @@ Para sair do 24.04: troque para `ubuntu-26.04` nos quatro arquivos, suba um job
 que só instala as dependências do E2E, e só depois mova os outros. Subir sem
 esse teste é trocar um `.deb` validado por um `.deb` não validado.
 
-Todas as actions estão fixadas por SHA **e** em Node 24 (`using: node24`): o
-Node 20 foi descontinuado e saiu dos runners em 23/09/2026, então uma action em
-Node 20 não roda mais — o runner a força para Node 24 e avisa a cada execução.
+Todas as actions estão fixadas por SHA **e** em Node 24 (`using: node24` — é o
+runtime **das actions**; o projeto roda em Node 26, declarado no
+`actions/setup-node` e em `engines` no `package.json`): o Node 20 foi
+descontinuado e saiu dos runners em 23/09/2026, então uma action em Node 20 não
+roda mais — o runner a força para Node 24 e avisa a cada execução.
 O Dependabot (`github-actions`) atualiza os pins.
 
 ## Fluxo do `publish.yml`

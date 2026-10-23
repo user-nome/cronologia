@@ -24,6 +24,12 @@ interface EditingState {
   isNew: boolean;
 }
 
+/** Aviso efêmero do rodapé: `error` só muda a cor. */
+interface Toast {
+  message: string;
+  kind: 'info' | 'error';
+}
+
 interface Stats {
   total: number;
   reading: number;
@@ -71,7 +77,7 @@ export default function App(): JSX.Element {
   const [showDonate, setShowDonate] = useState(false);
   const [drive, setDrive] = useState<DriveStatus | null>(null);
   const [language, setLanguage] = useState<Language>('pt-BR');
-  const [toast, setToast] = useState<{ message: string; kind: 'info' | 'error' } | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
   // Cofre fechado: `VaultModal` cobre a tela e nada do acervo é carregado.
   const [vaultPrompt, setVaultPrompt] = useState<'create' | 'unlock' | null>(null);
 
@@ -86,7 +92,7 @@ export default function App(): JSX.Element {
   // bundle inteiro (que mudaria a cada troca de idioma).
   const saveErrorMessage = m.app.toastSaveError;
 
-  const notify = useCallback((message: string, kind: 'info' | 'error' = 'info'): void => {
+  const notify = useCallback((message: string, kind: Toast['kind'] = 'info'): void => {
     setToast({ message, kind });
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), TOAST_TIMEOUT_MS);

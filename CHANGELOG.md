@@ -4,6 +4,70 @@ Todos os lançamentos seguem [versionamento semântico](https://semver.org/lang/
 (`MAJOR.MINOR.PATCH`) e o formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 em português do Brasil.
 
+## [2.2.2]
+
+### Mudado
+
+- **Node 26 no lugar do 24.** O `engines` de `package.json` passa a exigir
+  `>=26.0.0`, e os quatro jobs do `quality.yml` e os três do `publish.yml` usam
+  `node-version: 26`. O Node 24 que aparece nos comments dos workflows é o
+  runtime **das actions** (`using: node24`), não o do projeto; `@types/node` já
+  estava em `^26`.
+- **O empacotamento herdou o endurecimento do Guardinha.** O `postinst` agora
+  instala o perfil AppArmor por troca atômica (`install` num `.new` + `mv`) e
+  apaga o arquivo se o kernel recusar o carregamento, em vez de deixar o
+  `apparmor.service` quebrado; compila com `--warn=rule-not-enforced` e
+  `--warn=rule-downgraded` para que regra ignorada pelo kernel apareça no log
+  do apt; grava a ação do PolicyKit por `mktemp` + `mv` (XML truncado derrubaria
+  a ação inteira); não sobrescreve um arquivo real em `/usr/bin` e avisa quando
+  o `update-alternatives` não aponta para o binário do pacote. O
+  `cronologia-setup` recusa ligação simbólica nos caminhos fixos (roda como
+  root e `install -d` segue link), o `postrm` sai sem tocar em nada no
+  `upgrade` do dpkg e limpa o `.new` órfão e o link direto que sobrou, e o
+  `after-pack.cjs` confere `chrome-sandbox`, `libffmpeg.so`, `resources/app.asar`
+  e o executável **depois** de enxugar — arquivo errado na lista vira build
+  vermelho, não `.deb` que não abre.
+- **As dependências foram atualizadas.** Electron 44.9.3, ESLint 10.13.0,
+  `typescript-eslint` 8.72.0 e Vite 8.3.5 (15 pacotes, auditoria OSV limpa). O
+  Vite novo depreciou `rollupOptions`, então o `electron.vite.config.mts` passou
+  a usar `rolldownOptions` nos três blocos: sem isso o `no-deprecated` do ESLint
+  derrubava o `npm run check`. Electron 45 e TypeScript 7 são majors e ficaram
+  para uma mudança própria.
+
+### Segurança
+
+- **A pasta do cofre só é criada/reparada por caminho fixo.** O helper do
+  `.deb` passou a recusar symlink antes de `install -d` (medida registrada em
+  `docs/seguranca.md`).
+
+### Limpeza
+
+- **Tipos inline ganharam nome.** `WorkDraft` (`types/work.ts`) substitui o
+  `Omit<Work, 'createdAt' | 'updatedAt'> & Partial<Pick<...>>` que aparecia
+  copiado em `types/api.ts`, `main/library.ts` e no fixture dos testes; o
+  `Toast` do `App.tsx` deixou de ser um objeto solto no `useState`.
+- **Números mágicos saíram do meio do código.** O cabeçalho do `vault.zkv`
+  agora tem deslocamentos nomeados (`OFFSET_MAGIC`…`OFFSET_PAYLOAD_SALT`, com
+  `HEADER_BYTES` derivado deles), a listagem do Dropbox usa `LIST_PAGE_SIZE` e
+  o fluxo do Google usa `GOOGLE_AUTH_TIMEOUT_MS` (espelhando o Dropbox).
+- **Dois `as` a menos no seletor.** `Select.tsx` trocou `event.target as Node` e
+  `as HTMLElement` por `instanceof`, que além de dispensar a asserção não lança
+  quando o alvo não é um elemento.
+- **Comentários duplicados saíram.** O bloco em inglês do template do
+  electron-builder que repetia a explicação em português (AppArmor no
+  `postinst`, link do `postrm`) foi removido, e a destruição do cofre no
+  `main/index.ts` ficou com um comentário em vez de dois sobre a mesma ordem.
+
+### Cobertura de teste
+
+- **A suíte continua medindo o piso por arquivo.** 1.154 testes em 74 arquivos,
+  85 arquivos de `src/` medidos, com o piso de 95% nas quatro métricas mantido
+  (pior arquivo: `main/cleanup.ts` em 95,45% das linhas e `vault/unlock.ts` em
+  95,00% dos ramos). O refactor de constantes do `vault.zkv` e a troca de `as`
+  por `instanceof` no `Select.tsx` não mudaram comportamento, então não pediram
+  teste novo; a medição foi refeita para o número em `docs/testes.md` não
+  envelhecer (ramos globais: 98,72%).
+
 ## [2.2.1]
 
 ### Mudado
