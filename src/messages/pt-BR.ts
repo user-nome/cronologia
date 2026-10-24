@@ -213,35 +213,6 @@ export const ptBR = {
     creditsLoop: 'os créditos recomeçam em loop',
   },
 
-  donate: {
-    ariaLabel: 'Doações',
-    title: 'Apoie o projeto',
-    banner:
-      'Com um cafezinho por leitor, a revisão de produção do app saía antes do próximo capítulo.',
-    text1:
-      'O projeto nasceu pra comunidade otaku: um lugar pra guardar nossas leituras e não ' +
-      'perder tudo se perdermos acesso às plataformas favoritas.',
-    text2:
-      'E eu tô mais quebrado que arroz de quinta: o backup em nuvem depende de um serviço ' +
-      'externo e, depois das primeiras 50 contas conectadas, o app tem só 2 semanas pra ser ' +
-      'aprovado, senão para de aceitar gente nova. Sua doação ajuda a manter tudo (e a minha ' +
-      'paciência) no ar.',
-    text3:
-      'Na real, o projeto é pessoal: é pra eu acompanhar minhas leituras. E você, otaku ' +
-      'compulsivo como eu, sabe o que é ver a plataforma favorita ir de Vasco e perder todo ' +
-      'o progresso.',
-    text4:
-      'Mas se por milagre aparecer doação, faço o possível pra deixar tudo o mais completo ' +
-      'possível, aí a gente dorme tranquilo, sem medo de acordar com o histórico de leitura ' +
-      'indo de Vasco.',
-    openTitle: 'Abre a página de doação no navegador',
-    donateNow: 'Doar agora',
-    copyTitle: 'Copia o link de doação',
-    copyLink: 'Copiar link',
-    copied: 'Copiado!',
-    thanks: 'Valeu por manter a biblioteca viva e boa leitura!',
-  },
-
   workTypes: {
     webtoon: 'Webtoon',
     manhwa: 'Manhwa',
