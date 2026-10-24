@@ -45,6 +45,9 @@ export const GOOGLE_SCOPE_VERSION = 1;
 /** Desconto de renovação: o access token se considera velho 60 s antes do fim. */
 export const GOOGLE_TOKEN_MARGIN_MS = 60_000;
 
+/** Teto de espera pelo consentimento no navegador (o mesmo do Dropbox). */
+export const GOOGLE_AUTH_TIMEOUT_MS = 5 * 60 * 1000;
+
 /**
  * Passo do callback no servidor local.
  *

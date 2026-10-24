@@ -29,8 +29,22 @@ import { IV_BYTES, SALT_BYTES, TAG_BYTES, kdfParamsInRange } from '@zero/main/va
 export const MAGIC = 'CHRONOS1';
 export const VAULT_VERSION = 2;
 
-/** magic(8) + versão(4) + createdAt(8) + attempts(4) + lockUntil(8) + flags(1) + payloadSalt(16). */
-export const HEADER_BYTES = 49;
+/**
+ * Deslocamentos do cabeçalho, na ordem em que os campos aparecem no arquivo:
+ * magic(8) + versão(4) + createdAt(8) + attempts(4) + lockUntil(8) + flags(1)
+ * + payloadSalt(16). Escritos uma vez aqui para a leitura e a escrita não
+ * divergirem por causa de um `33` solto.
+ */
+const OFFSET_MAGIC = 0;
+const OFFSET_VERSION = OFFSET_MAGIC + 8;
+const OFFSET_CREATED_AT = OFFSET_VERSION + 4;
+const OFFSET_ATTEMPTS = OFFSET_CREATED_AT + 8;
+const OFFSET_LOCK_UNTIL = OFFSET_ATTEMPTS + 4;
+const OFFSET_FLAGS = OFFSET_LOCK_UNTIL + 8;
+const OFFSET_PAYLOAD_SALT = OFFSET_FLAGS + 1;
+
+/** Tamanho fixo do cabeçalho; o primeiro método começa logo depois dele. */
+export const HEADER_BYTES = OFFSET_PAYLOAD_SALT + SALT_BYTES;
 
 /** kdf(12) por método: memória, iterações e threads do Argon2id. */
 const METHOD_KDF_BYTES = 12;
@@ -162,13 +176,13 @@ export function encodeContainer(container: VaultContainer): Buffer {
   }
 
   const buffer = Buffer.alloc(size);
-  buffer.write(MAGIC, 0, 'ascii');
-  buffer.writeUInt32BE(VAULT_VERSION, 8);
-  buffer.writeBigUInt64BE(BigInt(container.createdAt), 12);
-  buffer.writeUInt32BE(container.attempts, 20);
-  buffer.writeBigInt64BE(BigInt(container.lockUntil), 24);
-  buffer.writeUInt8(flags, 32);
-  container.payloadSalt.copy(buffer, 33);
+  buffer.write(MAGIC, OFFSET_MAGIC, 'ascii');
+  buffer.writeUInt32BE(VAULT_VERSION, OFFSET_VERSION);
+  buffer.writeBigUInt64BE(BigInt(container.createdAt), OFFSET_CREATED_AT);
+  buffer.writeUInt32BE(container.attempts, OFFSET_ATTEMPTS);
+  buffer.writeBigInt64BE(BigInt(container.lockUntil), OFFSET_LOCK_UNTIL);
+  buffer.writeUInt8(flags, OFFSET_FLAGS);
+  container.payloadSalt.copy(buffer, OFFSET_PAYLOAD_SALT);
 
   let cursor = HEADER_BYTES;
   for (const [, , method] of presentes) {
@@ -181,19 +195,19 @@ export function encodeContainer(container: VaultContainer): Buffer {
 /** Lê o container; qualquer anormalidade devolve `null` (fail-closed). */
 export function decodeContainer(buffer: Buffer): VaultContainer | null {
   if (buffer.length < HEADER_BYTES) return null;
-  if (buffer.toString('ascii', 0, 8) !== MAGIC) return null;
-  if (buffer.readUInt32BE(8) !== VAULT_VERSION) return null;
+  if (buffer.toString('ascii', OFFSET_MAGIC, OFFSET_VERSION) !== MAGIC) return null;
+  if (buffer.readUInt32BE(OFFSET_VERSION) !== VAULT_VERSION) return null;
 
-  const createdAtBig = buffer.readBigUInt64BE(12);
-  const lockUntilBig = buffer.readBigInt64BE(24);
+  const createdAtBig = buffer.readBigUInt64BE(OFFSET_CREATED_AT);
+  const lockUntilBig = buffer.readBigInt64BE(OFFSET_LOCK_UNTIL);
   if (createdAtBig > BigInt(Number.MAX_SAFE_INTEGER)) return null;
   if (lockUntilBig < 0n || lockUntilBig > BigInt(Number.MAX_SAFE_INTEGER)) return null;
 
-  const flags = buffer.readUInt8(32);
+  const flags = buffer.readUInt8(OFFSET_FLAGS);
   // Flag fora do conjunto é arquivo adulterado (ou de outra versão futura).
   if ((flags & ~FLAGS_ALL) !== 0) return null;
 
-  const attempts = buffer.readUInt32BE(20);
+  const attempts = buffer.readUInt32BE(OFFSET_ATTEMPTS);
   if (attempts > MAX_ATTEMPTS) return null;
 
   const methods: VaultWrappings = {};
@@ -223,7 +237,9 @@ export function decodeContainer(buffer: Buffer): VaultContainer | null {
     createdAt: Number(createdAtBig),
     attempts,
     lockUntil: Number(lockUntilBig),
-    payloadSalt: Buffer.from(buffer.subarray(33, 33 + SALT_BYTES)),
+    payloadSalt: Buffer.from(
+      buffer.subarray(OFFSET_PAYLOAD_SALT, OFFSET_PAYLOAD_SALT + SALT_BYTES),
+    ),
     methods,
     payload: payloadRead.block,
   };

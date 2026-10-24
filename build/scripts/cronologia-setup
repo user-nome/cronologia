@@ -13,10 +13,23 @@ CALLER_USER="$(getent passwd "$CALLER_UID" | cut -d: -f1)"
 [ -n "$CALLER_USER" ] || exit 1
 CALLER_GROUP="$(id -gn "$CALLER_USER")"
 
+VAULT_ROOT='/var/lib/.cronologia'
+VAULT_DIR="$VAULT_ROOT/.vault"
+
+# Recusa ligação simbólica no caminho: este script roda como root, e o
+# `install -d` segue symlink, então um diretório plantado levaria o chown e o
+# chmod para outro lugar. Nada nesta árvore deveria ser ligação.
+for path in "$VAULT_ROOT" "$VAULT_DIR"; do
+  if [ -L "$path" ]; then
+    echo "cronologia-setup: $path é ligação simbólica; recusando." >&2
+    exit 1
+  fi
+done
+
 # raiz: root sem listagem (exige sudo para navegar/excluir o topo da árvore)
-install -d -m 0711 -o root -g root /var/lib/.cronologia
+install -d -m 0711 -o root -g root "$VAULT_ROOT"
 
 # área de trabalho do app: dono = usuário que autenticou (0700, oculta)
-install -d -m 0700 -o "$CALLER_USER" -g "$CALLER_GROUP" /var/lib/.cronologia/.vault
+install -d -m 0700 -o "$CALLER_USER" -g "$CALLER_GROUP" "$VAULT_DIR"
 
 exit 0

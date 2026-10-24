@@ -11,11 +11,16 @@
     "manhwa",
     "manga",
     "leitura",
+    "acervo",
+    "estante",
     "biblioteca"
   ],
   "author": "Otaku Delirante",
   "homepage": "https://github.com/user-nome/cronologia",
   "license": "MIT",
+  "engines": {
+    "node": ">=26.0.0"
+  },
   "scripts": {
     "dev": "bin/dev.sh",
     "dev:inspect": "bin/dev.sh --inspect 5858",

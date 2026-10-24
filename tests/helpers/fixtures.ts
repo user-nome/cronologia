@@ -1,4 +1,4 @@
-import type { Work } from '@zero/types';
+import type { Work, WorkDraft } from '@zero/types';
 
 export function makeWork(overrides: Partial<Work> = {}): Work {
   return {
@@ -14,9 +14,7 @@ export function makeWork(overrides: Partial<Work> = {}): Work {
   };
 }
 
-export function makeDraft(
-  overrides: Partial<Work> = {},
-): Omit<Work, 'createdAt' | 'updatedAt'> & Partial<Pick<Work, 'createdAt' | 'updatedAt'>> {
+export function makeDraft(overrides: Partial<Work> = {}): WorkDraft {
   const base = makeWork();
   return {
     id: base.id,

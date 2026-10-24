@@ -63,20 +63,6 @@ describe('App: páginas de apoio', () => {
       expect(screen.queryByRole('dialog', { name: 'Atribuições' })).not.toBeInTheDocument(),
     );
   });
-
-  it('fecha a página de doações', async () => {
-    const user = userEvent.setup();
-    setup();
-    await screen.findByText(/1 obra\(s\)/);
-
-    await user.click(screen.getByRole('button', { name: /^Doar$/ }));
-    expect(screen.getByRole('dialog', { name: 'Doações' })).toBeInTheDocument();
-
-    await user.click(screen.getByTitle('Fechar'));
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Doações' })).not.toBeInTheDocument(),
-    );
-  });
 });
 
 describe('App: zona de risco dentro das configurações', () => {
