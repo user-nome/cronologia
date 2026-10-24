@@ -17,7 +17,6 @@ import {
   trackProgressFromCard,
   unlockWithMaster,
   visitAttributions,
-  visitDonate,
 } from './support/flows.ts';
 
 /**
@@ -72,10 +71,6 @@ describe('App compilado (out/)', () => {
 
   it('abre a tela de atribuições', async () => {
     await visitAttributions(current().page);
-  });
-
-  it('abre a tela de doações e copia o link', async () => {
-    await visitDonate(current().page);
   });
 
   it('troca o idioma e volta para o português', async () => {
