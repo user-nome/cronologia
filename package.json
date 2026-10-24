@@ -1,7 +1,15 @@
 {
   "name": "cronologia",
   "productName": "Cronologia",
+<<<<<<< HEAD
   "version": "2.3.0",
+=======
+<<<<<<< HEAD
+  "version": "2.2.2",
+=======
+  "version": "2.3.0",
+>>>>>>> 6d79ffd (chore: update version to 2.3.0 and dependencies)
+>>>>>>> 83e7922 (chore: update version to 2.3.0 and dependencies)
   "description": "Biblioteca de anotação de progresso em leituras de webtoons, manhwas, manhuas, mangás e livros",
   "main": "out/main/index.js",
   "desktopName": "cronologia.desktop",
