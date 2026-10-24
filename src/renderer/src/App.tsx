@@ -16,7 +16,6 @@ import WorkCard from '@zero/renderer/components/WorkCard';
 import WorkModal from '@zero/renderer/components/WorkModal';
 import SettingsModal from '@zero/renderer/components/SettingsModal';
 import AttributionsModal from '@zero/renderer/components/AttributionsModal';
-import DonateModal from '@zero/renderer/components/DonateModal';
 import VaultModal from '@zero/renderer/components/VaultModal';
 
 interface EditingState {
@@ -68,7 +67,6 @@ export default function App(): JSX.Element {
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showAttributions, setShowAttributions] = useState(false);
-  const [showDonate, setShowDonate] = useState(false);
   const [drive, setDrive] = useState<DriveStatus | null>(null);
   const [language, setLanguage] = useState<Language>('pt-BR');
   const [toast, setToast] = useState<{ message: string; kind: 'info' | 'error' } | null>(null);
@@ -348,13 +346,6 @@ export default function App(): JSX.Element {
               <i className="fa-solid fa-clapperboard" /> {m.app.attributionsLabel}
             </button>
             <button
-              className="btn ghost"
-              onClick={() => setShowDonate(true)}
-              title={m.app.openDonateTitle}
-            >
-              <i className="fa-solid fa-heart" /> {m.app.donateLabel}
-            </button>
-            <button
               className="btn ghost icon-only"
               onClick={() => setShowSettings(true)}
               title={m.app.settingsTitle}
@@ -463,8 +454,6 @@ export default function App(): JSX.Element {
         ) : null}
 
         {showAttributions ? <AttributionsModal onClose={() => setShowAttributions(false)} /> : null}
-
-        {showDonate ? <DonateModal onClose={() => setShowDonate(false)} /> : null}
 
         {vaultPrompt !== null ? (
           <VaultModal

@@ -207,36 +207,6 @@ export const en: Messages = {
     creditsLoop: 'the credits restart in a loop',
   },
 
-  donate: {
-    ariaLabel: 'Donations',
-    title: 'Support the project',
-    banner:
-      'If every reader bought a small coffee, the production review of the app would land ' +
-      'before the next chapter.',
-    text1:
-      'This project was born for the otaku community: a place to save our readings and not ' +
-      'get lost if we lose access to our favorite reading platforms.',
-    text2:
-      'Like it or not, I am more broke than week-old rice and cloud backup depends on an ' +
-      'external service: after the first 50 connected accounts the app has only 2 weeks to ' +
-      'be approved, or it stops accepting new people. Your donation helps keep everything ' +
-      '(and my patience) up.',
-    text3:
-      'The truth is this project is personal, for me to track my own readings. Because you, ' +
-      'a compulsive otaku like me, know what it is to watch your favorite platform go down ' +
-      'the drain and lose every bit of your reading progress.',
-    text4:
-      'But if by some miracle this project ever receives donations, I will do my best to ' +
-      'make it as complete as possible so we can sleep soundly, without fear of waking up ' +
-      'the next day and finding that your reader history went down the drain.',
-    openTitle: 'Opens the donation page in the browser',
-    donateNow: 'Donate now',
-    copyTitle: 'Copies the donation link',
-    copyLink: 'Copy link',
-    copied: 'Copied!',
-    thanks: 'Thanks for keeping the library alive, happy reading!',
-  },
-
   workTypes: {
     webtoon: 'Webtoon',
     manhwa: 'Manhwa',
