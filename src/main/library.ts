@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import type { Work } from '@zero/types';
+import type { Work, WorkDraft } from '@zero/types';
 import { isWorkArray } from '@zero/shared';
 import { currentMessages } from '@zero/main/i18n';
 import { cacheDir, configDir, coversDir, dataDir, userDataDir } from '@zero/main/paths';
@@ -117,9 +117,7 @@ export function isValidWorkId(id: string): boolean {
   return WORK_ID_PATTERN.test(id);
 }
 
-export function upsertWork(
-  input: Omit<Work, 'createdAt' | 'updatedAt'> & Partial<Pick<Work, 'createdAt' | 'updatedAt'>>,
-): Work[] {
+export function upsertWork(input: WorkDraft): Work[] {
   if (input.id !== '' && !isValidWorkId(input.id)) {
     throw new Error(currentMessages().libraryErrors.invalidId);
   }

@@ -39,7 +39,7 @@ export default defineConfig(({ mode }) => ({
     },
     define: oauthCredentials(mode),
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         input: resolve(root, 'src/main/index.ts'),
       },
     },
@@ -52,7 +52,7 @@ export default defineConfig(({ mode }) => ({
       },
     },
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         input: resolve(root, 'src/preload/index.ts'),
         output: {
           // Preload sandboxed não tem loader ESM no Electron: precisa sair como
@@ -81,7 +81,7 @@ export default defineConfig(({ mode }) => ({
     },
     plugins: [react()],
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         input: resolve(root, 'src/renderer/index.html'),
       },
     },

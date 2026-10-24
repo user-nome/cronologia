@@ -12,8 +12,8 @@ name: Publicar .deb
 # "Gerar e publicar" só começa se os dois passarem.
 #
 # Imagem `ubuntu-24.04` fixada e actions fixadas por SHA (com a tag na
-# comentário, atualizadas pelo Dependabot) em Node 24: o porquê de cada escolha
-# está em `docs/build.md`.
+# comentário, atualizadas pelo Dependabot); runtime das actions em Node 24, o
+# projeto em Node 26: o porquê de cada escolha está em `docs/build.md`.
 on:
   push:
     branches:

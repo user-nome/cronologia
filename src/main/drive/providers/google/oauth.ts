@@ -2,6 +2,7 @@ import type { AccountEmailResponse } from '@zero/types';
 import type { OAuthFlow } from '@zero/main/drive/oauth-flow';
 import {
   GOOGLE_AUTH_ENDPOINT,
+  GOOGLE_AUTH_TIMEOUT_MS,
   GOOGLE_LOOPBACK_PATH,
   GOOGLE_SCOPES,
   GOOGLE_TOKEN_ENDPOINT,
@@ -72,7 +73,7 @@ export const googleFlow: OAuthFlow = {
   authorizeEndpoint: GOOGLE_AUTH_ENDPOINT,
   tokenEndpoint: GOOGLE_TOKEN_ENDPOINT,
   scopes: GOOGLE_SCOPES,
-  timeoutMs: 5 * 60 * 1000,
+  timeoutMs: GOOGLE_AUTH_TIMEOUT_MS,
   loopbackPath: GOOGLE_LOOPBACK_PATH,
   authorizeParams,
   tokenParams,

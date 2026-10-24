@@ -479,10 +479,7 @@ function registerIpc(): void {
   // `drive:purge`, operação separada e explícita.
   ipcMain.handle('vault:destroy', (event): VaultDestroyResult => {
     assertAppFrame(event);
-    // O acervo sai do disco **antes** do cofre: a chave morre na mesma
-    // operação, e a biblioteca que sobrasse seria ilegível para o cofre novo
-    // (viraria `libraryTampered` na primeira abertura) — além de continuar no
-    // disco, contra o que a tela promete ao usuário.
+    // Ordem: o acervo sai primeiro; a chave morre na mesma operação.
     const acervo = shredLibrary();
     destroyVault();
     reloadDriveState();
