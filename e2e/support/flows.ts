@@ -252,14 +252,6 @@ export async function visitAttributions(page: Page): Promise<void> {
   await waitForText(page, WORK.editedTitle);
 }
 
-export async function visitDonate(page: Page): Promise<void> {
-  await page.getByTitle(pt.app.openDonateTitle, { exact: true }).click();
-  await waitForHeading(page, pt.donate.title);
-  await waitForText(page, pt.donate.copyLink);
-  await closeButton(page, pt.common.close).click();
-  await waitForText(page, WORK.editedTitle);
-}
-
 /**
  * Troca de idioma e volta. O `Select` de idioma fica no modal de configurações,
  * que é onde o ajuste é salvo; o header e os cards acompanham porque a UI lê do
