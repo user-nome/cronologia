@@ -4,6 +4,12 @@ Todos os lançamentos seguem [versionamento semântico](https://semver.org/lang/
 (`MAJOR.MINOR.PATCH`) e o formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 em português do Brasil.
 
+## [2.3.0]
+
+### Mudado
+
+- **Remoção do modal de doações** Fiquei emburrado e removi as doações, fazer o que! Sou sentimental.
+
 ## [2.2.2]
 
 ### Mudado
