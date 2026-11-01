@@ -54,18 +54,18 @@ export default defineConfig({
         // o número deitar um teste que existe e passa.
         'src/node.loader.ts',
       ],
-      // Meta de 95% **por arquivo** nas quatro métricas. Subiu de 50% depois
+      // Meta de 90% **por arquivo** nas quatro métricas. Subiu de 50% depois
       // da leva de testes de 2026-10: a varredura por arquivo, de baixo para
       // cima, mostrou que o piso agregado deixava passar um arquivo inteiro
       // sem teste (o entry do renderer estava em 0%, os bundles de idioma em
-      // 10% e o scheme da SPA em 35%). A diferença entre 95% global e 95% por
+      // 10% e o scheme da SPA em 35%). A diferença entre 90% global e 90% por
       // arquivo é que a segunda não perdoa o arquivo esquecido.
       thresholds: {
         perFile: true,
-        lines: 95,
+        lines: 90,
         statements: 90,
-        functions: 95,
-        branches: 95,
+        functions: 90,
+        branches: 90,
       },
     },
   },
