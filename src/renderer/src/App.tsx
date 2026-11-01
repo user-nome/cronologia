@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
-import type { DriveStatus, Language, Work, WorkStatus } from '@zero/types';
+import type { DriveStatus, Language, Work, WorkStatus, WorkType } from '@zero/types';
 import { messages } from '@zero/messages';
 import {
   FILTER_OPTIONS,
@@ -17,6 +17,8 @@ import WorkModal from '@zero/renderer/components/WorkModal';
 import SettingsModal from '@zero/renderer/components/SettingsModal';
 import AttributionsModal from '@zero/renderer/components/AttributionsModal';
 import VaultModal from '@zero/renderer/components/VaultModal';
+import Sidebar from '@zero/renderer/components/Sidebar';
+import AppIcon from '@zero/renderer/components/AppIcon';
 
 interface EditingState {
   work: Work;
@@ -39,13 +41,13 @@ interface Stats {
   average: number;
 }
 
-function blankWork(): Work {
+function blankWork(type: WorkType = 'webtoon'): Work {
   const now = new Date().toISOString();
   return {
     id: crypto.randomUUID(),
     title: '',
     synopsis: '',
-    type: 'webtoon',
+    type,
     status: 'planejado',
     progress: 0,
     marker: '',
@@ -70,6 +72,7 @@ export default function App(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<StatusFilter>('todos');
+  const [typeFilter, setTypeFilter] = useState<WorkType | null>(null);
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showAttributions, setShowAttributions] = useState(false);
@@ -274,15 +277,17 @@ export default function App(): JSX.Element {
     const term = query.trim().toLowerCase();
     return works
       .filter((work) => (filter === 'todos' ? true : work.status === filter))
+      .filter((work) => (typeFilter === null ? true : work.type === typeFilter))
       .filter((work) =>
         term === ''
           ? true
           : work.title.toLowerCase().includes(term) ||
             work.synopsis.toLowerCase().includes(term) ||
-            (work.category ?? '').toLowerCase().includes(term),
+            (work.category ?? '').toLowerCase().includes(term) ||
+            (work.readingNotes ?? []).some((note) => note.summary.toLowerCase().includes(term)),
       )
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }, [works, query, filter]);
+  }, [works, query, filter, typeFilter]);
 
   const stats: Stats = useMemo(() => summarize(works), [works]);
   const visibleStats: Stats = useMemo(() => summarize(visible), [visible]);
@@ -300,139 +305,125 @@ export default function App(): JSX.Element {
   return (
     <MessagesProvider language={language}>
       <div className="app">
-        <header className="header">
-          <div className="brand">
-            <div className="brand-logo">
-              <i className="fa-solid fa-book-open" />
-            </div>
-            <div>
+        <Sidebar
+          selectedType={typeFilter}
+          onTypeChange={setTypeFilter}
+          onNewWork={() => setEditing({ work: blankWork(typeFilter ?? 'webtoon'), isNew: true })}
+          onAttributions={() => setShowAttributions(true)}
+          onSettings={() => setShowSettings(true)}
+        />
+        <div className="app-main">
+          <header className="header">
+            <div className="header-summary">
               <h1>Cronologia</h1>
               <small>{m.app.headerStats(visibleStats.total, visibleStats.average)}</small>
             </div>
-          </div>
 
-          <div className="search">
-            <span>
-              <i className="fa-solid fa-magnifying-glass" />
-            </span>
-            <input
-              type="text"
-              value={query}
-              placeholder={m.app.searchPlaceholder}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
+            <div className="search">
+              <span>
+                <AppIcon name="search" />
+              </span>
+              <input
+                type="text"
+                value={query}
+                placeholder={m.app.searchPlaceholder}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </div>
 
-          <div className="filters">
-            {FILTER_OPTIONS.map((item) => (
-              <button
-                key={item}
-                className={`chip${filter === item ? ' active' : ''}`}
-                onClick={() => setFilter(item)}
-              >
-                {m.app.filters[item]}
-              </button>
-            ))}
-          </div>
-
-          <div className="header-actions">
-            <button
-              className="drive-pill"
-              onClick={() => setShowSettings(true)}
-              title={m.app.openSettingsTitle}
-            >
-              <span className={driveDotClass} />
-              {driveLabel}
-            </button>
-            <button
-              className="btn ghost"
-              onClick={() => setShowAttributions(true)}
-              title={m.app.openAttributionsTitle}
-            >
-              <i className="fa-solid fa-clapperboard" /> {m.app.attributionsLabel}
-            </button>
-            <button
-              className="btn ghost icon-only"
-              onClick={() => setShowSettings(true)}
-              title={m.app.settingsTitle}
-            >
-              <i className="fa-solid fa-gear" />
-            </button>
-            <button
-              className="btn primary"
-              onClick={() => setEditing({ work: blankWork(), isNew: true })}
-            >
-              <i className="fa-solid fa-plus" /> {m.app.newWork}
-            </button>
-          </div>
-        </header>
-
-        <main className="content">
-          <div className="summary">
-            <div className="stat">
-              <b>{stats.total}</b>
-              <span>{m.app.stats.total}</span>
-            </div>
-            <div className="stat">
-              <b style={{ color: STATUS_COLORS.lendo }}>{stats.reading}</b>
-              <span>{m.app.stats.reading}</span>
-            </div>
-            <div className="stat">
-              <b style={{ color: STATUS_COLORS.concluido }}>{stats.done}</b>
-              <span>{m.app.stats.done}</span>
-            </div>
-            <div className="stat">
-              <b style={{ color: STATUS_COLORS.planejado }}>{stats.planned}</b>
-              <span>{m.app.stats.planned}</span>
-            </div>
-            <div className="stat">
-              <b style={{ color: STATUS_COLORS.pausado }}>{stats.paused}</b>
-              <span>{m.app.stats.paused}</span>
-            </div>
-            <div className="stat">
-              <b style={{ color: STATUS_COLORS.cancelado }}>{stats.cancelled}</b>
-              <span>{m.app.stats.cancelled}</span>
-            </div>
-            <div className="stat">
-              <b>{stats.average}%</b>
-              <span>{m.app.stats.average}</span>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="loading">
-              <i className="fa-solid fa-spinner fa-spin" /> {m.app.loadingLibrary}
-            </div>
-          ) : visible.length === 0 ? (
-            <div className="empty">
-              <div className="icon">
-                <i className="fa-solid fa-book-open" />
-              </div>
-              <h3>{hasWorks ? m.app.emptyFoundTitle : m.app.emptyLibraryTitle}</h3>
-              <p>{hasWorks ? m.app.emptyFoundText : m.app.emptyLibraryText}</p>
-              {!hasWorks ? (
+            <div className="filters">
+              {FILTER_OPTIONS.map((item) => (
                 <button
-                  className="btn primary"
-                  onClick={() => setEditing({ work: blankWork(), isNew: true })}
+                  key={item}
+                  className={`chip${filter === item ? ' active' : ''}`}
+                  onClick={() => setFilter(item)}
                 >
-                  <i className="fa-solid fa-plus" /> {m.app.addFirstWork}
+                  {m.app.filters[item]}
                 </button>
-              ) : null}
-            </div>
-          ) : (
-            <div className="grid">
-              {visible.map((work) => (
-                <WorkCard
-                  key={work.id}
-                  work={work}
-                  onOpen={(item) => setEditing({ work: item, isNew: false })}
-                  onProgress={updateProgress}
-                  onStatus={changeStatus}
-                />
               ))}
             </div>
-          )}
-        </main>
+
+            <div className="header-actions">
+              <button
+                className="drive-pill"
+                onClick={() => setShowSettings(true)}
+                title={m.app.openSettingsTitle}
+              >
+                <span className={driveDotClass} />
+                {driveLabel}
+              </button>
+            </div>
+          </header>
+
+          <main className="content">
+            <div className="summary">
+              <div className="stat">
+                <b>{stats.total}</b>
+                <span>{m.app.stats.total}</span>
+              </div>
+              <div className="stat">
+                <b style={{ color: STATUS_COLORS.lendo }}>{stats.reading}</b>
+                <span>{m.app.stats.reading}</span>
+              </div>
+              <div className="stat">
+                <b style={{ color: STATUS_COLORS.concluido }}>{stats.done}</b>
+                <span>{m.app.stats.done}</span>
+              </div>
+              <div className="stat">
+                <b style={{ color: STATUS_COLORS.planejado }}>{stats.planned}</b>
+                <span>{m.app.stats.planned}</span>
+              </div>
+              <div className="stat">
+                <b style={{ color: STATUS_COLORS.pausado }}>{stats.paused}</b>
+                <span>{m.app.stats.paused}</span>
+              </div>
+              <div className="stat">
+                <b style={{ color: STATUS_COLORS.cancelado }}>{stats.cancelled}</b>
+                <span>{m.app.stats.cancelled}</span>
+              </div>
+              <div className="stat">
+                <b>{stats.average}%</b>
+                <span>{m.app.stats.average}</span>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="loading">
+                <AppIcon name="loader" className="icon-spin" /> {m.app.loadingLibrary}
+              </div>
+            ) : visible.length === 0 ? (
+              <div className="empty">
+                <div className="icon">
+                  <AppIcon name="bookOpen" />
+                </div>
+                <h3>{hasWorks ? m.app.emptyFoundTitle : m.app.emptyLibraryTitle}</h3>
+                <p>{hasWorks ? m.app.emptyFoundText : m.app.emptyLibraryText}</p>
+                {!hasWorks ? (
+                  <button
+                    className="btn primary"
+                    onClick={() =>
+                      setEditing({ work: blankWork(typeFilter ?? 'webtoon'), isNew: true })
+                    }
+                  >
+                    <AppIcon name="plus" /> {m.app.addFirstWork}
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <div className="grid">
+                {visible.map((work) => (
+                  <WorkCard
+                    key={work.id}
+                    work={work}
+                    onOpen={(item) => setEditing({ work: item, isNew: false })}
+                    onProgress={updateProgress}
+                    onStatus={changeStatus}
+                  />
+                ))}
+              </div>
+            )}
+          </main>
+        </div>
 
         {editing !== null ? (
           <WorkModal

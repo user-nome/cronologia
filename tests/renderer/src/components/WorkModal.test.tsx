@@ -155,6 +155,42 @@ describe('WorkModal: campos', () => {
     expect(screen.getByPlaceholderText('Cap. 45 / Vol. 3')).toHaveValue('Vol. 2');
   });
 
+  it('acumula resumos ligados ao progresso atual', async () => {
+    const user = userEvent.setup();
+    const existingNote = {
+      id: 'note-1',
+      progress: 10,
+      summary: 'Primeiro resumo.',
+      createdAt: '2026-02-01T10:00:00.000Z',
+    };
+    const { onSave } = setup(makeWork({ progress: 20, readingNotes: [existingNote] }));
+    const progress = progressInput();
+    await user.clear(progress);
+    await user.type(progress, '24');
+    await user.type(
+      screen.getByPlaceholderText('O que aconteceu nesta parte da leitura?'),
+      'Uma nova aliada apareceu.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Adicionar resumo' }));
+
+    expect(screen.getByText('2 resumo(s) guardado(s)')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Salvar/ }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        progress: 24,
+        readingNotes: [
+          existingNote,
+          expect.objectContaining({
+            progress: 24,
+            summary: 'Uma nova aliada apareceu.',
+          }),
+        ],
+      }),
+    );
+  });
+
   it('edita datas de início e término', async () => {
     const user = userEvent.setup();
     setup(makeWork({ startedAt: '2026-01-10', finishedAt: '2026-02-15' }));

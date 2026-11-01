@@ -49,6 +49,18 @@ describe('shared/work: isWorkRecord', () => {
     expect(updatedAt).toBe('2026-01-02T00:00:00.000Z');
     expect(isWorkRecord(minima)).toBe(true);
   });
+
+  it('valida resumos acumulados de leitura quando presentes', () => {
+    const note = {
+      id: 'note-1',
+      progress: 12,
+      summary: 'A protagonista descobriu a passagem secreta.',
+      createdAt: '2026-03-01T10:00:00.000Z',
+    };
+    expect(isWorkRecord({ ...makeWork(), readingNotes: [note] })).toBe(true);
+    expect(isWorkRecord({ ...makeWork(), readingNotes: null })).toBe(false);
+    expect(isWorkRecord({ ...makeWork(), readingNotes: [{ ...note, summary: 12 }] })).toBe(false);
+  });
 });
 
 describe('shared/work: isWorkArray', () => {

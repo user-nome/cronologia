@@ -8,6 +8,7 @@ import {
 } from '@zero/shared';
 import { richText, useMessages } from '@zero/renderer/i18n';
 import StrengthMeter from '@zero/renderer/components/StrengthMeter';
+import AppIcon from '@zero/renderer/components/AppIcon';
 
 interface CredentialModalProps {
   /** Qual credencial está sendo trocada: define rótulos, formato e canal. */
@@ -131,10 +132,10 @@ export default function CredentialModal({
       <div className="modal">
         <div className="modal-header">
           <h2>
-            <i className={`fa-solid ${isMaster ? 'fa-key' : 'fa-hashtag'}`} /> {title}
+            <AppIcon name={isMaster ? 'key' : 'hash'} /> {title}
           </h2>
           <button className="modal-close" onClick={onClose} title={m.common.close}>
-            <i className="fa-solid fa-xmark" />
+            <AppIcon name="x" />
           </button>
         </div>
         <div className="modal-body">
@@ -147,7 +148,7 @@ export default function CredentialModal({
           {field('credential-confirm', confirmLabel, confirm, setConfirm, !isMaster)}
           {error !== null ? (
             <div className="banner error">
-              <i className="fa-solid fa-triangle-exclamation" /> {error}
+              <AppIcon name="alert" /> {error}
             </div>
           ) : null}
         </div>
@@ -165,12 +166,11 @@ export default function CredentialModal({
           >
             {busy ? (
               <>
-                <i className="fa-solid fa-spinner fa-spin" /> {m.common.loading}
+                <AppIcon name="loader" className="icon-spin" /> {m.common.loading}
               </>
             ) : (
               <>
-                <i className={`fa-solid ${isMaster ? 'fa-key' : 'fa-hashtag'}`} />{' '}
-                {m.auth.changeAction}
+                <AppIcon name={isMaster ? 'key' : 'hash'} /> {m.auth.changeAction}
               </>
             )}
           </button>

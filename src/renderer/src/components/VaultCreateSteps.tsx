@@ -13,6 +13,7 @@ import { richText, useMessages } from '@zero/renderer/i18n';
 import StrengthMeter from '@zero/renderer/components/StrengthMeter';
 import { VaultActions, VaultShell, VaultSubmit } from '@zero/renderer/components/VaultShell';
 import { ErrorBanner, submitOnEnter } from '@zero/renderer/components/VaultBanners';
+import AppIcon from '@zero/renderer/components/AppIcon';
 
 /**
  * Criação do cofre em duas etapas: credenciais (senha mestra + PIN) e frase de
@@ -199,7 +200,7 @@ export function VaultCreateSteps({
         <ErrorBanner error={error} />
         <VaultActions onClose={closable ? onClose : null} busy={busy}>
           <button className="btn primary" onClick={toRecovery} disabled={busy}>
-            <i className="fa-solid fa-arrow-right" /> {m.common.next}
+            <AppIcon name="arrowRight" /> {m.common.next}
           </button>
         </VaultActions>
       </VaultShell>
@@ -258,11 +259,11 @@ export function VaultCreateSteps({
           }}
           disabled={busy}
         >
-          <i className="fa-solid fa-arrow-left" /> {m.common.back}
+          <AppIcon name="arrowLeft" /> {m.common.back}
         </button>
         <VaultSubmit
           busy={busy}
-          icon="fa-vault"
+          icon="vault"
           label={m.auth.createAction}
           onClick={() => {
             void submit();

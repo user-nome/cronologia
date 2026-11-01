@@ -111,7 +111,7 @@ describe('SettingsModal: carregamento', () => {
     // O rótulo agora fica no seletor (que é o que escolhe), e a lista
     // informativa é a irmã seguinte: é onde ficam os selos e os motivos.
     const rotulo = await screen.findByText('Provedores de backup');
-    const seletor = screen.getByRole('button', { name: 'Dropbox' });
+    const seletor = await screen.findByRole('button', { name: 'Dropbox' });
     expect(rotulo.closest('.field')?.contains(seletor)).toBe(true);
 
     const lista = document.querySelector<HTMLElement>('.provider-list');
@@ -132,7 +132,7 @@ describe('SettingsModal: carregamento', () => {
     await screen.findByText('Provedores de backup');
     // O catálogo mostra o Google Drive (com o motivo), mas o seletor não:
     // oferecer e recusar seria pior que não oferecer.
-    const seletor = screen.getByRole('button', { name: 'Dropbox' });
+    const seletor = await screen.findByRole('button', { name: 'Dropbox' });
     await userEvent.click(seletor);
     expect(screen.getAllByRole('option')).toHaveLength(1);
     expect(screen.getByRole('option', { name: 'Dropbox' })).toBeInTheDocument();

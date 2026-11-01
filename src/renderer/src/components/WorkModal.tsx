@@ -16,6 +16,7 @@ import DateField from '@zero/renderer/components/DateField';
 import Select from '@zero/renderer/components/Select';
 import type { SelectOption } from '@zero/renderer/components/Select';
 import { dateMask } from '@zero/shared/date';
+import AppIcon from '@zero/renderer/components/AppIcon';
 
 interface WorkModalProps {
   work: Work;
@@ -40,6 +41,7 @@ export default function WorkModal({
   const [error, setError] = useState<string | null>(null);
   const [startedInvalid, setStartedInvalid] = useState(false);
   const [finishedInvalid, setFinishedInvalid] = useState(false);
+  const [readingNote, setReadingNote] = useState('');
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -62,6 +64,19 @@ export default function WorkModal({
 
   const setStatus = (status: WorkStatus): void => {
     patch({ status });
+  };
+
+  const addReadingNote = (): void => {
+    const summary = readingNote.trim();
+    if (summary === '') return;
+    const note = {
+      id: crypto.randomUUID(),
+      progress: draft.progress,
+      summary,
+      createdAt: new Date().toISOString(),
+    };
+    patch({ readingNotes: [...(draft.readingNotes ?? []), note] });
+    setReadingNote('');
   };
 
   const chooseCover = async (): Promise<void> => {
@@ -138,7 +153,7 @@ export default function WorkModal({
         <div className="modal-header">
           <h2>{isNew ? m.workModal.newTitle : m.workModal.editTitle}</h2>
           <button className="modal-close" onClick={onClose} title={m.common.close}>
-            <i className="fa-solid fa-xmark" />
+            <AppIcon name="x" />
           </button>
         </div>
 
@@ -150,7 +165,7 @@ export default function WorkModal({
               {url !== null ? (
                 <img src={url} alt={m.workModal.coverAlt} />
               ) : (
-                <i className="fa-solid fa-book-open" />
+                <AppIcon name="bookOpen" />
               )}
             </div>
             <div className="cover-tools">
@@ -162,7 +177,7 @@ export default function WorkModal({
                     void chooseCover();
                   }}
                 >
-                  <i className="fa-regular fa-image" /> {m.workModal.chooseImage}
+                  <AppIcon name="image" /> {m.workModal.chooseImage}
                 </button>
                 {hasCover ? (
                   <button
@@ -264,14 +279,14 @@ export default function WorkModal({
                   title={m.workModal.decreaseStep(PROGRESS_STEP)}
                   onClick={() => setProgress(draft.progress - PROGRESS_STEP)}
                 >
-                  <i className="fa-solid fa-minus" /> {PROGRESS_STEP}
+                  <AppIcon name="minus" /> {PROGRESS_STEP}
                 </button>
                 <button
                   className="btn small"
                   title={m.workModal.increaseStep(PROGRESS_STEP)}
                   onClick={() => setProgress(draft.progress + PROGRESS_STEP)}
                 >
-                  <i className="fa-solid fa-plus" /> {PROGRESS_STEP}
+                  <AppIcon name="plus" /> {PROGRESS_STEP}
                 </button>
                 <span className="progress-percent">
                   {draft.status === 'concluido'
@@ -282,13 +297,34 @@ export default function WorkModal({
                   className="btn small success"
                   onClick={() => patch({ status: 'concluido' })}
                 >
-                  <i className="fa-solid fa-check" /> {m.workModal.finish}
+                  <AppIcon name="check" /> {m.workModal.finish}
                 </button>
                 <button
                   className="btn small ghost"
                   onClick={() => patch({ progress: 0, status: 'planejado' })}
                 >
-                  <i className="fa-solid fa-rotate-left" /> {m.workModal.reset}
+                  <AppIcon name="rotate" /> {m.workModal.reset}
+                </button>
+              </div>
+            </div>
+
+            <div className="reading-note-editor">
+              <div className="field">
+                <label>{m.workModal.readingNoteLabel}</label>
+                <textarea
+                  value={readingNote}
+                  placeholder={m.workModal.readingNotePlaceholder}
+                  onChange={(event) => setReadingNote(event.target.value)}
+                />
+              </div>
+              <div className="reading-note-actions">
+                <span>{m.workModal.readingNotesCount(draft.readingNotes?.length ?? 0)}</span>
+                <button
+                  className="btn small"
+                  onClick={addReadingNote}
+                  disabled={readingNote.trim() === ''}
+                >
+                  <AppIcon name="layers" /> {m.workModal.addReadingNote}
                 </button>
               </div>
             </div>
@@ -304,9 +340,7 @@ export default function WorkModal({
               }}
               disabled={saving}
             >
-              <i
-                className={confirmDelete ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-trash'}
-              />{' '}
+              <AppIcon name={confirmDelete ? 'alert' : 'trash'} />{' '}
               {confirmDelete ? m.workModal.confirmDelete : m.workModal.deleteAction}
             </button>
           ) : null}
@@ -323,11 +357,11 @@ export default function WorkModal({
           >
             {saving ? (
               <>
-                <i className="fa-solid fa-spinner fa-spin" /> {m.common.saving}
+                <AppIcon name="loader" className="icon-spin" /> {m.common.saving}
               </>
             ) : (
               <>
-                <i className="fa-solid fa-floppy-disk" /> {m.common.save}
+                <AppIcon name="save" /> {m.common.save}
               </>
             )}
           </button>

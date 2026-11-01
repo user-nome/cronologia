@@ -1,4 +1,4 @@
-import type { Work } from '@zero/types';
+import type { ReadingNote, Work } from '@zero/types';
 import type { Untrusted } from '@zero/types/errors';
 
 /**
@@ -29,7 +29,8 @@ const REQUIRED_WORK_FIELDS = ['id', 'title', 'synopsis', 'type', 'status', 'prog
  * não-confiável: sem ele não há como saber que `value.id` existe. Os campos
  * opcionais (`createdAt`, `updatedAt`, `category`, `marker`, `coverFile`,
  * `startedAt`, `finishedAt`) não são conferidos: são exatamente os que o
- * backup antigo não tinha.
+ * backup antigo não tinha. Quando resumos estão presentes, sua forma é validada
+ * para que dados externos não quebrem a visualização no renderer.
  */
 export function isWorkRecord(value: Untrusted): value is Work {
   if (typeof value !== 'object' || value === null) return false;
@@ -41,7 +42,24 @@ export function isWorkRecord(value: Untrusted): value is Work {
     typeof record.synopsis === 'string' &&
     typeof record.type === 'string' &&
     typeof record.status === 'string' &&
-    typeof record.progress === 'number'
+    typeof record.progress === 'number' &&
+    (!('readingNotes' in value) ||
+      value.readingNotes === undefined ||
+      (Array.isArray(value.readingNotes) && value.readingNotes.every(isReadingNoteRecord)))
+  );
+}
+
+function isReadingNoteRecord(value: Untrusted): value is ReadingNote {
+  if (typeof value !== 'object' || value === null) return false;
+  return (
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'progress' in value &&
+    typeof value.progress === 'number' &&
+    'summary' in value &&
+    typeof value.summary === 'string' &&
+    'createdAt' in value &&
+    typeof value.createdAt === 'string'
   );
 }
 

@@ -8,6 +8,12 @@ em português do Brasil.
 
 ### Mudado
 
+- Mudança no layout e melhoria na qualidade, e é isso.
+
+## [2.3.0]
+
+### Mudado
+
 - **Remoção do modal de doações** Fiquei emburrado e removi as doações, fazer o que! Sou sentimental.
 
 ## [2.2.2]

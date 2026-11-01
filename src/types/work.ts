@@ -2,6 +2,13 @@ export type WorkType = 'webtoon' | 'manhwa' | 'manhua' | 'manga' | 'livro' | 'ou
 
 export type WorkStatus = 'planejado' | 'lendo' | 'pausado' | 'concluido' | 'cancelado';
 
+export interface ReadingNote {
+  id: string;
+  progress: number;
+  summary: string;
+  createdAt: string;
+}
+
 export interface Work {
   id: string;
   title: string;
@@ -20,6 +27,8 @@ export interface Work {
   startedAt?: string | undefined;
   /** Data de conclusão da leitura (ISO 8601) */
   finishedAt?: string | undefined;
+  /** Resumos acumulados de sessões de leitura */
+  readingNotes?: ReadingNote[] | undefined;
   createdAt: string;
   updatedAt: string;
 }

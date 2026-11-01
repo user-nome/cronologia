@@ -9,6 +9,7 @@ Todo texto vem do contexto de idioma (`useMessages()`), nunca embutido no JSX.
 | Componente                            | Papel                                                                      |
 | ------------------------------------- | -------------------------------------------------------------------------- |
 | `App.tsx`                             | Carrega biblioteca/status/config, busca, filtros, estatísticas e modais    |
+| `components/Sidebar.tsx`              | Nova obra, filtro por tipo, atribuições e configurações                    |
 | `components/WorkCard.tsx`             | Card da obra: capa, badges, barra e ações de progresso/status              |
 | `components/WorkModal.tsx`            | Criar/editar obra (capa, campos, progresso, excluir com confirmação)       |
 | `components/SettingsModal.tsx`        | Configurações: idioma, cofre, provedores, senha de backup e ações do Drive |
@@ -29,17 +30,18 @@ Todo texto vem do contexto de idioma (`useMessages()`), nunca embutido no JSX.
 | `donations.ts`                        | Constantes do link de doação (`DONATION_URL`)                              |
 | `attributions.ts`                     | Fonte de verdade dos créditos (`ATTRIBUTIONS`)                             |
 
-## Cabeçalho
+## Navegação e cabeçalho
 
-| Elemento        | Comportamento                                                               |
-| --------------- | --------------------------------------------------------------------------- |
-| Busca           | Filtra por título, sinopse ou categoria, instantaneamente                   |
-| Chips de filtro | Todos, Lendo, Planejados, Pausados, Concluídos, Cancelados                  |
-| Pílula do Drive | Estado do backup (ponto `on`/`busy`/vazio + rótulo); **abre Configurações** |
-| **Atribuições** | Abre `AttributionsModal`                                                    |
-| **Doar**        | Abre `DonateModal`                                                          |
-| Engrenagem      | Abre `SettingsModal`                                                        |
-| **Nova obra**   | Abre `WorkModal` em modo de criação                                         |
+| Elemento                        | Comportamento                                                           |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| **Nova obra** na barra lateral  | Abre `WorkModal` em modo de criação, já no tipo selecionado             |
+| Todas as obras                  | Limpa o filtro por tipo; inclui livros e outros tipos                   |
+| Webtoon, Manhwa, Manhua e Mangá | Filtra a grade pelo tipo escolhido                                      |
+| **Atribuições**                 | Abre `AttributionsModal`                                                |
+| **Configurações**               | Abre `SettingsModal`                                                    |
+| Busca                           | Filtra por título, sinopse, categoria ou resumo de leitura              |
+| Chips de filtro                 | Todos, Lendo, Planejados, Pausados, Concluídos, Cancelados              |
+| Pílula do Drive                 | Estado do backup (ponto `on`/`busy`/vazio + rótulo); abre Configurações |
 
 A linha de estatísticas (total, por status e % médio) acompanha **o que está
 sendo exibido** (busca + filtro); o restante continua com o total da
@@ -63,6 +65,9 @@ biblioteca.
   - `↑` / `↓`: progresso ±1 (mínimo 0);
   - obra `concluída` → só **Reabrir**; `cancelada` → só **Retomar**;
   - demais → **Concluir**, **Pausar**/**Retomar** e **Cancelar**.
+- Resumos guardados ficam recolhidos; **Revelar resumos** abre uma carta por vez
+  com o capítulo e a data. As setas percorrem o histórico sem aumentar a altura
+  dos cards enquanto ele está fechado.
 - Clicar no card abre o `WorkModal` de edição.
 
 ## WorkModal
@@ -80,6 +85,9 @@ biblioteca.
   última válida.
 - Progresso: campo numérico, `−10`/`+10`, percentual, **Concluir** e **Zerar**
   (volta para 0 e `planejado`).
+- Resumo da leitura: o texto é anexado ao histórico da obra com o progresso
+  atual. Os resumos anteriores são mantidos; **Salvar** grava progresso e
+  anotações juntos no acervo cifrado.
 - Exclusão só em modo de edição, com confirmação em dois cliques no próprio
   botão. `Escape` ou clique fora fecha.
 

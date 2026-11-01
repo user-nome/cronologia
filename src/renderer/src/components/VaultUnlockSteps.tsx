@@ -6,6 +6,7 @@ import { useMessages } from '@zero/renderer/i18n';
 import StrengthMeter from '@zero/renderer/components/StrengthMeter';
 import { VaultActions, VaultShell, VaultSubmit } from '@zero/renderer/components/VaultShell';
 import { ErrorBanner, LockBanner, submitOnEnter } from '@zero/renderer/components/VaultBanners';
+import AppIcon from '@zero/renderer/components/AppIcon';
 
 /**
  * Abertura do cofre e recuperação do PIN esquecido.
@@ -205,11 +206,11 @@ export function VaultUnlockSteps({
             }}
             disabled={busy}
           >
-            <i className="fa-solid fa-arrow-left" /> {m.auth.backToPin}
+            <AppIcon name="arrowLeft" /> {m.auth.backToPin}
           </button>
           <VaultSubmit
             busy={busy}
-            icon="fa-key"
+            icon="key"
             label={m.auth.resetAction}
             onClick={() => {
               void reset();
@@ -231,7 +232,7 @@ export function VaultUnlockSteps({
     >
       {masterAvailable ? (
         <div className="banner warning">
-          <i className="fa-solid fa-circle-info" /> {m.auth.masterAvailable}
+          <AppIcon name="info" /> {m.auth.masterAvailable}
         </div>
       ) : null}
       <div className="field">
@@ -273,7 +274,7 @@ export function VaultUnlockSteps({
       <VaultActions onClose={closable ? onClose : null} busy={busy}>
         <VaultSubmit
           busy={busy}
-          icon={masterAvailable ? 'fa-key' : 'fa-unlock'}
+          icon={masterAvailable ? 'key' : 'unlock'}
           label={m.auth.unlockAction}
           onClick={() => {
             void unlock();

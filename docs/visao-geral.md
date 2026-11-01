@@ -50,11 +50,11 @@ São 4 pacotes em `dependencies`, todos com licença permissiva. Pense duas veze
 antes de adicionar um: regra do `AGENTS.md` e registro em
 `THIRD-PARTY-NOTICES.txt`.
 
-| Pacote                          | Papel                                    |
-| ------------------------------- | ---------------------------------------- |
-| `react` / `react-dom`           | Interface (grade, modais, configurações) |
-| `@fortawesome/fontawesome-free` | Ícones da interface (fontes + CSS)       |
-| `hash-wasm`                     | Argon2id do cofre de segredos (main)     |
+| Pacote                | Papel                                    |
+| --------------------- | ---------------------------------------- |
+| `react` / `react-dom` | Interface (grade, modais, configurações) |
+| `lucide-react`        | Ícones vetoriais da interface            |
+| `hash-wasm`           | Argon2id do cofre de segredos (main)     |
 
 O Electron é dependência de desenvolvimento, mas é a plataforma: o
 electron-builder o embute no `.deb`. O restante (electron-vite, Vite, Vitest,

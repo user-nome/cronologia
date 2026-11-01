@@ -145,6 +145,37 @@ describe('WorkCard', () => {
     expect(screen.queryByText('Término da leitura')).not.toBeInTheDocument();
   });
 
+  it('revela os resumos como cartas sem abrir a edição da obra', async () => {
+    const user = userEvent.setup();
+    const props = setup({
+      work: makeWork({
+        readingNotes: [
+          {
+            id: 'note-1',
+            progress: 10,
+            summary: 'A jornada começou.',
+            createdAt: '2026-03-01T10:00:00.000Z',
+          },
+          {
+            id: 'note-2',
+            progress: 12,
+            summary: 'A protagonista encontrou uma passagem secreta.',
+            createdAt: '2026-03-02T10:00:00.000Z',
+          },
+        ],
+      }),
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Revelar resumos (2)' }));
+    expect(screen.getByText('A protagonista encontrou uma passagem secreta.')).toBeInTheDocument();
+    expect(screen.getByText('2 de 2')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Próximo resumo' }));
+    expect(screen.getByText('A jornada começou.')).toBeInTheDocument();
+    expect(screen.getByText('1 de 2')).toBeInTheDocument();
+    expect(props.onOpen).not.toHaveBeenCalled();
+  });
+
   it('usa a classe planned para obras planejadas', () => {
     setup({ work: makeWork({ status: 'planejado', progress: 0 }) });
     const barFill = screen.getByTestId('progress-bar-fill');

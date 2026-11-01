@@ -25,10 +25,10 @@ export const ATTRIBUTIONS: Attribution[] = [
     url: 'https://github.com/danilow/hash-wasm',
   },
   {
-    name: 'Font Awesome Free',
-    license: 'MIT (código) · OFL-1.1 (fontes) · CC-BY-4.0 (ícones)',
-    description: 'Ícones da interface (busca, cards, modais e cabeçalho).',
-    url: 'https://fontawesome.com',
+    name: 'Lucide React',
+    license: 'ISC · MIT (ícones derivados do Feather)',
+    description: 'Ícones vetoriais da interface.',
+    url: 'https://lucide.dev',
   },
   {
     name: 'Electron',

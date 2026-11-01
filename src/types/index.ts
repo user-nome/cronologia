@@ -34,4 +34,4 @@ export type {
   VaultResult,
   VaultStatus,
 } from '@zero/types/vault';
-export type { Work, WorkDraft, WorkStatus, WorkType } from '@zero/types/work';
+export type { ReadingNote, Work, WorkDraft, WorkStatus, WorkType } from '@zero/types/work';

@@ -185,6 +185,23 @@ describe('biblioteca', () => {
     expect(works[0]?.progress).toBe(80);
   });
 
+  it('upsertWork preserva os resumos de leitura', () => {
+    const readingNotes = [
+      {
+        id: 'note-1',
+        progress: 18,
+        summary: 'A batalha terminou.',
+        createdAt: '2026-03-01T10:00:00.000Z',
+      },
+    ];
+    const works = upsertWork(makeDraft({ id: 'notes', readingNotes }));
+    expect(works[0]?.readingNotes).toEqual(readingNotes);
+    expect(loadLibrary()[0]?.readingNotes).toEqual(readingNotes);
+
+    const updated = upsertWork(makeDraft({ id: 'notes', title: 'Obra atualizada' }));
+    expect(updated[0]?.readingNotes).toEqual(readingNotes);
+  });
+
   it('upsertWork aceita createdAt/updatedAt explícitos em obra nova', () => {
     const works = upsertWork(makeDraft({ id: 'beta', createdAt: '2020-01-01T00:00:00.000Z' }));
     expect(works[0]?.createdAt).toBe('2020-01-01T00:00:00.000Z');

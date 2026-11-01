@@ -113,6 +113,59 @@ describe('App: carregamento e estatísticas', () => {
 });
 
 describe('App: busca e filtros', () => {
+  it('filtra pela navegação de tipo sem interferir nos filtros de status', async () => {
+    const works = [
+      makeWork({ id: 'webtoon', type: 'webtoon', title: 'The Boxer' }),
+      makeWork({ id: 'manhwa', type: 'manhwa', title: 'Solo Leveling', status: 'concluido' }),
+      makeWork({ id: 'manhua', type: 'manhua', title: 'Apotheosis' }),
+      makeWork({ id: 'manga', type: 'manga', title: 'Berserk' }),
+      makeWork({ id: 'book', type: 'livro', title: 'O Hobbit' }),
+    ];
+    const user = userEvent.setup();
+    setup(works);
+    await screen.findByText(/5 obra\(s\)/);
+
+    expect(
+      [...document.querySelectorAll('.sidebar button')].map((button) => button.textContent),
+    ).toEqual([
+      'Nova obra',
+      'Webtoon',
+      'Manhwa',
+      'Manhua',
+      'Mangá',
+      'Todas as obras',
+      'Atribuições',
+      'Configurações',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'Manhwa' }));
+    expect(screen.getByText('Solo Leveling')).toBeInTheDocument();
+    expect(screen.queryByText('The Boxer')).not.toBeInTheDocument();
+    expect(screen.queryByText('O Hobbit')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Concluídos' }));
+    expect(screen.getByText('Solo Leveling')).toBeInTheDocument();
+    expect(screen.queryByText('The Boxer')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Todas as obras' }));
+    expect(screen.getByText('Solo Leveling')).toBeInTheDocument();
+    expect(screen.queryByText('The Boxer')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Todos' }));
+    expect(screen.getByText('The Boxer')).toBeInTheDocument();
+    expect(screen.getByText('O Hobbit')).toBeInTheDocument();
+  });
+
+  it('cria uma obra do gênero atualmente selecionado', async () => {
+    const user = userEvent.setup();
+    setup();
+    await screen.findByText(/4 obra\(s\)/);
+
+    await user.click(screen.getByRole('button', { name: 'Manhua' }));
+    await user.click(screen.getByRole('button', { name: 'Nova obra' }));
+    expect(screen.getByRole('heading', { name: 'Nova obra' })).toBeInTheDocument();
+    expect(screen.getByText('Manhua', { selector: '.select-value' })).toBeInTheDocument();
+  });
+
   it('filtra por título', async () => {
     const user = userEvent.setup();
     setup();

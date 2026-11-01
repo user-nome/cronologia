@@ -55,6 +55,12 @@ obra. Nada sai da sua máquina e ninguém, nem nós, vemos o que está dentro.
 - **Busca e filtros.** A lista filtra enquanto você digita, pelo título, pela
   descrição ou pela categoria, e pelos chips de status (Lendo, Planejados,
   Pausados, Concluídos, Cancelados).
+- **Barra lateral por tipo.** Acesse Webtoons, Manhwas, Manhuas e Mangás com um
+  clique; livros e outros tipos continuam em Todas as obras. A barra também
+  concentra Nova obra, Atribuições e Configurações.
+- **Resumos em cartas.** Ao editar o progresso, anexe um resumo da leitura.
+  Eles se acumulam por obra, ficam recolhidos nos cards e podem ser revelados
+  um a um, sem ocupar espaço na grade.
 
 ### Progresso que dá para usar no dia a dia
 

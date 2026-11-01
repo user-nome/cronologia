@@ -1,7 +1,7 @@
 {
   "name": "cronologia",
   "productName": "Cronologia",
-  "version": "2.3.0",
+  "version": "2.4.1",
   "description": "Biblioteca de anotação de progresso em leituras de webtoons, manhwas, manhuas, mangás e livros",
   "main": "out/main/index.js",
   "desktopName": "cronologia.desktop",
@@ -19,17 +19,17 @@
   "homepage": "https://github.com/user-nome/cronologia",
   "license": "MIT",
   "engines": {
-    "node": ">=26.0.0"
+    "node": ">=26.13.0"
   },
   "scripts": {
     "dev": "bin/dev.sh",
     "dev:inspect": "bin/dev.sh --inspect 5858",
     "dev:inspect-brk": "bin/dev.sh --inspectBrk 5858",
-    "clean": "rm -rf out",
-    "build": "npm run clean && electron-vite build",
+    "pre-build": "rm -rf out release && tsc -p tsconfig.node.json && tsc -p tsconfig.web.json",
+    "build": "npm run pre-build && electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tests/tsconfig.json && tsc --noEmit -p e2e/tsconfig.json",
-    "lint": "eslint .",
+    "lint": "eslint --ext .ts,.tsx,.js,.jsx,.mts,.cts,.mjs,.cjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -48,27 +48,27 @@
     "postinstall": "node node_modules/electron/install.js"
   },
   "dependencies": {
-    "@fortawesome/fontawesome-free": "^7.3.1",
     "hash-wasm": "^4.12.0",
+    "lucide-react": "^1.66.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@babel/parser": "^8.0.8",
-    "@babel/types": "^8.0.8",
+    "@babel/parser": "^8.0.10",
+    "@babel/types": "^8.0.10",
     "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.8",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "@vitest/coverage-v8": "^5.0.5",
-    "electron": "^45.0.0",
+    "electron": "^45.2.1",
     "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
-    "eslint": "^10.13.0",
+    "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
@@ -76,12 +76,12 @@
     "playwright-core": "^1.64.1",
     "prettier": "^3.9.10",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.72.0",
+    "typescript-eslint": "^8.72.1",
     "vite": "^8.3.5",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.5"
   },
   "allowScripts": {
-    "electron@44.7.2": true,
+    "electron@45.2.1": true,
     "esbuild@0.25.12": true,
     "esbuild@0.28.2": true,
     "electron-winstaller@5.4.0": true
@@ -89,6 +89,8 @@
   "overrides": {
     "@electron/get": "^5.1.0",
     "@electron/asar": "4.3.1",
+    "glob": "^14.0.2",
+    "minimatch": "^11.0.1",
     "temp": {
       "rimraf": "^6.1.3"
     }

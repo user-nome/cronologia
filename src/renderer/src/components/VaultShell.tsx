@@ -1,5 +1,7 @@
 import type { JSX, ReactNode } from 'react';
 import { useMessages } from '@zero/renderer/i18n';
+import AppIcon from '@zero/renderer/components/AppIcon';
+import type { AppIconName } from '@zero/renderer/components/AppIcon';
 
 /**
  * Casca dos modais de cofre, compartilhada pelos quatro passos de
@@ -41,11 +43,11 @@ export function VaultShell({
       <div className="modal">
         <div className="modal-header">
           <h2>
-            <i className="fa-solid fa-vault" /> {title}
+            <AppIcon name="vault" /> {title}
           </h2>
           {closable ? (
             <button className="modal-close" onClick={onClose} title={m.common.close}>
-              <i className="fa-solid fa-xmark" />
+              <AppIcon name="x" />
             </button>
           ) : null}
         </div>
@@ -87,8 +89,8 @@ export function VaultActions({ onClose, busy, children }: VaultActionsProps): JS
 
 interface VaultSubmitProps {
   busy: boolean;
-  /** Classe do ícone do Font Awesome (o botão troca por spinner quando busy). */
-  icon: string;
+  /** O botão troca o ícone por um spinner enquanto busy. */
+  icon: AppIconName;
   label: string;
   onClick: () => void;
   disabled?: boolean;
@@ -107,11 +109,11 @@ export function VaultSubmit({
     <button className="btn primary" onClick={onClick} disabled={busy || disabled}>
       {busy ? (
         <>
-          <i className="fa-solid fa-spinner fa-spin" /> {m.common.loading}
+          <AppIcon name="loader" className="icon-spin" /> {m.common.loading}
         </>
       ) : (
         <>
-          <i className={`fa-solid ${icon}`} /> {label}
+          <AppIcon name={icon} /> {label}
         </>
       )}
     </button>

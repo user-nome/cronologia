@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { JSX } from 'react';
 import { useMessages } from '@zero/renderer/i18n';
+import AppIcon from '@zero/renderer/components/AppIcon';
 
 /**
  * Ações destrutivas: apagar o acervo e destruir o cofre.
@@ -123,7 +124,7 @@ export default function DangerZone({
     <div className="field">
       <label>{m.danger.zoneLabel}</label>
       <div className="banner warning">
-        <i className="fa-solid fa-triangle-exclamation" /> {m.danger.zoneBody}
+        <AppIcon name="alert" /> {m.danger.zoneBody}
       </div>
 
       {pending === null ? (
@@ -134,7 +135,7 @@ export default function DangerZone({
             disabled={busy}
             title={m.danger.resetTitle}
           >
-            <i className="fa-solid fa-eraser" /> {m.danger.resetAction}
+            <AppIcon name="eraser" /> {m.danger.resetAction}
           </button>
           <button
             className="btn ghost"
@@ -142,7 +143,7 @@ export default function DangerZone({
             disabled={busy || !connected}
             title={m.danger.purgeTitle}
           >
-            <i className="fa-solid fa-cloud-arrow-up" /> {m.danger.purgeAction}
+            <AppIcon name="cloudUpload" /> {m.danger.purgeAction}
           </button>
           <button
             className="btn ghost"
@@ -150,13 +151,13 @@ export default function DangerZone({
             disabled={busy}
             title={m.danger.destroyTitle}
           >
-            <i className="fa-solid fa-vault" /> {m.danger.destroyAction}
+            <AppIcon name="vault" /> {m.danger.destroyAction}
           </button>
         </div>
       ) : (
         <div className="field">
           <div className="banner error">
-            <i className="fa-solid fa-triangle-exclamation" />{' '}
+            <AppIcon name="alert" />{' '}
             {pending === 'library'
               ? m.danger.resetConfirm
               : pending === 'vault'
@@ -187,11 +188,11 @@ export default function DangerZone({
             >
               {busy ? (
                 <>
-                  <i className="fa-solid fa-spinner fa-spin" /> {m.common.loading}
+                  <AppIcon name="loader" className="icon-spin" /> {m.common.loading}
                 </>
               ) : (
                 <>
-                  <i className="fa-solid fa-triangle-exclamation" /> {m.danger.confirmAction}
+                  <AppIcon name="alert" /> {m.danger.confirmAction}
                 </>
               )}
             </button>

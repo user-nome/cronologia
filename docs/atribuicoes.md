@@ -28,18 +28,17 @@ nome, licença, descrição curta e URL de cada dependência direta do
 `package.json`. As **versões exatas** não ficam hardcoded na tela; consulte
 `package.json` / `package-lock.json`.
 
-| Dependência                                                           | Licença                                              |
-| --------------------------------------------------------------------- | ---------------------------------------------------- |
-| React, React DOM                                                      | MIT                                                  |
-| hash-wasm                                                             | MIT                                                  |
-| Font Awesome Free                                                     | MIT (código) · OFL-1.1 (fontes) · CC-BY-4.0 (ícones) |
-| Electron, electron-vite, electron-builder, Vite, @vitejs/plugin-react | MIT                                                  |
-| TypeScript                                                            | Apache-2.0                                           |
-| Vitest, jsdom, Testing Library, ESLint, Prettier e demais ferramentas | MIT (rimraf: BlueOak-1.0.0)                          |
+| Dependência                                                           | Licença                                 |
+| --------------------------------------------------------------------- | --------------------------------------- |
+| React, React DOM                                                      | MIT                                     |
+| hash-wasm                                                             | MIT                                     |
+| Lucide React                                                          | ISC · MIT (ícones derivados do Feather) |
+| Electron, electron-vite, electron-builder, Vite, @vitejs/plugin-react | MIT                                     |
+| TypeScript                                                            | Apache-2.0                              |
+| Vitest, jsdom, Testing Library, ESLint, Prettier e demais ferramentas | MIT (rimraf: BlueOak-1.0.0)             |
 
-Todas são licenças permissivas aprovadas pela OSI (código). OFL-1.1 e CC-BY-4.0
-aparecem **apenas para os assets** (fontes/ícones) do Font Awesome, nunca para
-código executado pelo app.
+Todas são licenças permissivas aprovadas pela OSI. O pacote Lucide React usa ISC;
+os ícones derivados do Feather mantêm a licença MIT.
 
 ## Manutenção
 

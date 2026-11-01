@@ -6,6 +6,7 @@ import type {
   DriveStatus,
   ElectronApi,
   Language,
+  ReadingNote,
   Work,
   WorkStatus,
   WorkType,
@@ -20,6 +21,7 @@ describe('tipos compartilhados', () => {
     expectTypeOf<Work['category']>().toEqualTypeOf<string | undefined>();
     expectTypeOf<Work['startedAt']>().toEqualTypeOf<string | undefined>();
     expectTypeOf<Work['finishedAt']>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<Work['readingNotes']>().toEqualTypeOf<ReadingNote[] | undefined>();
     expectTypeOf<keyof Work>().toEqualTypeOf<
       | 'id'
       | 'title'
@@ -32,6 +34,7 @@ describe('tipos compartilhados', () => {
       | 'category'
       | 'startedAt'
       | 'finishedAt'
+      | 'readingNotes'
       | 'createdAt'
       | 'updatedAt'
     >();

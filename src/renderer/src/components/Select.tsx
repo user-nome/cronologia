@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useMessages } from '@zero/renderer/i18n';
+import AppIcon from '@zero/renderer/components/AppIcon';
 
 export interface SelectOption<T extends string> {
   value: T;
@@ -193,14 +194,14 @@ export default function Select<T extends string>({
         ) : (
           <span className="select-placeholder">{placeholder ?? m.common.select}</span>
         )}
-        <i className="fa-solid fa-chevron-down select-chevron" />
+        <AppIcon name="chevronDown" className="select-chevron" />
       </button>
 
       {open ? (
         <div className="select-menu" role="listbox" ref={menuRef}>
           {searchable ? (
             <div className="select-search">
-              <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
+              <AppIcon name="search" />
               <input
                 type="text"
                 value={query}
@@ -217,7 +218,7 @@ export default function Select<T extends string>({
                   aria-label={m.common.clearSearch}
                   onClick={() => setQuery('')}
                 >
-                  <i className="fa-solid fa-xmark" />
+                  <AppIcon name="x" />
                 </button>
               ) : null}
             </div>
@@ -238,7 +239,7 @@ export default function Select<T extends string>({
                 <span className="select-dot" style={{ background: option.color }} />
               ) : null}
               <span className="select-option-label">{option.label}</span>
-              <i className="fa-solid fa-check select-check" />
+              <AppIcon name="check" className="select-check" />
             </div>
           ))}
           {filtered.length === 0 ? (

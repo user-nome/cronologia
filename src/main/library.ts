@@ -139,6 +139,7 @@ export function upsertWork(input: WorkDraft): Work[] {
     marker: input.marker,
     coverFile: input.coverFile,
     category: input.category,
+    readingNotes: input.readingNotes ?? previous?.readingNotes,
     createdAt: previous?.createdAt ?? input.createdAt ?? now,
     updatedAt: now,
   };

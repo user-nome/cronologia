@@ -18,11 +18,13 @@ import Select from '@zero/renderer/components/Select';
 import type { SelectOption } from '@zero/renderer/components/Select';
 import VaultModal from '@zero/renderer/components/VaultModal';
 import DangerZone from '@zero/renderer/components/DangerZone';
+import AppIcon from '@zero/renderer/components/AppIcon';
+import type { AppIconName } from '@zero/renderer/components/AppIcon';
 
-/** Ícone de marca por provedor (catálogo fechado em `BackupProviderId`). */
-const PROVIDER_ICONS: Record<BackupProviderId, string> = {
-  dropbox: 'fa-brands fa-dropbox',
-  'google-drive': 'fa-brands fa-google',
+/** Ícone genérico por provedor (o catálogo não depende de logos de marca). */
+const PROVIDER_ICONS: Record<BackupProviderId, AppIconName> = {
+  dropbox: 'cloud',
+  'google-drive': 'drive',
 };
 
 interface SettingsModalProps {
@@ -271,10 +273,10 @@ export default function SettingsModal({
         <div className="modal wide">
           <div className="modal-header">
             <h2>
-              <i className="fa-solid fa-gear" /> {m.settings.title}
+              <AppIcon name="settings" /> {m.settings.title}
             </h2>
             <button className="modal-close" onClick={onClose} title={m.common.close}>
-              <i className="fa-solid fa-xmark" />
+              <AppIcon name="x" />
             </button>
           </div>
 
@@ -288,7 +290,7 @@ export default function SettingsModal({
               )}
             </div>
             <div className="banner info">
-              <i className="fa-solid fa-circle-info" /> {m.settings.translationNotice.text}
+              <AppIcon name="info" /> {m.settings.translationNotice.text}
             </div>
 
             <div className="form-row">
@@ -329,7 +331,7 @@ export default function SettingsModal({
                 {providers.map((provider) => (
                   <li key={provider.id} className="provider-item">
                     <span className="provider-name">
-                      <i className={PROVIDER_ICONS[provider.id]} /> {provider.label}
+                      <AppIcon name={PROVIDER_ICONS[provider.id]} /> {provider.label}
                     </span>
                     {provider.storageHidden ? (
                       <span className="provider-badge hidden">{m.settings.hiddenFolder}</span>
@@ -379,7 +381,7 @@ export default function SettingsModal({
                       disabled={working}
                       title={m.vault.createHint}
                     >
-                      <i className="fa-solid fa-vault" /> {m.auth.createAction}
+                      <AppIcon name="vault" /> {m.auth.createAction}
                     </button>
                   ) : null}
                   {vault?.exists === true && !vault.unlocked ? (
@@ -388,7 +390,7 @@ export default function SettingsModal({
                       onClick={() => setVaultPrompt('unlock')}
                       disabled={working}
                     >
-                      <i className="fa-solid fa-unlock" /> {m.auth.unlockAction}
+                      <AppIcon name="unlock" /> {m.auth.unlockAction}
                     </button>
                   ) : null}
                   {vault?.unlocked === true ? (
@@ -400,7 +402,7 @@ export default function SettingsModal({
                         }}
                         disabled={working}
                       >
-                        <i className="fa-solid fa-lock" /> {m.vault.closeVault}
+                        <AppIcon name="lock" /> {m.vault.closeVault}
                       </button>
                       <button
                         className="btn ghost"
@@ -408,7 +410,7 @@ export default function SettingsModal({
                         disabled={working}
                         title={m.auth.changeMasterSubtitle}
                       >
-                        <i className="fa-solid fa-key" /> {m.auth.changeMasterTitle}
+                        <AppIcon name="key" /> {m.auth.changeMasterTitle}
                       </button>
                       <button
                         className="btn ghost"
@@ -416,7 +418,7 @@ export default function SettingsModal({
                         disabled={working}
                         title={m.auth.changePinSubtitle}
                       >
-                        <i className="fa-solid fa-hashtag" /> {m.auth.changePinTitle}
+                        <AppIcon name="hash" /> {m.auth.changePinTitle}
                       </button>
                     </>
                   ) : null}
@@ -442,7 +444,7 @@ export default function SettingsModal({
             {lastError !== '' ? <div className="banner error">{lastError}</div> : null}
             {syncing ? (
               <div className="banner info">
-                <i className="fa-solid fa-spinner fa-spin" />{' '}
+                <AppIcon name="loader" className="icon-spin" />{' '}
                 {m.settings.syncingBanner(providerLabel)}
               </div>
             ) : null}
@@ -469,7 +471,7 @@ export default function SettingsModal({
               disabled={!connected || working}
               title={m.settings.disconnectTitle(providerLabel)}
             >
-              <i className="fa-solid fa-link-slash" /> {m.settings.disconnectAction}
+              <AppIcon name="linkOff" /> {m.settings.disconnectAction}
             </button>
             <span className="spacer" />
             <button
@@ -481,11 +483,11 @@ export default function SettingsModal({
             >
               {busy === 'save' ? (
                 <>
-                  <i className="fa-solid fa-spinner fa-spin" /> {m.common.saving}
+                  <AppIcon name="loader" className="icon-spin" /> {m.common.saving}
                 </>
               ) : (
                 <>
-                  <i className="fa-solid fa-floppy-disk" /> {m.common.save}
+                  <AppIcon name="save" /> {m.common.save}
                 </>
               )}
             </button>
@@ -496,7 +498,7 @@ export default function SettingsModal({
               }}
               disabled={working}
             >
-              <i className={PROVIDER_ICONS[settings.backupProvider]} />{' '}
+              <AppIcon name={PROVIDER_ICONS[settings.backupProvider]} />{' '}
               {busy === 'auth' ? m.settings.authorizing : m.settings.connectAction(providerLabel)}
             </button>
             <button
@@ -505,7 +507,7 @@ export default function SettingsModal({
               disabled={!connected || working}
               title={m.settings.restoreTitle(providerLabel)}
             >
-              <i className="fa-solid fa-clock-rotate-left" />{' '}
+              <AppIcon name="history" />{' '}
               {busy === 'restore' ? m.settings.restoring : m.settings.restoreAction}
             </button>
             <button
@@ -515,11 +517,11 @@ export default function SettingsModal({
               }}
               disabled={!connected || working}
             >
-              <i className="fa-solid fa-cloud-arrow-up" />{' '}
+              <AppIcon name="cloudUpload" />{' '}
               {busy === 'backup' ? m.settings.sending : m.settings.backupAction}
             </button>
             <button className="btn ghost" onClick={onClose}>
-              <i className="fa-solid fa-xmark" /> {m.common.close}
+              <AppIcon name="x" /> {m.common.close}
             </button>
           </div>
         </div>

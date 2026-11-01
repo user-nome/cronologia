@@ -1,6 +1,7 @@
 import type { JSX, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { MS_PER_SECOND, formatCountdown } from '@zero/shared';
 import { useMessages } from '@zero/renderer/i18n';
+import AppIcon from '@zero/renderer/components/AppIcon';
 
 /**
  * Peças de apresentação que os passos do cofre repetem: o aviso de erro, o
@@ -21,7 +22,7 @@ export function ErrorBanner({ error }: ErrorBannerProps): JSX.Element | null {
   if (error === null) return null;
   return (
     <div className="banner error">
-      <i className="fa-solid fa-triangle-exclamation" /> {error}
+      <AppIcon name="alert" /> {error}
     </div>
   );
 }
@@ -42,8 +43,7 @@ export function LockBanner({ remainingSeconds }: LockBannerProps): JSX.Element |
   if (remainingSeconds <= 0) return null;
   return (
     <div className="banner warning">
-      <i className="fa-solid fa-clock" />{' '}
-      {m.auth.lockout(formatCountdown(remainingSeconds * MS_PER_SECOND))}
+      <AppIcon name="clock" /> {m.auth.lockout(formatCountdown(remainingSeconds * MS_PER_SECOND))}
     </div>
   );
 }

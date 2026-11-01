@@ -103,6 +103,9 @@ Cria ou atualiza uma obra e devolve a lista completa atualizada.
   arquivo, `isValidWorkId`).
 - `progress` é fixado em `>= 0` (`clampProgress`), sem limite superior.
 - Uma obra `concluida` cujo progresso muda volta para `lendo` (regra de UI).
+- `readingNotes` é opcional para manter compatibilidade com acervos antigos.
+  Cada item contém `id`, `progress`, `summary` e `createdAt`; os registros são
+  acumulativos e gravados junto com a obra no acervo cifrado.
 
 ### `library.remove(id: string) → Promise<Work[]>`
 
@@ -498,19 +501,24 @@ prefixo) e não usa `file://`.
 
 ### `Work`
 
-| Campo       | Tipo         | Obrigatório | Notas                                                 |
-| ----------- | ------------ | ----------- | ----------------------------------------------------- |
-| `id`        | `string`     | sim         | identificador único                                   |
-| `title`     | `string`     | sim         | título da obra                                        |
-| `synopsis`  | `string`     | sim         | descrição livre                                       |
-| `type`      | `WorkType`   | sim         | `webtoon` `manhwa` `manhua` `manga` `livro` `outro`   |
-| `status`    | `WorkStatus` | sim         | `planejado` `lendo` `pausado` `concluido` `cancelado` |
-| `progress`  | `number`     | sim         | capítulos (`Cap. X`), `>= 0`, sem teto                |
-| `marker`    | `string`     | não         | ex.: `Cap. 45`, `Vol. 3`                              |
-| `coverFile` | `string`     | não         | arquivo em `covers/` (ver §7)                         |
-| `category`  | `string`     | não         | ex.: `Isekai`                                         |
-| `createdAt` | `string`     | sim         | ISO 8601 (gerado pelo main)                           |
-| `updatedAt` | `string`     | sim         | ISO 8601 (renovado a cada save)                       |
+| Campo          | Tipo            | Obrigatório | Notas                                                 |
+| -------------- | --------------- | ----------- | ----------------------------------------------------- |
+| `id`           | `string`        | sim         | identificador único                                   |
+| `title`        | `string`        | sim         | título da obra                                        |
+| `synopsis`     | `string`        | sim         | descrição livre                                       |
+| `type`         | `WorkType`      | sim         | `webtoon` `manhwa` `manhua` `manga` `livro` `outro`   |
+| `status`       | `WorkStatus`    | sim         | `planejado` `lendo` `pausado` `concluido` `cancelado` |
+| `progress`     | `number`        | sim         | capítulos (`Cap. X`), `>= 0`, sem teto                |
+| `marker`       | `string`        | não         | ex.: `Cap. 45`, `Vol. 3`                              |
+| `coverFile`    | `string`        | não         | arquivo em `covers/` (ver §7)                         |
+| `category`     | `string`        | não         | ex.: `Isekai`                                         |
+| `readingNotes` | `ReadingNote[]` | não         | resumos acumulados associados ao progresso            |
+| `createdAt`    | `string`        | sim         | ISO 8601 (gerado pelo main)                           |
+| `updatedAt`    | `string`        | sim         | ISO 8601 (renovado a cada save)                       |
+
+Cada `ReadingNote` contém `id: string`, `progress: number`, `summary: string`
+e `createdAt: string` (ISO 8601). Registros antigos sem `readingNotes` continuam
+válidos.
 
 Transições de status válidas no card: `planejado→{concluido,pausado,cancelado}`,
 `lendo→{concluido,pausado,cancelado}`, `pausado→{lendo,concluido,cancelado}`,

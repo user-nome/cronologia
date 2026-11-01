@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import type { JSX } from 'react';
 import type { Work, WorkStatus } from '@zero/types';
-import { STATUS_COLORS, TYPE_COLORS, coverUrl } from '@zero/renderer/constants';
+import { STATUS_COLORS, TYPE_COLORS, coverUrl, formatDate } from '@zero/renderer/constants';
 import { useLanguage, useMessages } from '@zero/renderer/i18n';
 import { formatDateText } from '@zero/shared/date';
+import AppIcon from '@zero/renderer/components/AppIcon';
 
 interface WorkCardProps {
   work: Work;
@@ -19,7 +21,11 @@ export default function WorkCard({
 }: WorkCardProps): JSX.Element {
   const m = useMessages();
   const language = useLanguage();
+  const [noteIndex, setNoteIndex] = useState<number | null>(null);
   const url = coverUrl(work.coverFile);
+  const notes = work.readingNotes ?? [];
+  const activeNoteIndex = Math.min(noteIndex ?? notes.length - 1, notes.length - 1);
+  const activeNote = notes[activeNoteIndex];
   const done = work.status === 'concluido';
   const paused = work.status === 'pausado';
   const cancelled = work.status === 'cancelado';
@@ -48,7 +54,7 @@ export default function WorkCard({
           <img src={url} alt={m.workCard.coverOf(work.title)} draggable={false} />
         ) : (
           <div className="cover-placeholder">
-            <i className="fa-solid fa-book-open" />
+            <AppIcon name="bookOpen" />
           </div>
         )}
         <span className="cover-badge" style={{ color: TYPE_COLORS[work.type] }}>
@@ -67,13 +73,13 @@ export default function WorkCard({
         ) : null}
         {work.startedAt !== undefined && work.startedAt !== '' ? (
           <div className="card-date">
-            <i className="fa-solid fa-calendar-days" /> {m.workModal.startedAtLabel}:{' '}
+            <AppIcon name="calendarDays" /> {m.workModal.startedAtLabel}:{' '}
             {formatDateText(work.startedAt, language)}
           </div>
         ) : null}
         {work.finishedAt !== undefined && work.finishedAt !== '' ? (
           <div className="card-date">
-            <i className="fa-solid fa-calendar-check" /> {m.workModal.finishedAtLabel}:{' '}
+            <AppIcon name="calendarCheck" /> {m.workModal.finishedAtLabel}:{' '}
             {formatDateText(work.finishedAt, language)}
           </div>
         ) : null}
@@ -93,14 +99,14 @@ export default function WorkCard({
               title={m.workCard.increase1}
               onClick={() => onProgress(work, work.progress + 1)}
             >
-              <i className="fa-solid fa-arrow-up" />
+              <AppIcon name="arrowUp" />
             </button>
             <button
               className="btn small icon-only"
               title={m.workCard.decrease1}
               onClick={() => onProgress(work, work.progress - 1)}
             >
-              <i className="fa-solid fa-arrow-down" />
+              <AppIcon name="arrowDown" />
             </button>
           </div>
           {done ? (
@@ -109,7 +115,7 @@ export default function WorkCard({
               title={m.workCard.reopen}
               onClick={() => onStatus(work, 'lendo')}
             >
-              <i className="fa-solid fa-rotate-left" />
+              <AppIcon name="rotate" />
             </button>
           ) : cancelled ? (
             <button
@@ -117,7 +123,7 @@ export default function WorkCard({
               title={m.workCard.resume}
               onClick={() => onStatus(work, 'lendo')}
             >
-              <i className="fa-solid fa-play" />
+              <AppIcon name="play" />
             </button>
           ) : (
             <>
@@ -126,7 +132,7 @@ export default function WorkCard({
                 title={m.workCard.finish}
                 onClick={() => onStatus(work, 'concluido')}
               >
-                <i className="fa-solid fa-check" />
+                <AppIcon name="check" />
               </button>
               {paused ? (
                 <button
@@ -134,7 +140,7 @@ export default function WorkCard({
                   title={m.workCard.resume}
                   onClick={() => onStatus(work, 'lendo')}
                 >
-                  <i className="fa-solid fa-play" />
+                  <AppIcon name="play" />
                 </button>
               ) : (
                 <button
@@ -142,7 +148,7 @@ export default function WorkCard({
                   title={m.workCard.pause}
                   onClick={() => onStatus(work, 'pausado')}
                 >
-                  <i className="fa-solid fa-pause" />
+                  <AppIcon name="pause" />
                 </button>
               )}
               <button
@@ -150,11 +156,58 @@ export default function WorkCard({
                 title={m.workCard.cancel}
                 onClick={() => onStatus(work, 'cancelado')}
               >
-                <i className="fa-solid fa-ban" />
+                <AppIcon name="ban" />
               </button>
             </>
           )}
         </div>
+
+        {notes.length > 0 ? (
+          <div className="reading-note-deck" onClick={(event) => event.stopPropagation()}>
+            <button
+              className="reading-note-toggle"
+              aria-expanded={noteIndex !== null}
+              onClick={() =>
+                setNoteIndex((current) => (current === null ? notes.length - 1 : null))
+              }
+            >
+              <AppIcon name="layers" />
+              {noteIndex === null
+                ? m.workCard.showReadingNotes(notes.length)
+                : m.workCard.hideReadingNotes}
+            </button>
+            {noteIndex !== null && activeNote !== undefined ? (
+              <div className="reading-note-card" aria-live="polite">
+                <div className="reading-note-meta">
+                  <span>{m.workCard.readingNoteProgress(activeNote.progress)}</span>
+                  <time>{formatDate(activeNote.createdAt, language)}</time>
+                </div>
+                <p>{activeNote.summary}</p>
+                <div className="reading-note-controls">
+                  <button
+                    className="reading-note-arrow"
+                    title={m.workCard.previousReadingNote}
+                    aria-label={m.workCard.previousReadingNote}
+                    onClick={() =>
+                      setNoteIndex((activeNoteIndex - 1 + notes.length) % notes.length)
+                    }
+                  >
+                    <AppIcon name="chevronLeft" />
+                  </button>
+                  <span>{m.workCard.readingNoteCount(activeNoteIndex + 1, notes.length)}</span>
+                  <button
+                    className="reading-note-arrow"
+                    title={m.workCard.nextReadingNote}
+                    aria-label={m.workCard.nextReadingNote}
+                    onClick={() => setNoteIndex((activeNoteIndex + 1) % notes.length)}
+                  >
+                    <AppIcon name="chevronRight" />
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </article>
   );

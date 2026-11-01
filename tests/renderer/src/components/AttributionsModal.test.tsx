@@ -40,16 +40,14 @@ describe('AttributionsModal: créditos', () => {
     const user = userEvent.setup();
     setup();
     const botao = screen.getByRole('button', { name: /Pausar/ });
-    const icone = (): Element | null => botao.querySelector('i');
+    const icone = (): Element | null => botao.querySelector('svg');
 
-    // Pausado: o comando mostrado é o de retomar, não o de pausar de novo.
-    expect(icone()?.classList.contains('fa-pause')).toBe(true);
-    expect(icone()?.classList.contains('fa-play')).toBe(false);
+    // Em movimento, o comando disponível é pausar.
+    expect(icone()?.getAttribute('data-icon')).toBe('pause');
 
     await user.click(botao);
     const retomado = screen.getByRole('button', { name: /Continuar/ });
-    expect(retomado.querySelector('i')?.classList.contains('fa-play')).toBe(true);
-    expect(retomado.querySelector('i')?.classList.contains('fa-pause')).toBe(false);
+    expect(retomado.querySelector('svg')?.getAttribute('data-icon')).toBe('play');
   });
 
   it('a trilha pausada sai para a cópia acessível e volta ao normal', async () => {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { richText, useMessages } from '@zero/renderer/i18n';
+import AppIcon from '@zero/renderer/components/AppIcon';
 
 interface RestorePasswordModalProps {
   onConfirm: (passphrase: string) => void;
@@ -32,10 +33,10 @@ export default function RestorePasswordModal({
       <div className="modal">
         <div className="modal-header">
           <h2>
-            <i className="fa-solid fa-key" /> {m.restore.title}
+            <AppIcon name="key" /> {m.restore.title}
           </h2>
           <button className="modal-close" onClick={onCancel} title={m.common.close}>
-            <i className="fa-solid fa-xmark" />
+            <AppIcon name="x" />
           </button>
         </div>
 
@@ -63,7 +64,7 @@ export default function RestorePasswordModal({
             {m.common.cancel}
           </button>
           <button className="btn primary" onClick={() => onConfirm(passphrase)}>
-            <i className="fa-solid fa-clock-rotate-left" /> {m.restore.action}
+            <AppIcon name="history" /> {m.restore.action}
           </button>
         </div>
       </div>

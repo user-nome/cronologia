@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { ATTRIBUTIONS } from '@zero/renderer/attributions';
 import { richText, useMessages } from '@zero/renderer/i18n';
+import AppIcon from '@zero/renderer/components/AppIcon';
 
 interface AttributionsModalProps {
   onClose: () => void;
@@ -40,10 +41,10 @@ export default function AttributionsModal({ onClose }: AttributionsModalProps): 
       >
         <div className="modal-header">
           <h2>
-            <i className="fa-solid fa-clapperboard" /> {m.attributions.title}
+            <AppIcon name="clapperboard" /> {m.attributions.title}
           </h2>
           <button className="modal-close" onClick={onClose} title={m.common.close}>
-            <i className="fa-solid fa-xmark" />
+            <AppIcon name="x" />
           </button>
         </div>
 
@@ -54,7 +55,7 @@ export default function AttributionsModal({ onClose }: AttributionsModalProps): 
 
           <div className="credits-controls">
             <button className="btn small ghost" onClick={togglePaused}>
-              <i className={`fa-solid ${paused ? 'fa-play' : 'fa-pause'}`} />
+              <AppIcon name={paused ? 'play' : 'pause'} />
               {paused ? m.attributions.resume : m.attributions.pause}
             </button>
             <span className="help">{m.attributions.hoverHint}</span>
@@ -89,7 +90,7 @@ export default function AttributionsModal({ onClose }: AttributionsModalProps): 
         <div className="modal-footer">
           <span className="spacer" />
           <button className="btn primary" onClick={onClose}>
-            <i className="fa-solid fa-check" /> {m.common.close}
+            <AppIcon name="check" /> {m.common.close}
           </button>
         </div>
       </div>
