@@ -70,6 +70,14 @@ async function openNewWork(page: Page): Promise<void> {
   await waitForHeading(page, pt.workModal.newTitle);
 }
 
+/**
+ * O modal de obra, localizado pelo título `h2`.
+ * A subida é pelo DOM: `h2` → `modal-header` → `modal`.
+ */
+function workModal(page: Page, title: string): Locator {
+  return page.getByRole('heading', { name: title, exact: true }).locator('xpath=../..');
+}
+
 /** Preenche título, descrição, tipo, status, categoria e marcação. */
 async function fillWorkForm(page: Page, work: { title: string; synopsis: string }): Promise<void> {
   await page.getByPlaceholder(pt.workModal.titlePlaceholder, { exact: true }).fill(work.title);
@@ -142,27 +150,29 @@ export async function createVault(page: Page): Promise<void> {
   await fillLabel(page, pt.auth.recoveryConfirmLabel, `  ${VAULT.phrase}  `);
   await clickButton(page, pt.auth.createAction);
   // A criação deriva um Argon2id por credencial (128 MiB na senha mestra, 256 MiB
-  // no PIN): a biblioteca vazia cobre a espera.
+  // no PIN): a barreira fechada cobre a espera do cálculo e do reload.
+  await waitForHeadingGone(page, pt.auth.recoveryTitle);
   await waitForText(page, pt.app.emptyLibraryTitle);
 }
 
 export async function addWork(page: Page): Promise<void> {
   await openNewWork(page);
+  const modal = workModal(page, pt.workModal.newTitle);
   await fillWorkForm(page, WORK);
 
   // Os `Select` do modal não têm `label` associado (o `label` é decorativo), então
-  // o gatilho é localizado pelo nome acessível, que é o da opção escolhida.
-  await clickButton(page, pt.workTypes.webtoon);
+  // o gatilho é localizado pelo nome acessível dentro do próprio modal.
+  await modal.getByRole('button', { name: pt.workTypes.webtoon, exact: true }).click();
   await page.getByRole('option', { name: pt.workTypes.manga, exact: true }).click();
-  await clickButton(page, pt.workStatus.planejado);
+  await modal.getByRole('button', { name: pt.workStatus.planejado, exact: true }).click();
   await page.getByRole('option', { name: pt.workStatus.lendo, exact: true }).click();
 
   // A categoria é o único `Select` com busca: filtra e escolhe.
-  await clickButton(page, pt.common.none);
+  await modal.getByRole('button', { name: pt.common.none, exact: true }).click();
   await page.getByPlaceholder(pt.common.searchOptions, { exact: true }).fill('Isekai');
   await page.getByRole('option', { name: 'Isekai', exact: true }).click();
 
-  await clickButton(page, pt.common.save);
+  await modal.getByRole('button', { name: pt.common.save, exact: true }).click();
   await waitForToast(page, pt.app.toastSaved);
   await waitForText(page, WORK.title);
   await waitForText(page, pt.workTypes.manga);
@@ -203,13 +213,14 @@ export async function searchAndEditWork(page: Page): Promise<void> {
 
   await page.getByText(WORK.title, { exact: true }).click();
   await waitForHeading(page, pt.workModal.editTitle);
+  const editModal = workModal(page, pt.workModal.editTitle);
   await page
     .getByPlaceholder(pt.workModal.titlePlaceholder, { exact: true })
     .fill(WORK.editedTitle);
   await page
     .getByPlaceholder(pt.workModal.synopsisPlaceholder, { exact: true })
     .fill(`${WORK.synopsis} Editado.`);
-  await clickButton(page, pt.common.save);
+  await editModal.getByRole('button', { name: pt.common.save, exact: true }).click();
   await waitForToast(page, pt.app.toastSaved);
   await waitForText(page, WORK.editedTitle);
   expect(await page.getByText(WORK.title, { exact: true }).count()).toBe(0);
@@ -217,17 +228,19 @@ export async function searchAndEditWork(page: Page): Promise<void> {
 
 export async function addAndDeleteWork(page: Page): Promise<void> {
   await openNewWork(page);
+  const modal = workModal(page, pt.workModal.newTitle);
   await fillWorkForm(page, SECOND_WORK);
-  await clickButton(page, pt.common.save);
+  await modal.getByRole('button', { name: pt.common.save, exact: true }).click();
   await waitForToast(page, pt.app.toastSaved);
   await waitForText(page, pt.app.headerStats(2, 0));
 
   const card = workCard(page, SECOND_WORK.title);
   await card.getByText(SECOND_WORK.title, { exact: true }).click();
   await waitForHeading(page, pt.workModal.editTitle);
+  const editModal = workModal(page, pt.workModal.editTitle);
   // Duas etapas: o primeiro clique só troca o rótulo do botão.
-  await clickButton(page, pt.workModal.deleteAction);
-  await clickButton(page, pt.workModal.confirmDelete);
+  await editModal.getByRole('button', { name: pt.workModal.deleteAction, exact: true }).click();
+  await editModal.getByRole('button', { name: pt.workModal.confirmDelete, exact: true }).click();
   await waitForToast(page, pt.app.toastRemoved);
   await waitForText(page, pt.app.headerStats(1, 0));
   expect(await page.getByText(SECOND_WORK.title, { exact: true }).count()).toBe(0);
@@ -249,6 +262,7 @@ export async function visitAttributions(page: Page): Promise<void> {
   // subtítulo é o mesmo nas duas, e a visível vem primeiro.
   await page.getByText(pt.attributions.creditsSubtitle, { exact: true }).first().waitFor();
   await closeButton(page, pt.common.close).click();
+  await page.getByRole('heading', { name: pt.attributions.title }).waitFor({ state: 'detached' });
   await waitForText(page, WORK.editedTitle);
 }
 
