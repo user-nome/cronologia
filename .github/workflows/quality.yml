@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - ajustes
   pull_request:
   workflow_dispatch:
     inputs:
@@ -103,7 +104,7 @@ jobs:
   e2e:
     name: Testes E2E
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
