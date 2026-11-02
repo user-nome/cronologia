@@ -1,24 +1,5 @@
 name: Qualidade
 
-# Gate de qualidade do dia a dia (push na main e pull request). O `publish.yml`
-# continua sendo o gate da release e carrega o seu próprio `npm run check` +
-# `npm test`, porque precisa ser autossuficiente para os gatilhos de reserva
-# (tag `v*`, Release criada na UI) que este arquivo não vê.
-#
-# Gatilhos: push na main, pull_request e workflow_dispatch (para rodar na mão
-# quando um passo local ficou duvidoso).
-#
-# A porta de cobertura mora em `vitest.config.mts` (`thresholds`, `perFile`), não
-# aqui, para o número ser o mesmo localmente e no CI.
-#
-# "Testes E2E" sobe o app compilado e o payload do `.deb` (`docs/e2e.md`);
-# "Testes de mutação" só por disparo manual, porque a varredura leva horas
-# (`docs/mutation.md`).
-#
-# Imagem `ubuntu-24.04` fixada e actions fixadas por SHA (runtime das actions
-# em Node 24; o projeto em si roda em Node 26): o porquê de cada escolha está
-# em `docs/build.md`.
-
 on:
   push:
     branches:
@@ -39,8 +20,6 @@ on:
 permissions:
   contents: read
 
-# Push seguido de outro cancela a corrida velha; PR nunca é cancelado, para o
-# status não ficar indefinido enquanto o autor corrige.
 concurrency:
   group: qualidade-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'push' }}
@@ -50,9 +29,9 @@ jobs:
     name: Verificar qualidade
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 26
           cache: npm
@@ -62,7 +41,6 @@ jobs:
       - name: OSV Scanner (binário fora do git; versão fixada)
         run: |
           set -euo pipefail
-          # bin/ é gitignored: sem o mkdir o curl falha com exit 23.
           mkdir -p bin
           curl -fsSL -o bin/osv-scanner \
             https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64
@@ -77,17 +55,15 @@ jobs:
     name: Testes e cobertura
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 26
           cache: npm
 
       - run: npm ci
 
-      # Reporter extra (o `vitest.config.mts` já traz `text` e `html`): é do
-      # `json-summary` que sai o resumo na página da execução.
       - name: Testes com cobertura
         run: npm run test:coverage -- --coverage.reporter=json-summary
 
@@ -117,7 +93,7 @@ jobs:
 
       - name: Relatório HTML da cobertura
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: cobertura-relatorio
           path: coverage/
@@ -126,23 +102,17 @@ jobs:
 
   e2e:
     name: Testes E2E
-    # Único job que junta bundle compilado, `cronologia://`, IPC real, Argon2id
-    # real e React montado: é o que pega a quebra de integração.
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 26
           cache: npm
 
       - run: npm ci
-
-      # O Electron abre uma janela: precisa de display (Xvfb) e das gráficas.
-      # Os `t64` respondem pelos nomes antigos por `Provides`, que é o que o
-      # `.deb` declara.
       - name: Dependências de janela
         run: |
           set -euo pipefail
@@ -153,16 +123,12 @@ jobs:
             libxfixes3 libxrandr2 libxkbcommon0 libgtk-3-0t64 libxss1 \
             libxtst6 libatspi2.0-0t64 libuuid1 xdg-utils fakeroot
 
-      # Um build serve aos dois alvos: `out/` (compilado) e `release/` (`.deb`).
-      # O `--publish never` já vem no script `dist:dir` do package.json.
       - name: Compila o app e o pacote
         run: npm run dist:dir
 
       - name: E2E do app compilado e do payload do .deb
         run: xvfb-run -a npm run test:e2e
 
-      # Instalação real: o E2E roda sobre o payload extraído porque o AppArmor
-      # do pacote nega a porta TCP do CDP (`docs/e2e.md`).
       - name: Instalação real do .deb
         run: |
           set -euo pipefail
@@ -172,10 +138,6 @@ jobs:
 
   mutacao:
     name: Testes de mutação
-    # Só por disparo manual (e agendamento): a varredura leva horas e o número
-    # só muda quando alguém escreve teste novo. O `if` é do job, para não
-    # repuxar o ritmo dos outros; pulado aparece como *Skipped* e não é status
-    # check obrigatório.
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     # Grupo próprio: o do workflow cancelaria a varredura no meio.
@@ -185,9 +147,9 @@ jobs:
     # Teto só para o job não ficar pendurado; abaixo do limite de 6 h do runner.
     timeout-minutes: 330
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 26
           cache: npm
@@ -196,20 +158,14 @@ jobs:
 
       - name: Varredura de mutação
         env:
-          # Piso provisório até a primeira varredura completa de `src/` medir o
-          # número real (`docs/mutation.md` § "No CI"); o score também depende
-          # da máquina, porque mutante que estoura o `--timeout` sai do
-          # denominador.
           MIN_SCORE: ${{ inputs.min_score || '55' }}
           MUTATION_FILE: ${{ inputs.mutation_file }}
         run: |
           set -euo pipefail
           args=(--min-score "$MIN_SCORE")
           if [ -n "${MUTATION_FILE:-}" ]; then
-            # Um `--file` por arquivo, senão a lista inteira vira um caminho só.
             IFS=',' read -ra arquivos <<< "$MUTATION_FILE"
             for arquivo in "${arquivos[@]}"; do
-              # Input vem de digitação: tira o espaço em volta de cada item.
               limpo="${arquivo#"${arquivo%%[![:space:]]*}"}"
               limpo="${limpo%"${limpo##*[![:space:]]}"}"
               [ -n "$limpo" ] && args+=(--file "$limpo")
@@ -248,7 +204,7 @@ jobs:
 
       - name: Relatório da varredura
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: mutacao-relatorio
           path: mutation/report.md
